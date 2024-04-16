@@ -1,9 +1,15 @@
 import random
 import re
 import unittest
-from typing import Set, Tuple
+from typing import Set, Tuple, List
 
 from kubemarine import demo, modprobe, packages
+from kubemarine.core.group import NodeGroup
+
+
+def actual_kernel_modules(node: NodeGroup) -> List[str]:
+    config = modprobe.generate_config(node)
+    return [] if not config else config.rstrip('\n').split('\n')
 
 
 class ModulesEnrichment(unittest.TestCase):
@@ -135,8 +141,26 @@ class ModulesEnrichment(unittest.TestCase):
             if i == os_family_i:
                 expected_modules_list += ['custom_module']
 
-            actual_modules_list = modprobe.generate_config(control_plane).rstrip('\n').split('\n')
+            actual_modules_list = actual_kernel_modules(control_plane)
             self.assertEqual(expected_modules_list, actual_modules_list)
+
+    def test_default_enrichment(self):
+        for os_family in packages.get_associations_os_family_keys():
+            with self.subTest(os_family):
+                self.inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+                os_name, os_version = self._get_os_context(os_family)
+                self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
+
+                cluster = self.new_cluster()
+
+                for node in cluster.nodes['all'].get_ordered_members_list():
+                    if 'balancer' in node.get_config()['roles']:
+                        expected_modules_list = []
+                    else:
+                        expected_modules_list = ['br_netfilter', 'nf_conntrack']
+
+                    actual_modules_list = actual_kernel_modules(node)
+                    self.assertEqual(expected_modules_list, actual_modules_list)
 
     def test_ipv6_default_enrichment(self):
         for os_family in packages.get_associations_os_family_keys():
@@ -150,7 +174,7 @@ class ModulesEnrichment(unittest.TestCase):
                 cluster = self.new_cluster()
 
                 if os_family == 'rhel':
-                    expected_modules_list = [
+                    expected_all_modules_list = [
                         'br_netfilter',
                         'nf_conntrack_ipv6',
                         'ip6table_filter',
@@ -159,7 +183,7 @@ class ModulesEnrichment(unittest.TestCase):
                         'nf_defrag_ipv6',
                     ]
                 else:
-                    expected_modules_list = [
+                    expected_all_modules_list = [
                         'br_netfilter',
                         'nf_conntrack',
                         'ip6table_filter',
@@ -168,8 +192,19 @@ class ModulesEnrichment(unittest.TestCase):
                         'nf_defrag_ipv6',
                     ]
 
+                kubernetes_only_modules_list = [
+                    'br_netfilter',
+                    'nf_conntrack',
+                ]
+
                 for node in cluster.nodes['all'].get_ordered_members_list():
-                    actual_modules_list = modprobe.generate_config(node).rstrip('\n').split('\n')
+                    expected_modules_list = list(expected_all_modules_list)
+                    if 'balancer' in node.get_config()['roles']:
+                        for module_name in kubernetes_only_modules_list:
+                            if module_name in expected_modules_list:
+                                expected_modules_list.remove(module_name)
+
+                    actual_modules_list = actual_kernel_modules(node)
                     self.assertEqual(expected_modules_list, actual_modules_list)
 
     def _get_os_context(self, os_family: str) -> Tuple[str, str]:
@@ -182,7 +217,7 @@ class ModulesEnrichment(unittest.TestCase):
 
     def _nodes_having_modules(self, cluster: demo.FakeKubernetesCluster, module_name: str) -> Set[str]:
         return {node.get_node_name() for node in cluster.nodes['all'].get_ordered_members_list()
-                if module_name in modprobe.generate_config(node).rstrip('\n').split('\n')}
+                if module_name in actual_kernel_modules(node)}
 
 
 if __name__ == '__main__':

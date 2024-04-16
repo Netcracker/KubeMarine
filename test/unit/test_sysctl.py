@@ -99,6 +99,28 @@ class ParametersEnrichment(unittest.TestCase):
         self.assertEqual(set(cluster.nodes['all'].get_nodes_names()),
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-ip6tables = 0'))
 
+    def test_override_default_extended_format_default_groups(self):
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-iptables': {
+            'value': 0
+        }}
+
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual({'master-1', 'worker-1'},
+                         nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 0'))
+        self.assertEqual(set(),
+                         nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 1'))
+
+    def test_override_default_add_nodes(self):
+        inventory = demo.generate_inventory(balancer=2, master=1, worker=1)
+        inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-iptables': {
+            'value': 1,
+            'nodes': ['balancer-2']
+        }}
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual({'balancer-2', 'master-1', 'worker-1'},
+                         nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 1'))
+
     def test_override_not_installed_default(self):
         inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
         inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-ip6tables': {
@@ -112,7 +134,7 @@ class ParametersEnrichment(unittest.TestCase):
             'value': '0', 'install': True
         }}
         cluster = demo.new_cluster(deepcopy(inventory))
-        self.assertEqual(set(cluster.nodes['all'].get_nodes_names()),
+        self.assertEqual(set(cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_names()),
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-ip6tables = 0'))
 
     def test_override_default_simple_format_empty_value(self):
@@ -167,22 +189,75 @@ class ParametersEnrichment(unittest.TestCase):
                                                          "in section ['services']['sysctl']['parameter']['install']")):
             demo.new_cluster(inventory)
 
+    def test_default_enrichment(self):
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        cluster = demo.new_cluster(inventory)
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            if 'balancer' in node.get_config()['roles']:
+                expected_params = {'net.ipv4.ip_nonlocal_bind'}
+            else:
+                expected_params = {
+                    'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward',
+                    'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
+                    'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops', 'kernel.pid_max'}
+
+            actual_params = actual_sysctl_params(cluster, node)
+            self.assertEqual(expected_params, actual_params)
+
+    def test_ipv6_default_enrichment(self):
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        for i, node in enumerate(inventory['nodes']):
+            node['internal_address'] = f'2001::{i + 1}'
+
+        cluster = demo.new_cluster(inventory)
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            if 'balancer' in node.get_config()['roles']:
+                expected_params = {'net.ipv4.ip_nonlocal_bind', 'net.ipv6.ip_nonlocal_bind'}
+            else:
+                expected_params = {
+                    'net.bridge.bridge-nf-call-iptables', 'net.bridge.bridge-nf-call-ip6tables', 'net.ipv4.ip_forward',
+                    'net.ipv4.conf.all.route_localnet', 'net.ipv6.conf.all.forwarding', 'net.netfilter.nf_conntrack_max',
+                    'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops', 'kernel.pid_max'}
+
+            actual_params = actual_sysctl_params(cluster, node)
+            self.assertEqual(expected_params, actual_params)
+
+    def test_kubelet_doesnt_protect_kernel_defaults(self):
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory['services']['kubeadm_kubelet'] = {
+            'protectKernelDefaults': False,
+        }
+        cluster = demo.new_cluster(inventory)
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            if 'balancer' in node.get_config()['roles']:
+                expected_params = {'net.ipv4.ip_nonlocal_bind'}
+            else:
+                expected_params = {
+                    'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward',
+                    'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
+                    'kernel.pid_max'}
+
+            actual_params = actual_sysctl_params(cluster, node)
+            self.assertEqual(expected_params, actual_params)
+
 
 class KernelPidMax(unittest.TestCase):
     def test_default_value_default_kubelet_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
         cluster = demo.new_cluster(inventory)
-        self.assertEqual(set(cluster.nodes['all'].get_nodes_names()),
+        self.assertEqual(set(cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_names()),
                          nodes_having_parameter(cluster, f'kernel.pid_max = 452608'))
 
     def test_default_value_custom_kubelet_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
         inventory['services']['kubeadm_kubelet'] = {
             'maxPods': 1,
             'podPidsLimit': 1,
         }
         cluster = demo.new_cluster(inventory)
-        self.assertEqual(set(cluster.nodes['all'].get_nodes_names()),
+        self.assertEqual(set(cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_names()),
                          nodes_having_parameter(cluster, f'kernel.pid_max = 2049'))
 
     def test_error_not_set(self):

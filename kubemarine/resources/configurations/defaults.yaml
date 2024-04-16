@@ -152,7 +152,9 @@ services:
   modprobe:
     rhel:
       - modulename: br_netfilter
+        groups: [control-plane, worker]
       - modulename: nf_conntrack
+        groups: [control-plane, worker]
         install: '{{ nodes[0]["internal_address"] | isipv4 }}'
       - modulename: nf_conntrack_ipv6
         install: '{{ nodes[0]["internal_address"] | isipv6 }}'
@@ -166,7 +168,9 @@ services:
         install: '{{ nodes[0]["internal_address"] | isipv6 }}'
     rhel8: &modprobe-default-modules
       - modulename: br_netfilter
+        groups: [control-plane, worker]
       - modulename: nf_conntrack
+        groups: [control-plane, worker]
       - modulename: ip6table_filter
         install: '{{ nodes[0]["internal_address"] | isipv6 }}'
       - modulename: nf_nat
@@ -179,33 +183,52 @@ services:
     debian: *modprobe-default-modules
 
   sysctl:
-    net.bridge.bridge-nf-call-iptables:
-      value: 1
-    net.ipv4.ip_forward:
-      value: 1
     net.ipv4.ip_nonlocal_bind:
       value: 1
-    net.ipv4.conf.all.route_localnet:
-      value: 1
-    net.bridge.bridge-nf-call-ip6tables:
-      value: 1
-      install: '{{ nodes[0]["internal_address"] | isipv6 }}'
-    net.ipv6.conf.all.forwarding:
-      value: 1
-      install: '{{ nodes[0]["internal_address"] | isipv6 }}'
+      # actually, need to be enabled only if balancer is combined with other roles
+      groups: [balancer]
     net.ipv6.ip_nonlocal_bind:
       value: 1
+      # actually, need to be enabled only if balancer is combined with other roles
+      groups: [balancer]
+      install: '{{ nodes[0]["internal_address"] | isipv6 }}'
+    net.bridge.bridge-nf-call-iptables:
+      value: 1
+      groups: [control-plane, worker]
+    net.bridge.bridge-nf-call-ip6tables:
+      value: 1
+      groups: [control-plane, worker]
+      install: '{{ nodes[0]["internal_address"] | isipv6 }}'
+    net.ipv4.ip_forward:
+      value: 1
+      groups: [control-plane, worker]
+    net.ipv4.conf.all.route_localnet:
+      # backward compatibility
+      # https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6
+      value: 1
+      groups: [control-plane, worker]
+    net.ipv6.conf.all.forwarding:
+      value: 1
+      groups: [control-plane, worker]
       install: '{{ nodes[0]["internal_address"] | isipv6 }}'
     net.netfilter.nf_conntrack_max:
       value: 1000000
+      groups: [control-plane, worker]
     kernel.panic:
       value: 10
+      groups: [control-plane, worker]
+      install: '{{ services.kubeadm_kubelet.protectKernelDefaults }}'
     vm.overcommit_memory:
       value: 1
+      groups: [control-plane, worker]
+      install: '{{ services.kubeadm_kubelet.protectKernelDefaults }}'
     kernel.panic_on_oops:
       value: 1
-    kernel.pid_max: {}
+      groups: [control-plane, worker]
+      install: '{{ services.kubeadm_kubelet.protectKernelDefaults }}'
+    kernel.pid_max:
       # default value is set in sysctl.enrich_inventory
+      groups: [control-plane, worker]
 
   etc_hosts:
     127.0.0.1:

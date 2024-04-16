@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Tuple, Optional
 
 from deepmerge import Merger  # type: ignore[import-untyped]
 
 
-def is_list_extends(nxt: list) -> bool:
-    return any({'<<': 'merge'} == v for i, v in enumerate(nxt))
+def is_list_extends(nxt: list, path: list) -> bool:
+    return get_strategy_position(nxt, path)[0] == 'merge'
 
 
-def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
+def get_strategy_position(nxt: list, path: list) -> Tuple[Optional[str], int]:
     strategy = None
     strategy_definition_position = 0
     for i, v in enumerate(nxt):
@@ -30,6 +31,12 @@ def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
             strategy_definition_position = i
             if v.keys() != {'<<'} or strategy not in ('replace', 'merge'):
                 raise Exception(f"Unexpected merge strategy definition {v} at path {path}.")
+
+    return strategy, strategy_definition_position
+
+
+def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
+    strategy, strategy_definition_position = get_strategy_position(nxt, path)
 
     if strategy is None:
         return nxt

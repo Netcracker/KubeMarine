@@ -2575,59 +2575,80 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *OS specific*: Yes
 
-The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version and OS family):
+The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system.
+By default, the following modules are loaded:
 
-IPv4:
-```yaml
-services:
-  modprobe:
-    rhel:
-    - br_netfilter
-    - nf_conntrack
-    rhel8:
-    - br_netfilter
-    - nf_conntrack
-    rhel9:
-    - br_netfilter
-    - nf_conntrack
-    debian:
-    - br_netfilter
-    - nf_conntrack
-```
-
-IPv6:
-```yaml
-services:
-  modprobe:
-    rhel:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack_ipv6
-    - nf_nat_masquerade_ipv6
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-    rhel8:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack
-    - nf_nat
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-    rhel9:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack
-    - nf_nat
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-    debian:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack
-    - nf_nat
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-```
+<table style="width: 1000px">
+<colgroup>
+<col style="width: 100px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 300px">
+</colgroup>
+<thead>
+  <tr>
+    <th scope="col" rowspan="2">IP version</th>
+    <th scope="col" colspan="4">OS families</th>
+    <th scope="col" rowspan="2">Note</th>
+  </tr>
+  <tr>
+    <th scope="col">rhel</th>
+    <th scope="col">rhel8</th>
+    <th scope="col">rhel9</th>
+    <th scope="col">debian</th>
+  </tr>
+</thead>
+<tbody align="center">
+  <tr>
+    <th scope="row" rowspan="2">IPv4</th>
+    <td colspan="4">br_netfilter</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_conntrack</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <th scope="row" rowspan="8">IPv6</th>
+    <td colspan="4">br_netfilter</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td colspan="3">nf_conntrack</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td>nf_conntrack_ipv6</td>
+    <td colspan="3"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">ip6table_filter</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td colspan="3">nf_nat</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>nf_nat_masquerade_ipv6</td>
+    <td colspan="3"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_reject_ipv6</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_defrag_ipv6</td>
+    <td></td>
+  </tr>
+</tbody>
+</table>
 
 If necessary, you can redefine or add [List Merge Strategy](#list-merge-strategy) to the standard list of Kernel modules to load. For example (Debian OS family):
 
@@ -2692,9 +2713,9 @@ The `services.sysctl` section manages the Linux Kernel parameters for all hosts 
 |net.ipv6.conf.all.forwarding|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.ip_nonlocal_bind|1|Presented only when IPv6 detected in node IP|
 |net.netfilter.nf_conntrack_max|1000000||
-|kernel.panic|10||
-|vm.overcommit_memory|1||
-|kernel.panic_on_oops|1||
+|kernel.panic|10|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
+|vm.overcommit_memory|1|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
+|kernel.panic_on_oops|1|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
 |kernel.pid_max|calculated| If this parameter is not explicitly indicated in the `cluster.yaml`, then this value is calculated by this formula: `maxPods * podPidsLimit + 2048` |
 
 Constant value equal to `2048` means the maximum number of processes that the system can require during run (only processes of the Linux virtual machine itself are implied). This value have been established empirically.
@@ -2702,6 +2723,9 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 **Note**: You can also define the `kernel.pid_max` value by your own, but you need to be sure that it is at least greater than the result of the expression: `maxPods * podPidsLimit + 2048`. For more information about the `podPidsLimit` and `maxPods` values, refer to the [kubeadm_kubelet](#kubeadm_kubelet) section. 
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
+
+**Note**: All default parameters are installed only on `control-plane`, `worker` nodes,
+except `net.ipv4.ip_nonlocal_bind`, and `net.ipv6.ip_nonlocal_bind` that are installed on `balancer` nodes only by default.
 
 **Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 

@@ -248,27 +248,13 @@ class PrimitiveValuesAsString(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.26.11'
-        context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
 
-        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        cluster = demo.new_cluster(inventory)
         inventory = cluster.inventory
 
         self.assertEqual(True, inventory['services']['cri']['containerdConfig']
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
         self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
-
-        for node in cluster.nodes['all'].get_ordered_members_list():
-            modules_list = self._actual_kernel_modules(node)
-            self.assertEqual(['br_netfilter', 'nf_conntrack'], modules_list)
-
-        for node in cluster.nodes['all'].get_ordered_members_list():
-            expected_params = {
-                'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward', 'net.ipv4.ip_nonlocal_bind',
-                'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
-                'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops', 'kernel.pid_max'}
-            actual_params = self._actual_sysctl_params(cluster, node)
-            self.assertEqual(expected_params, actual_params)
 
         typha = inventory['plugins']['calico']['typha']
         self.assertEqual(False, typha['enabled'])

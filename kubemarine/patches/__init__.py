@@ -22,10 +22,10 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.preserve_compatibility_sysctl import PreserveCompatibilitySysctl
+from kubemarine.patches.preserve_compatibility_kernel import PreserveCompatibilityKernel
 
 patches: List[Patch] = [
-    PreserveCompatibilitySysctl(),
+    PreserveCompatibilityKernel(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
