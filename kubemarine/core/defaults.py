@@ -582,63 +582,58 @@ def _escape_jinja_character(value: str) -> str:
     return value
 
 
-def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], Any], bool]]:
+def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], Any]]]:
     return [
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
-          'SystemdCgroup'], utils.strtobool, False),
-        (['services', 'modprobe', '*', '*', 'install'], utils.strtobool, False),
+          'SystemdCgroup'], utils.strtobool),
+        (['services', 'modprobe', '*', '*', 'install'], utils.strtobool),
         # kernel parameters are actually not always represented as integers
-        (['services', 'sysctl', '*', 'value'], utils.strtoint, False),
-        (['services', 'sysctl', '*', 'install'], utils.strtobool, False),
-        (['plugins', '*', 'install'], utils.strtobool, False),
-        (['plugins', 'calico', 'typha', 'enabled'], utils.strtobool, False),
-        (['plugins', 'calico', 'typha', 'replicas'], utils.strtoint, False),
-        (['plugins', 'nginx-ingress-controller', 'ports', '*', 'hostPort'], utils.strtoint, False),
+        (['services', 'sysctl', '*', 'value'], utils.strtoint),
+        (['services', 'sysctl', '*', 'install'], utils.strtobool),
+        (['plugins', '*', 'install'], utils.strtobool),
+        (['plugins', 'calico', 'typha', 'enabled'], utils.strtobool),
+        (['plugins', 'calico', 'typha', 'replicas'], utils.strtoint),
+        (['plugins', 'nginx-ingress-controller', 'ports', '*', 'hostPort'], utils.strtoint),
     ]
 
 
 @enrichment(EnrichmentStage.FULL)
 def manage_primitive_values(cluster: KubernetesCluster) -> None:
     paths_func_strip = _get_primitive_values_registry()
-    for search_path, func, strip in paths_func_strip:
-        _convert_primitive_values(cluster.inventory, [], search_path, func, strip)
+    for search_path, func in paths_func_strip:
+        _convert_primitive_values(cluster.inventory, [], search_path, func)
 
 
 def _convert_primitive_values(struct: Union[Any], path: List[Union[str, int]],
-                              search_path: List[str], func: Callable[[Any], Any], strip: bool) -> None:
+                              search_path: List[str], func: Callable[[Any], Any]) -> None:
     depth = len(path)
     section = search_path[depth]
     if section == '*':
         if isinstance(struct, list):
             for i in reversed(range(len(struct))):
-                _convert_primitive_value_section(struct, i, path, search_path, func, strip)
+                _convert_primitive_value_section(struct, i, path, search_path, func)
 
         elif isinstance(struct, dict):
             for k in list(struct):
-                _convert_primitive_value_section(struct, k, path, search_path, func, strip)
+                _convert_primitive_value_section(struct, k, path, search_path, func)
 
     elif isinstance(struct, dict) and section in struct:
-        _convert_primitive_value_section(struct, section, path, search_path, func, strip)
+        _convert_primitive_value_section(struct, section, path, search_path, func)
 
 
 def _convert_primitive_value_section(struct: Union[dict, list], section: Union[str, int],
                                      path: List[Union[str, int]],
-                                     search_path: List[str], func: Callable[[Any], Any], strip: bool) -> None:
+                                     search_path: List[str], func: Callable[[Any], Any]) -> None:
     value = struct[section]  # type: ignore[index]
     path.append(section)
     depth = len(path)
     if depth < len(search_path):
-        _convert_primitive_values(value, path, search_path, func, strip)
+        _convert_primitive_values(value, path, search_path, func)
     else:
-        if strip and isinstance(value, str):
-            value = value.strip()
-        if strip and value == '':
-            del struct[section]  # type: ignore[arg-type]
-        else:
-            try:
-                struct[section] = func(value)  # type: ignore[index]
-            except ValueError as e:
-                raise ValueError(f"{str(e)} in section {utils.pretty_path(path)}") from None
+        try:
+            struct[section] = func(value)  # type: ignore[index]
+        except ValueError as e:
+            raise ValueError(f"{str(e)} in section {utils.pretty_path(path)}") from None
 
     path.pop()
