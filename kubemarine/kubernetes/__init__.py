@@ -277,7 +277,7 @@ def drain_nodes(group: NodeGroup, disable_eviction: bool = False,
         node_name = node.get_node_name()
 
         # Split stdout into lines
-        stdout_lines = stdout.split('\n')
+        stdout_lines = stdout.split('\n')[1:]
         # Check if node_name exactly matches any line
         if node_name in stdout_lines:
             log.debug("Draining node %s..." % node_name)
@@ -305,7 +305,7 @@ def delete_nodes(group: NodeGroup) -> RunnersGroupResult:
         node_name = node.get_node_name()
         
         # Split stdout into lines
-        stdout_lines = stdout.split('\n')
+        stdout_lines = stdout.split('\n')[1:]
         # Check if node_name exactly matches any line
         if node_name in stdout_lines:
             log.debug("Deleting node %s from the cluster..." % node_name)
