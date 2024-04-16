@@ -14,6 +14,7 @@
 
 import io
 import unittest
+from typing import List
 from unittest import mock
 
 import yaml
@@ -60,7 +61,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def _test_common_calico_config(self, manifest: Manifest):
         data = self.get_obj(manifest, "ConfigMap_calico-config")['data']
-        self.assertEqual('1440', data['veth_mtu'],
+        self.assertEqual('1430', data['veth_mtu'],
                          "Unexpected veth_mtu configuration in calico-config ConfigMap")
 
     def _test_deployment_calico_kube_controllers(self, manifest: Manifest, k8s_version: str):
@@ -414,6 +415,43 @@ class APIServerManifestEnrichment(_AbstractManifestEnrichmentTest):
                     container['resources'], "Unexpected calico-apiserver resources")
 
 
+def get_default_expect_config(typha_enabled: bool) -> dict:
+    config = {
+        'daemonsets': {'list': ['calico-node']},
+        'deployments': {'list': ['calico-kube-controllers']},
+        'pods': {'list': ['coredns', 'calico-kube-controllers', 'calico-node']},
+    }
+    if typha_enabled:
+        config['deployments']['list'].append('calico-typha')
+        config['pods']['list'].append('calico-typha')
+
+    return config
+
+
+class EnrichmentTest(unittest.TestCase):
+    def test_expect_typha_default(self):
+        for nodes in (3, 4):
+            with self.subTest(f"Kubernetes nodes: {nodes}"):
+                scheme = {'master': [], 'worker': []}
+                for i in range(nodes):
+                    scheme['master'].append(f'master-{i+1}')
+                    scheme['worker'].append(f'master-{i+1}')
+
+                inventory = demo.generate_inventory(**scheme)
+                inventory.setdefault('plugins', {})['calico'] = {
+                    'install': True,
+                }
+
+                cluster = demo.new_cluster(inventory)
+
+                expected_expect_step = get_default_expect_config(nodes > 3)
+
+                steps = cluster.inventory['plugins']['calico']['installation']['procedures']
+                actual_expect_steps = [step['expect'] for step in steps if 'expect' in step]
+                self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps,
+                                 "Unexpected expect procedures")
+
+
 class RedeployIfNeeded(unittest.TestCase):
     def prepare_context(self, procedure: str):
         task = 'deploy.plugins' if procedure == 'add_node' else 'update.plugins'
@@ -447,6 +485,11 @@ class RedeployIfNeeded(unittest.TestCase):
 
         return resources
 
+    @staticmethod
+    def get_actual_step_configs(inventory: dict, procedure: str) -> List[dict]:
+        steps = inventory['plugins']['calico']['installation']['procedures']
+        return [step[procedure] for step in steps if procedure in step]
+
     def test_add_fourth_kubernetes_node_redeploy_needed(self):
         for role in ('master', 'worker'):
             for typha_disabled_redefined in (False, True):
@@ -462,13 +505,21 @@ class RedeployIfNeeded(unittest.TestCase):
 
                     res = self._run_and_check(not typha_disabled_redefined)
 
+                    expected_expect_step = get_default_expect_config(not typha_disabled_redefined)
+
                     typha_enabled = res.working_inventory['plugins']['calico']['typha']['enabled']
                     self.assertEqual(not typha_disabled_redefined, typha_enabled,
                                      "Typha is not enabled in enriched inventory")
 
+                    actual_expect_steps = self.get_actual_step_configs(res.working_inventory, 'expect')
+                    self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps)
+
                     typha_enabled = res.finalized_inventory['plugins']['calico']['typha']['enabled']
                     self.assertEqual(not typha_disabled_redefined, typha_enabled,
                                      "Typha is not enabled in enriched inventory")
+
+                    actual_expect_steps = self.get_actual_step_configs(res.finalized_inventory, 'expect')
+                    self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps)
 
                     typha_enabled = res.inventory()['plugins']['calico']['typha'].get('enabled')
                     expected_enabled = None if not typha_disabled_redefined else False
@@ -490,13 +541,21 @@ class RedeployIfNeeded(unittest.TestCase):
 
                     res = self._run_and_check(False)
 
+                    expected_expect_step = get_default_expect_config(True)
+
                     typha_enabled = res.working_inventory['plugins']['calico']['typha']['enabled']
                     self.assertEqual(True, typha_enabled,
                                      "Typha is not enabled in enriched inventory")
 
+                    actual_expect_steps = self.get_actual_step_configs(res.working_inventory, 'expect')
+                    self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps)
+
                     typha_enabled = res.finalized_inventory['plugins']['calico']['typha']['enabled']
                     self.assertEqual(True, typha_enabled,
                                      "Typha is not enabled in enriched inventory")
+
+                    actual_expect_steps = self.get_actual_step_configs(res.finalized_inventory, 'expect')
+                    self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps)
 
                     typha_enabled = res.inventory()['plugins']['calico']['typha'].get('enabled')
                     self.assertEqual(True, typha_enabled,

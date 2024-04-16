@@ -370,6 +370,44 @@ class Processor(ABC):
 
         return image
 
+    def enrich_volume_and_volumemount(self, source_yaml: dict, serviceaccount: str, init_container_name: str = None) -> None:
+        """
+        Add a secret as volume and mount to the specified container in the manifest.
+
+        :param manifest: The Manifest object to operate with.
+        :param key: The key identifying the object in the manifest.
+        """
+
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+
+        volume_names = [volume["name"] for volume in source_yaml["spec"]["template"]["spec"]["volumes"]]
+        if f"{serviceaccount}-token" not in volume_names:
+            source_yaml['spec']['template']['spec']['volumes'].append({
+                'name': f'{serviceaccount}-token',
+                'secret': {
+                    'secretName': f'{serviceaccount}-token'  
+                }
+            })
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+            'name': f'{serviceaccount}-token',
+            'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+
+        init_containers = source_yaml['spec']['template']['spec'].get('initContainers', [])
+        target_container = next((c for c in init_containers if c['name'] == init_container_name), None)
+        if target_container:
+            if 'volumeMounts' not in target_container:
+                target_container['volumeMounts'] = []
+            if f"{serviceaccount}-token" not in [vm['name'] for vm in target_container['volumeMounts']]:
+                target_container['volumeMounts'].append({
+                    'name': f'{serviceaccount}-token',
+                    'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+                })
+
     def enrich_image_for_container(self, manifest: Manifest, key: str,
                                    *,
                                    plugin_service: Optional[str] = None,

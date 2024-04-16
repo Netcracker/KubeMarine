@@ -647,11 +647,11 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def _make_defer(self, executor: RemoteExecutor) -> DeferredGroup:
         return DeferredGroup(self.nodes, self.cluster, executor)
 
-    def new_defer(self, timeout: int = None) -> DeferredGroup:
-        return self.new_executor(timeout).group
+    def new_defer(self) -> DeferredGroup:
+        return self.new_executor().group
 
-    def new_executor(self, timeout: int = None) -> RemoteExecutor:
-        return RemoteExecutor(self, timeout=timeout)
+    def new_executor(self) -> RemoteExecutor:
+        return RemoteExecutor(self)
 
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_exec("get", remote_file, local_file)
@@ -679,7 +679,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def _do_exec(self, do_type: str, *args: object, **kwargs: Any) -> HostToResult:
         callback: Callback = kwargs.pop('callback', None)
 
-        executor = RawExecutor(self.cluster, timeout=kwargs.get('timeout'))
+        executor = RawExecutor(self.cluster)
         executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
         executor.flush()
 
@@ -825,8 +825,8 @@ class DeferredGroup(AbstractGroup[Token]):
 
 
 class RemoteExecutor(RawExecutor):
-    def __init__(self, group: NodeGroup, connection_pool: ConnectionPool = None, timeout: int = None) -> None:
-        super().__init__(group.cluster, connection_pool, timeout)
+    def __init__(self, group: NodeGroup, connection_pool: ConnectionPool = None) -> None:
+        super().__init__(group.cluster, connection_pool)
         self.group: DeferredGroup = group._make_defer(self)
         self.cluster = group.cluster
 

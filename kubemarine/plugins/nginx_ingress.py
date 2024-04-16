@@ -16,6 +16,9 @@ import io
 import ipaddress
 from typing import Optional, List, Dict
 
+from textwrap import dedent
+import yaml
+
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
@@ -159,6 +162,8 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_namespace_ingress_nginx,
             self.enrich_configmap_ingress_nginx_controller,
             self.add_configmap_ingress_nginx_controller,
+            self.enrich_service_account_secret,
+            self.enrich_service_account,
             self.enrich_deployment_ingress_nginx_controller,
             self.enrich_ingressclass_nginx,
             self.enrich_job_ingress_nginx_admission_create,
@@ -192,10 +197,26 @@ class IngressNginxManifestProcessor(Processor):
             self.include(manifest, ingres_nginx_cm, custom_headers_cm)
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
+            
+    def enrich_service_account_secret(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret)
+
+        service_account_key = "ServiceAccount_ingress-nginx"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
+
+    def enrich_service_account(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_ingress-nginx"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
 
     def enrich_deployment_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
+        service_account_name = "ingress-nginx"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         self.enrich_deamonset_ingress_nginx_controller_container(manifest)
 
@@ -297,6 +318,11 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
 
         super().enrich_deamonset_ingress_nginx_controller_container(manifest)
 
+        source_yaml = manifest.get_obj(key, patch=True)
+        service_account_name = "ingress-nginx"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
     def enrich_deamonset_ingress_nginx_controller_container_args(self, manifest: Manifest,
                                                                  *,
                                                                  remove_args: List[str],
@@ -365,3 +391,14 @@ psp_ingress_nginx = {
     "verbs":     ["use"],
     "resourceNames": ["oob-host-network-psp"]
 }
+
+service_account_secret = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ingress-nginx-token
+      namespace: ingress-nginx
+      annotations:
+        kubernetes.io/service-account.name: ingress-nginx
+    type: kubernetes.io/service-account-token  
+""")

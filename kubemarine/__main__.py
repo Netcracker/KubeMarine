@@ -200,15 +200,8 @@ def selftest() -> None:
 
         print("%s has %s imports" % (procedure, len(imports)))
 
-        if "main" not in dir(module):
-            raise Exception("No main method in %s" % procedure)
-        if procedure not in ["do", "migrate_kubemarine", "config"]:
-            if "tasks" not in dir(module):
-                raise Exception("Tasks tree is not presented in %s" % procedure)
-            if not isinstance(module.tasks, OrderedDict):
-                raise Exception("Tasks are not ordered in %s" % procedure)
-            if not module.tasks:
-                raise Exception("Tasks are empty in %s" % procedure)
+        if isinstance(module, proc.TasksProcedure) and not module.tasks:
+            raise Exception("Tasks are empty in %s" % procedure)
 
         print("%s OK" % procedure)
 
@@ -223,8 +216,8 @@ def selftest() -> None:
 
     print('\nValidating patch duplicates ...')
 
-    module = proc.import_procedure('migrate_kubemarine')
-    patches = module.load_patches()
+    from kubemarine.procedures import migrate_kubemarine
+    patches = migrate_kubemarine.load_patches()
     patch_ids = [patch.identifier for patch in patches]
     unique = set()
     for p_id in patch_ids:

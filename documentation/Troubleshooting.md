@@ -3,7 +3,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
 - [Kubemarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
-  - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
+    - [Command did not complete within a number of seconds](#command-did-not-complete-within-a-number-of-seconds)
   - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
   - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
@@ -35,7 +35,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
-  - [Operation not permitted error in kubemarine docker run](#operation-not-permitted-error-in-kubemarine-docker-run)
+  - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
@@ -114,23 +114,8 @@ KME0002: Remote group exception
 	
 	Exit code: 127
 	
-	Stdout:
-	
-	
-	
-	Stderr:
-	
+	=== stderr ===
 	bash: apt: command not found
-```
-
-Hierarchical error:
-
-```
-FAILURE!
-TASK FAILED xxx
-KME0002: Remote group exception
-10.101.10.1:
-	KME0003: Action took too long to complete and timed out
 ```
 
 An error indicating an unexpected runtime bash command exit on a remote cluster host. This error 
@@ -138,7 +123,7 @@ occurs when a command is terminated unexpectedly with a non-zero error code.
 
 The error prints the status of the command execution for each node in the group on which the bash command 
 was executed. The status can be a correct result (shell results), a result with an error 
-(shell error), as well as a hierarchical KME with its own code.
+(shell error), as well as a [timeout](#command-did-not-complete-within-a-number-of-seconds) error.
 
 To fix it, first try checking the nodes and the cluster with 
 [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
@@ -152,14 +137,20 @@ If you still can't resolve this error yourself, start
 error with its stacktrace. We will try to help as soon as possible.
 
 
-## KME0003: Action took too long to complete and timed out
+### Command did not complete within a number of seconds
 
 ```
 FAILURE!
 TASK FAILED xxx
 KME0002: Remote group exception
 10.101.10.1:
-	KME0003: Action took too long to complete and timed out
+ 	Command did not complete within 2700 seconds!
+ 	
+ 	Command: 'echo "sleeping..." && sleep 3000'
+ 	
+ 	=== stdout ===
+ 	sleeping...
+	
 ```
 
 An error that occurs when a command did not have time to execute at the specified time.
@@ -332,11 +323,11 @@ kubectl patch crontab/my-new-cron-object -p '{"metadata":{"finalizers":[]}}' --t
 **Solution**: To change MTU size to required value run following command on any control-plane node:
 
 ```
-# kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1440"}}'
+# kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1430"}}'
 ```
 
 where:
-  - **1440** is the size of MTU. For MTU 1450 on interface eth0 you should set MTU size 1430 for calico-config.
+  - **1430** is the size of MTU. For MTU 1450 on interface eth0 you should set MTU size 1430 for calico-config.
 
 
 After updating the ConfigMap, perform a rolling restart of all calico/node pods. For example:
@@ -367,7 +358,7 @@ The maximum size cannot be changed, so `kubectl apply` is unable to apply large 
 * `--max-requests-inflight` is the maximum number of non-mutating requests. The default value is 400.
 * `--max-mutating-requests-inflight` is the maximum number of mutating requests. The default value is 200.
 
-`kube-apiserver` configration file is stored in /etc/kubernetes/manifests/kube-apiserver.yaml. This file should be changed 
+`kube-apiserver` configuration file is stored in /etc/kubernetes/manifests/kube-apiserver.yaml. This file should be changed 
 on all control-planes. Also, the configuration map `kubeadm-config` from kube-system namespace should have the same values 
 in `apiServer` section.
 
@@ -491,7 +482,7 @@ In etcd logs there are such messages:
 
 **Root Cause**: Etcd database treats requests too slowly.
 
-**Solution**: to impove etcd performance.
+**Solution**: To improve etcd performance.
 
 First of all it is necessary to check that the disk under `/var/lib/etcd` satisfies [the recommendations](/documentation/Installation.md#etcd-recommendation).
 
@@ -523,11 +514,11 @@ Other general etcd tuning recommendations can be found in the [official etcd doc
 panic: failed to update; member unknown
 ```
 
-other etcd pods do not start due to no connection to the failed cluster members.
+Other etcd pods do not start due to no connection to the failed cluster members.
 
 **Root cause**: The etcd database is corrupted.
 
-**Solution**: If you have relevant backup created by [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole kubernetes cluster from it, you can use [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
+**Solution**: If you have relevant backup created by [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster from it, you can use [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
 
 If you want to restore not the whole cluster, but etcd database only, you can use `kubemarine restore` procedure with the list of required tasks:
 
@@ -541,7 +532,7 @@ kubemarine restore --config=${CLUSTER_YAML} --tasks="prepare,import.etcd,reboot 
 
 ### Manual Restoration of Etcd Database
 
-If it is not possible to use standard kubemarine procedure to restore etcd, you can do that manually.
+If it is not possible to use standard Kubemarine procedure to restore etcd, you can do that manually.
 
 #### Manual Etcd Restoration from a Snapshot
 
@@ -959,7 +950,7 @@ Installation failed with error:
 <DATETIME> CRITICAL [errors.error_logger] KME0002: Remote group exception
 ```
 
-Looks like IP address for kubernetes API is unreachable.
+Looks like IP address for Kubernetes API is unreachable.
 
 **Root Cause**:
 
@@ -1058,22 +1049,31 @@ $ nslookup kubernetes.default.svc.cluster.local
 
 **Solution**: Change the cloud provider configuration to allow the traffic on the IaaS layer. In OpenStack, the Security Groups manage the allowed traffic.
 
+## Pods do not Start Properly
+
+**Symptoms**: Pods do not start properly and `Audit` daemon has the following messages in the log:
+`Error receiving audit netlink packet (No buffer space available)`
+
+**Root cause**: `Audit` daemon internal issue.
+
+**Solution**: Change the `Audit` daemon configuration or disable it.
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
 
-## Operation not permitted error in kubemarine docker run
+## Operation not Permitted Error in Kubemarine Docker Run
 
-**Symptoms**: Some command in kubemarine docker fails with "Operation not permitted" error. The command can be absolutely different, e.g. new thread creation for kubemarine run or simple `ls` command.
+**Symptoms**: Some command in Kubemarine docker fails with "Operation not permitted" error. The command can be absolutely different, e.g. new thread creation for Kubemarine run or simple `ls` command.
 
-**Root cause**: The problem is not compatible docker and kubemarine base [image version](/Dockerfile#L1): kubemarine uses system calls, that is not allowed by default in docker.
+**Root cause**: The problem is not compatible docker and Kubemarine base [image version](/Dockerfile#L1): Kubemarine uses system calls, that is not allowed by default in docker.
 
-**Solution**: Check the compatibility issues for used docker version and kubemarine base [image version](/Dockerfile#L1) and 
+**Solution**: Check the compatibility issues for used docker version and Kubemarine base [image version](/Dockerfile#L1) and 
 upgrade docker version to one, where found issues are resolved. 
 
-As alternative, provide additional grants to kubemarine container using `--privileged` or `--cap-add` options for docker command.
+As alternative, provide additional grants to Kubemarine container using `--privileged` or `--cap-add` options for docker command.
 
-**Example of problem**: kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
+**Example of problem**: Kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
 
 ```bash
 $ docker run --entrypoint ls kubemarine:v0.25.0 -la
@@ -1086,7 +1086,7 @@ d????????? ? ? ? ?            ? ..
 -????????? ? ? ? ?            ? .dockerignore
 ```
 
-The root cause here is in `coreutils 8.32` library, that is installed in that kubemarine image. This library uses `statx` calls for `ls` command,
+The root cause here is in `coreutils 8.32` library, that is installed in that Kubemarine image. This library uses `statx` calls for `ls` command,
 but those calls were added to docker white-list only since `1.13.1-109` version. For this reason it works only with this  or newer version.
 
 

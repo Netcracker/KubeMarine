@@ -16,7 +16,6 @@ import sys
 import traceback
 from abc import ABC, abstractmethod
 
-from concurrent.futures import TimeoutError
 from textwrap import dedent
 from typing import Type, List
 
@@ -32,10 +31,6 @@ def get_kme_dictionary() -> dict:
         "KME0002": {
             "instance": GroupException,
             "name": "Remote group exception\n{reason}"
-        },
-        "KME0003": {
-            "instance": TimeoutError,
-            "name": "Action took too long to complete and timed out"
         },
         "KME0004": {
             "name": "There are no workers defined in the cluster scheme"

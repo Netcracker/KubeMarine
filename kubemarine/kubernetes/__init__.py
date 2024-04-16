@@ -186,8 +186,9 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
 
     # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max since they define the same kernel variable
     version_key = utils.version_key(inventory["services"]["kubeadm"]["kubernetesVersion"])
-    if version_key >= (1, 29, 0):
-        inventory["services"]["kubeadm_kube-proxy"]["conntrack"]["min"] = inventory["services"]["sysctl"]["net.netfilter.nf_conntrack_max"]
+    conntrack_max = inventory["services"]["sysctl"].get("net.netfilter.nf_conntrack_max")
+    if version_key >= (1, 29, 0) and conntrack_max is not None:
+        inventory["services"]["kubeadm_kube-proxy"]["conntrack"]["min"] = conntrack_max
     else:
         inventory["services"]["kubeadm_kube-proxy"]["conntrack"].pop("min",None)
 
@@ -490,7 +491,10 @@ def init_first_control_plane(group: NodeGroup) -> None:
     kubeconfig_filepath = fetch_admin_config(cluster)
     summary.schedule_report(cluster.context, summary.SummaryItem.KUBECONFIG, kubeconfig_filepath)
 
-    # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
+    # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
+    first_control_plane.call(components.patch_kubelet_configmap)
+
+    # Invoke method from admission module for applying the privileged PSP if it is enabled
     first_control_plane.call(admission.apply_admission)
 
     # Preparing join_dict to init other nodes
@@ -695,6 +699,10 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
         f"sudo systemctl restart kubelet", hide=False)
 
     copy_admin_config(cluster.log, first_control_plane)
+
+    # In some versions, kubeadm reverts resolvConf to the default during `upgrade apply`
+    # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
+    first_control_plane.call(components.patch_kubelet_configmap)
 
     expect_kubernetes_version(cluster, version, apply_filter=node_name)
     components.wait_for_pods(first_control_plane)

@@ -16,9 +16,9 @@
 
 import argparse
 import sys
-from typing import Callable, List, Dict
+from typing import List, Dict, Any
 
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -31,33 +31,30 @@ additional arguments:
     shell_command       command to execute on nodes
 """
 
+
 class CLIAction(Action):
-    def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup],
-                 remote_args: List[str], no_stream: bool) -> None:
+    def __init__(self, context: dict) -> None:
         super().__init__('do')
-        self.node_group_provider = node_group_provider
-        self.remote_args = remote_args
-        self.no_stream = no_stream
+        self.do_args: Dict[str, Any] = context['do_arguments']
+        self.remote_args: List[str] = context['remote_arguments']
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
-        executors_group = self.node_group_provider(cluster)
+        executors_group = get_executors_group(cluster, self.do_args)
         if executors_group.is_empty():
             print('Failed to find any of specified nodes or groups')
             sys.exit(1)
 
-        result = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True)
-        if self.no_stream:
-            cluster.log.debug(result)
+        no_stream: bool = self.do_args['no_stream']
+        result = executors_group.sudo(" ".join(self.remote_args), hide=no_stream, warn=True)
+        if no_stream:
+            print(result)
 
         if result.is_any_failed():
             sys.exit(1)
 
-        sys.exit(0)
 
-
-def main(cli_arguments: List[str] = None) -> None:
-
+def create_context(cli_arguments: List[str] = None) -> dict:
     if cli_arguments is None:
         cli_arguments = sys.argv[1:]
 
@@ -92,6 +89,8 @@ def main(cli_arguments: List[str] = None) -> None:
 
     context = flow.create_empty_context({
         'disable_dump': True,
+        'dump_location': '.',
+        'disable_dump_cleanup': True,
         'log': [
             ['stdout;level=error;colorize=true;correct_newlines=true']
         ],
@@ -100,26 +99,34 @@ def main(cli_arguments: List[str] = None) -> None:
     context['preserve_inventory'] = False
     context['load_inventory_silent'] = True
 
-    def node_group_provider(cluster: KubernetesCluster) -> NodeGroup:
-        if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
-            executor_lists: Dict[str, List[str]] = {
-                    'node': [],
-                    'group': []
-            }
-            for executors_type in executor_lists.keys():
-                executors_str = arguments.get(executors_type)
-                if executors_str:
-                    if "," in executors_str:
-                        for executor_name in executors_str.split(','):
-                            executor_lists[executors_type].append(executor_name.strip())
-                    else:
-                        executor_lists[executors_type].append(executors_str.strip())
-            return cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
-        else:
-            return cluster.nodes['control-plane'].get_any_member()
+    context['do_arguments'] = arguments
+    context['remote_arguments'] = remote_args
 
-    no_stream: bool = arguments['no_stream']
-    action = CLIAction(node_group_provider, remote_args, no_stream)
+    return context
+
+
+def get_executors_group(cluster: KubernetesCluster, arguments: dict) -> NodeGroup:
+    if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
+        executor_lists: Dict[str, List[str]] = {
+            'node': [],
+            'group': []
+        }
+        for executors_type in executor_lists.keys():
+            executors_str = arguments.get(executors_type)
+            if executors_str:
+                if "," in executors_str:
+                    for executor_name in executors_str.split(','):
+                        executor_lists[executors_type].append(executor_name.strip())
+                else:
+                    executor_lists[executors_type].append(executors_str.strip())
+        return cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
+    else:
+        return cluster.nodes['control-plane'].get_any_member()
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
+    action = CLIAction(context)
     flow.ActionsFlow([action]).run_flow(context, print_summary=False)
 
 

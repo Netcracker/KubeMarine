@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, Optional, Dict
+import yaml
+from textwrap import dedent
 
 from kubemarine.core import summary, utils, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
@@ -66,6 +68,8 @@ class DashboardManifestProcessor(Processor):
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
             self.enrich_namespace_kubernetes_dashboard,
+            self.enrich_service_account_secret_kubernetes_dashboard,
+            self.enrich_service_account_kubernetes_dashboard,
             self.enrich_deployment_kubernetes_dashboard,
             self.enrich_deployment_dashboard_metrics_scraper,
         ]
@@ -76,8 +80,28 @@ class DashboardManifestProcessor(Processor):
     def enrich_namespace_kubernetes_dashboard(self, manifest: Manifest) -> None:
         self.assign_default_pss_labels(manifest, 'kubernetes-dashboard')
 
+    def enrich_service_account_secret_kubernetes_dashboard(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret_kubernetes_dashboard)
+
+        service_account_key = "ServiceAccount_kubernetes-dashboard"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
+
+    def enrich_service_account_kubernetes_dashboard(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_kubernetes-dashboard"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
     def enrich_deployment_kubernetes_dashboard(self, manifest: Manifest) -> None:
         key = "Deployment_kubernetes-dashboard"
+        source_yaml = manifest.get_obj(key, patch=True)
+        
+        service_account_name = "kubernetes-dashboard"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_image_for_container(manifest, key,
             plugin_service='dashboard', container_name='kubernetes-dashboard', is_init_container=False)
 
@@ -87,6 +111,13 @@ class DashboardManifestProcessor(Processor):
 
     def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest) -> None:
         key = "Deployment_dashboard-metrics-scraper"
+        source_yaml = manifest.get_obj(key, patch=True)
+        
+        service_account_name = "kubernetes-dashboard"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
 
@@ -113,3 +144,14 @@ def get_dashboard_manifest_processor(logger: log.VerboseLogger, inventory: dict,
         return V2_5_X_DashboardManifestProcessor(logger, inventory, **kwargs)
 
     return DashboardManifestProcessor(logger, inventory, **kwargs)
+
+service_account_secret_kubernetes_dashboard = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: kubernetes-dashboard-token
+      namespace: kubernetes-dashboard
+      annotations:
+        kubernetes.io/service-account.name: kubernetes-dashboard
+    type: kubernetes.io/service-account-token  
+""")

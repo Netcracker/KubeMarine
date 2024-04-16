@@ -58,7 +58,7 @@ def print_config(cfg: dict, arguments: dict) -> None:
         print(json.dumps(cfg, indent=4))
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     if cli_arguments is None:
         cli_arguments = sys.argv[1:]
 
@@ -71,7 +71,11 @@ def main(cli_arguments: List[str] = None) -> None:
                         help='output format')
 
     arguments = vars(parser.parse_args(cli_arguments))
+    return {'config_arguments': arguments}
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    arguments = create_context(cli_arguments)['config_arguments']
     cfg = make_config()
     print_config(cfg, arguments)
 
