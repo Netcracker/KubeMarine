@@ -251,3 +251,13 @@ v0.28.0:
       of service account tokens
   - apiserver_cipher_suites: Patch to update the API server TLS cipher suites.
 
+v0.28.1:
+  patches:
+  - kubelet_resolvConf: 'If KubeletConfiguration.resolvConf is not redefined in the
+      inventory,
+
+      remove it from the kubelet-config ConfigMap if present.
+
+
+      This is necessary for smoother migration of the operating systems.'
+
