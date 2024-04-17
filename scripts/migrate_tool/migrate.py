@@ -13,11 +13,7 @@ import yaml
 # software upgrade patches --describe doesn't print exact 3rd party version, only patched k8s
 # to use kubemarine config feature to avoid migration to not supported k8s in migrated kubemarine
 
-KubemarineVersions: list = [ "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.7.1", "0.8.0", "0.9.0", "0.10.0", "0.11.0",
-                            "0.11.1", "0.12.0", "0.12.1", "0.13.0", "0.13.1", "0.14.0", "0.15.0", "0.15.1", "0.16.0", "0.17.0",
-                            "0.18.0", "0.18.1", "0.18.2", "0.19.0", "0.20.0", "0.21.0", "0.21.1", "0.22.0", "v0.23.0",
-                            "v0.24.1", "v0.25.0", "v0.25.1", "v0.26.0", "v0.27.0", "v0.28.0", "v0.28.1"
-]  # TODO to  get from github/gitlab/git/custom/file?
+
 
 MigrationProcedure: dict = {
     #    "v0.26.0":{"procedure":"",
@@ -27,6 +23,8 @@ MigrationProcedure: dict = {
     #               "env":"docker"}
 }
 
+def patches_to_versions() -> list:
+    return
 
 class Filepath:
     """manages environment {type} and a {path} to kubemarine executable"""
@@ -143,8 +141,20 @@ def get_patches_info(env:Filepath) -> dict:
     return patches_info
 
 
-def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = KubemarineVersions[-1], env:str = "bin") -> dict:
+def list_versions( old_version: str = "", new_version: str = "", patches_path:str = "patches.json") -> dict:
     """@returns: MigrationProcedure dict"""
+
+    MigrationProcedure: dict = {}
+
+    patches = dict(json.load(open(patches_path,'r'))) # initialization from patch list
+    KubemarineVersions = list(patches.keys())
+
+    if not old_version:
+        old_version = KubemarineVersions[0]
+
+    if not new_version:
+        new_version = KubemarineVersions[-1]
+    
     index_from = KubemarineVersions.index(old_version) if old_version in KubemarineVersions else None
     index_to = KubemarineVersions.index(new_version) if new_version in KubemarineVersions else None
 
@@ -152,6 +162,26 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
     if ( index_from is None or index_to is None ) or  index_from > index_to:
         logging.warning(f"Not supported combination of versions {old_version}, {new_version} or outdated version list {KubemarineVersions}")
         return {}
+
+    ## get the patch list
+    for version in KubemarineVersions[index_from:index_to + 1]:
+        logging.info(f"Iterating {version}")
+        MigrationProcedure[version] = patches[version]
+        MigrationProcedure[version]["procedure"] = "" #TODO to have it generated in patches.json already
+        MigrationProcedure[version]["env"] = "bin"    #TODO to have it generated in patches.json already
+
+    return MigrationProcedure
+
+def generate_patches_list(old_version: str, new_version: str, env:str = "bin") -> dict:   # TODO temporary
+    """@returns: MigrationProcedure dict"""
+    KubemarineVersions: list = [ "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.7.1", "0.8.0", "0.9.0", "0.10.0", "0.11.0",
+                            "0.11.1", "0.12.0", "0.12.1", "0.13.0", "0.13.1", "0.14.0", "0.15.0", "0.15.1", "0.16.0", "0.17.0",
+                            "0.18.0", "0.18.1", "0.18.2", "0.19.0", "0.20.0", "0.21.0", "0.21.1", "0.22.0", "v0.23.0",
+                            "v0.24.1", "v0.25.0", "v0.25.1", "v0.26.0", "v0.27.0", "v0.28.0", "v0.28.1"
+]  # TODO to  get from github/gitlab/git/custom/file?
+    
+    index_from = KubemarineVersions.index(old_version) if old_version in KubemarineVersions else None
+    index_to = KubemarineVersions.index(new_version) if new_version in KubemarineVersions else None
 
     ## get the patch list and  migration procedure
     for version in KubemarineVersions[index_from:index_to + 1]:
