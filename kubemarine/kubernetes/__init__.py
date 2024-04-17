@@ -275,7 +275,11 @@ def drain_nodes(group: NodeGroup, disable_eviction: bool = False,
 
     for node in group.get_ordered_members_list():
         node_name = node.get_node_name()
-        if node_name in stdout:
+
+        # Split stdout into lines
+        stdout_lines = stdout.split('\n')[1:]
+        # Check if node_name exactly matches any line
+        if node_name in stdout_lines:
             log.debug("Draining node %s..." % node_name)
             drain_cmd = prepare_drain_command(
                 cluster, node_name,
@@ -299,7 +303,11 @@ def delete_nodes(group: NodeGroup) -> RunnersGroupResult:
 
     for node in group.get_ordered_members_list():
         node_name = node.get_node_name()
-        if node_name in stdout:
+        
+        # Split stdout into lines
+        stdout_lines = stdout.split('\n')[1:]
+        # Check if node_name exactly matches any line
+        if node_name in stdout_lines:
             log.debug("Deleting node %s from the cluster..." % node_name)
             control_plane.sudo("kubectl delete node %s" % node_name, hide=False)
         else:
