@@ -163,7 +163,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_kubernetes_version_upgrade_env_variable(self):
-        before, after = 'v1.27.8', 'v1.28.6'
+        before, after = 'v1.27.8', 'v1.28.8'
         self.prepare_context(['fake_path.yaml', '--without-act'], procedure='upgrade')
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"

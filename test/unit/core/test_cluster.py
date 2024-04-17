@@ -108,7 +108,7 @@ class KubernetesClusterTest(unittest.TestCase):
                          msg="Unexpected package associations of remained node")
 
     def test_upgrade_get_redefined_package_associations(self):
-        before, after = 'v1.27.8', 'v1.28.6'
+        before, after = 'v1.27.8', 'v1.28.8'
         context = demo.create_silent_context(['fake.yaml'], procedure='upgrade')
         context['upgrade_step'] = 0
 

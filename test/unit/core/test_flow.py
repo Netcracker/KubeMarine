@@ -367,7 +367,7 @@ class FlowTest(unittest.TestCase):
             'kubernetesVersion': 'v1.27.8'
         }
         procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        procedure_inventory['upgrade_plan'] = ['v1.28.6']
+        procedure_inventory['upgrade_plan'] = ['v1.28.8']
 
         self._stub_detect_nodes_context(inventory, [], [])
         context = demo.create_silent_context(['fake_path.yaml'], procedure='upgrade')

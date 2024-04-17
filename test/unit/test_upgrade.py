@@ -354,7 +354,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                     self.new_cluster()
 
     def test_require_package_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -582,7 +582,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
             self.new_cluster()
 
     def test_require_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -901,7 +901,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_source_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -977,7 +977,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_sandbox_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -1171,8 +1171,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
                 ('v1.26.11', 'v1.27.8', False),
-                ('v1.27.8', 'v1.28.6', True),
-                ('v1.28.3', 'v1.28.6', False),
+                ('v1.27.8', 'v1.28.8', True),
+                ('v1.28.3', 'v1.28.8', False),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
@@ -1201,7 +1201,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                     utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
-                self.setUpVersions('v1.27.8', ['v1.28.6'])
+                self.setUpVersions('v1.27.8', ['v1.28.8'])
                 self.inventory.setdefault('rbac', {}).update({
                     'admission': 'pss', 'pss': {'pod-security': 'enabled'}
                 })
@@ -1231,7 +1231,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
 
     def test_kubernetes_preconfigure_kube_proxy_conntrack_min_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.27.8', 'v1.28.6', False),
+                ('v1.27.8', 'v1.28.8', False),
                 ('v1.28.4', 'v1.29.1', True),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
