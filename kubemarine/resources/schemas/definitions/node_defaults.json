@@ -40,8 +40,36 @@
     "SSHAccessCommonPropertyNames": {
       "enum": ["keyfile", "password", "username", "connection_port", "connection_timeout"]
     },
-    "CommonNodeProperties": {
+    "CommonNodeAccessProperties": {
       "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],
+      "properties": {
+        "gateway": {
+          "type": "string",
+          "description": "Gateway that should be used to connect to node(s)"
+        },
+        "boot": {
+           "type": "object",
+           "description": "Nodes boot settings",
+           "additionalProperties": false,
+           "properties": {
+             "timeout": {
+               "type": "integer",
+               "minimal": 1,
+               "default": 600,
+               "description": "Timeout for node reboot in seconds"
+             }
+           }
+         }
+      }
+    },
+    "CommonNodeAccessPropertyNames": {
+      "anyOf": [
+        {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
+        {"enum": ["gateway", "boot"]}
+      ]
+    },
+    "CommonNodeProperties": {
+      "allOf": [{"$ref": "#/definitions/CommonNodeAccessProperties"}],
       "properties": {
         "labels": {
           "type": "object",
@@ -53,17 +81,35 @@
         "taints": {
           "$ref": "common/utils.json#/definitions/ArrayOfStrings",
           "description": "Additional taints for node(s). Caution: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences."
-        },
-        "gateway": {
-          "type": "string",
-          "description": "Gateway that should be used to connect to node(s)"
         }
       }
     },
     "CommonNodePropertyNames": {
       "anyOf": [
-        {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
-        {"enum": ["labels", "taints", "gateway"]}
+        {"$ref": "#/definitions/CommonNodeAccessPropertyNames"},
+        {"enum": ["labels", "taints"]}
+      ]
+    },
+    "OneOfKeyfilePasswordSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "keyfile": {
+              "type": "string"
+            }
+          },
+          "required": ["keyfile"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": ["password"]
+        }
       ]
     }
   }

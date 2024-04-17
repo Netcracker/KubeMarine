@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "description": "Describe each node of the cluster.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "allOf": [{"$ref": "../definitions/node.json#/definitions/AccessProperties"}],
+        "properties": {
+          "roles": {
+            "$ref": "#/definitions/LegacyRoles",
+            "description": "Cluster member roles"
+          }
+        },
+        "required": ["internal_address", "roles"]
+      }
+    },
+    "node_defaults": {
+      "type": "object",
+      "description": "Section to hold the parameters to be applied by default to each record in the nodes section",
+      "allOf": [{"$ref": "../definitions/node_defaults.json#/definitions/CommonNodeAccessProperties"}]
+    },
+    "gateway_nodes": {
+      "$ref": "../cluster.json#/definitions/GatewayNodes"
+    },
+    "procedure_history": {
+      "$ref": "../cluster.json#/definitions/ProcedureHistory"
+    }
+  },
+  "required": ["nodes"],
+  "definitions": {
+    "LegacyRole": {
+      "enum": ["worker", "control-plane", "master", "balancer"]
+    },
+    "LegacyRoles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/LegacyRole"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  }
+}

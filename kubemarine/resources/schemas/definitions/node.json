@@ -7,7 +7,7 @@
     "$ref": "#/definitions/PropertyNames"
   },
   "definitions": {
-    "Properties": {
+    "AccessProperties": {
       "allOf": [{"$ref": "node_defaults.json#/definitions/CommonNodeProperties"}],
       "properties": {
         "name": {
@@ -22,6 +22,18 @@
           "type": "string",
           "description": "Internal node's IP-address"
         },
+        "connect_to": {"type": "string"}
+      }
+    },
+    "AccessPropertyNames": {
+      "anyOf": [
+        {"$ref": "node_defaults.json#/definitions/CommonNodePropertyNames"},
+        {"enum": ["name", "address", "internal_address", "connect_to"]}
+      ]
+    },
+    "Properties": {
+      "allOf": [{"$ref": "#/definitions/AccessProperties"}],
+      "properties": {
         "roles": {
           "$ref": "common/node_ref.json#/definitions/Roles",
           "description": "Cluster member roles"
@@ -30,14 +42,13 @@
           "type": "boolean",
           "default": false,
           "description": "Parameter to help the algorithm in choosing which address to take as the control_plain"
-        },
-        "connect_to": {"type": "string"}
+        }
       }
     },
     "PropertyNames": {
       "anyOf": [
-        {"$ref": "node_defaults.json#/definitions/CommonNodePropertyNames"},
-        {"enum": ["name", "address", "internal_address", "roles", "control_endpoint", "connect_to"]}
+        {"$ref": "#/definitions/AccessPropertyNames"},
+        {"enum": ["roles", "control_endpoint"]}
       ]
     }
   }

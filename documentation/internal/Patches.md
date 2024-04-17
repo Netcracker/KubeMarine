@@ -18,8 +18,8 @@ Patches are registered in a special folder [/kubemarine/patches](/kubemarine/pat
 
 Every patch should inherit one of:
 * `kubemarine.core.patch.InventoryOnlyPatch`
-   This only changes the inventory.
-   Running of enrichment is prohibited.
+   This may change the inventory.
+   Calling `DynamicResources.cluster(EnrichmentStage.LIGHT)` is allowed to connect to nodes for read-only aims.
    Patches if this type are executed first.
 * `kubemarine.core.patch.RegularPatch`. This accesses and makes some operations on the cluster.
    These patches should not upgrade software, and should not affect the upgrade procedure.

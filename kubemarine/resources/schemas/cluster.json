@@ -44,11 +44,7 @@
       "$ref": "definitions/registry.json"
     },
     "gateway_nodes": {
-      "type": "array",
-      "description": "Specify the gateway nodes through which you need to create an SSH-tunnel.",
-      "items": {
-        "$ref": "definitions/gateway_node.json"
-      }
+      "$ref": "#/definitions/GatewayNodes"
     },
     "vrrp_ips": {
       "type": "array",
@@ -70,6 +66,24 @@
       "$ref": "definitions/plugins.json"
     },
     "procedure_history": {
+      "$ref": "#/definitions/ProcedureHistory"
+    },
+    "values": {
+      "type": "object",
+      "description": "Section to hold custom variables to be used in Jinja2 templates."
+    }
+  },
+  "required": ["nodes", "cluster_name"],
+  "additionalProperties": false,
+  "definitions": {
+    "GatewayNodes": {
+      "type": "array",
+      "description": "Specify the gateway nodes through which you need to create an SSH-tunnel.",
+      "items": {
+        "$ref": "definitions/gateway_node.json"
+      }
+    },
+    "ProcedureHistory": {
       "type": "object",
       "description": "Parameters for the inventory preservation on nodes after each procedure run.",
       "properties": {
@@ -85,12 +99,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "values": {
-      "type": "object",
-      "description": "Section to hold custom variables to be used in Jinja2 templates."
     }
-  },
-  "required": ["nodes", "cluster_name"],
-  "additionalProperties": false
+  }
 }

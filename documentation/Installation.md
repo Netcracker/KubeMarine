@@ -95,6 +95,7 @@ This section provides information about the inventory, features, and steps for i
       - [Merge Strategy Positioning](#merge-strategy-positioning)
       - [List Merge Allowed Sections](#list-merge-allowed-sections)
     - [Dynamic Variables](#dynamic-variables)
+      - [Compilation Stages](#compilation-stages)
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
     - [Environment Variables](#environment-variables)
@@ -535,8 +536,6 @@ globals:
     ready:
       timeout: 10
       retries: 60
-    boot:
-      timeout: 900
 ```
 
 The following parameters are supported:
@@ -551,7 +550,6 @@ The following parameters are supported:
 | `expect.pods.plugins.retries`    | int  | no        | 150           | `300`   | Number of retires to check pods readiness in `plugins`                                                             |
 | `nodes.ready.timeout`            | int  | no        | 5             | `10`    | Timeout between `nodes.ready.retries` for cluster node readiness waiting                                           |
 | `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
-| `nodes.boot.timeout`             | int  | no        | 600           | `900`   | Timeout for node reboot waiting                                                                                    |
 
 
 ### node_defaults
@@ -594,7 +592,7 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, password, username, connection_port, connection_timeout and gateway.
+* keyfile, password, username, connection_port, connection_timeout, gateway, and boot.timeout.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 For more information about the listed parameters, refer to the following section.
 
@@ -620,6 +618,7 @@ The following options are supported:
 |roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
+|boot.timeout|int|no|600|`900`|Timeout for node reboot waiting|
 
 An example with parameters values is as follows:
 
@@ -628,6 +627,8 @@ node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
   password: '{{ env.PASS }}'     #Either keyfile or password can be used.
   username: "centos"
+  boot:
+    timeout: 900
 
 nodes:
   - name: "k8s-lb"
@@ -5734,11 +5735,47 @@ section:
 - variable: hello
 ```
 
+#### Compilation Stages
+
+The inventory is compiled in two stages:
+1. Lightweight compilation of only those sections that participate in the enrichment of SSH connections.
+2. Full compilation of the inventory.
+
+This introduces some restrictions to the sections that make up the connections.
+Such sections must not refer to the other sections of the inventory.
+
+For example, the following snippet shows illegal references:
+
+```yaml
+values:
+  kubernetesVersion: '{{ services.kubeadm.kubernetesVersion }}'
+ 
+nodes:
+- name: 'node-on-{{ services.cri.containerRuntime }}'
+  internal_address: 192.168.0.1
+  roles: [worker]
+```
+
+Back references are still possible.
+
+A complete subset of connection-making sections and properties is as follows:
+* `node_defaults`
+    * `keyfile`, `password`, `username`, `connection_port`, `connection_timeout`, `gateway`, `boot`
+* `nodes`
+    * `keyfile`, `password`, `username`, `connection_port`, `connection_timeout`, `gateway`, `boot`,
+      `address`, `internal_address`, `connect_to`, `name`, `roles`
+* `gateway_nodes`
+* `cluster_name`
+* `values`
+* `procedure_history`
+
 #### Limitations
 
 Dynamic variables have some limitations that should be considered when working with them:
 
-* Dynamic variables are not supported in inventory files of maintenance procedures like upgrade.
+* Limitations due to pecularities of [Compilation Stages](#compilation-stages).
+* Dynamic variables have restricted support in inventory files of maintenance procedures (e.g. upgrade, etc.).
+  The references are supported only in those sections that are merged with the main inventory.
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml

@@ -194,6 +194,8 @@ class KubernetesCluster(Environment):
         self._enrichment_stage = stage
         if stage == EnrichmentStage.DEFAULT:
             self._products.procedure_inventory = None
+            args: dict = self.context['execution_arguments']
+            args.pop('procedure_config', None)
         if stage == EnrichmentStage.PROCEDURE and previous_cluster is not None:
             self._previous_products = previous_cluster._products  # pylint: disable=protected-access
 
@@ -229,9 +231,15 @@ class KubernetesCluster(Environment):
     @enrichment(EnrichmentStage.ALL)
     def convert_formatted_inventory(self) -> dict:
         products = self._products
-        products.formatted_inventory = self.inventory
+        if self._enrichment_stage != EnrichmentStage.LIGHT:
+            products.formatted_inventory = self.inventory
+
         products.raw_inventory = utils.convert_native_yaml(self.inventory)
-        if products.procedure_inventory is not None:
+
+        if self._enrichment_stage == EnrichmentStage.LIGHT:
+            # inventory['nodes'] is already enriched, and the procedure inventory is no longer necessary.
+            products.procedure_inventory = None
+        elif self._enrichment_stage == EnrichmentStage.PROCEDURE:
             products.procedure_inventory = utils.convert_native_yaml(self.procedure_inventory)
 
         return utils.deepcopy_yaml(products.raw_inventory)
@@ -317,7 +325,7 @@ class KubernetesCluster(Environment):
     def procedure_inventory(self) -> dict:
         procedure_inventory = self._products.procedure_inventory
         if procedure_inventory is None:
-            raise ValueError("Procedure inventory is not available at 'default' enrichment stage")
+            raise ValueError("Procedure inventory is not available at 'default' or 'light' enrichment stage")
 
         return procedure_inventory
 
@@ -362,7 +370,7 @@ class KubernetesCluster(Environment):
         """
         formatted_inventory = self._products.formatted_inventory
         if formatted_inventory is None:
-            raise ValueError("Enrichment is not yet started")
+            raise ValueError("Formatted inventory is not available at 'light' enrichment stage")
 
         return formatted_inventory
 
@@ -677,12 +685,12 @@ class KubernetesCluster(Environment):
 
         return prepared_inventory
 
-    def preserve_inventory(self, context: dict) -> None:
+    def preserve_inventory(self, context: dict, *, enriched: bool = True) -> None:
         self.log.debug("Start preserving of the information about the procedure.")
         cluster_storage = self._create_cluster_storage(context)
         cluster_storage.make_dir()
         if self.context.get('initial_procedure') == 'add_node':
             cluster_storage.upload_info_new_control_planes()
         cluster_storage.collect_procedure_info()
-        cluster_storage.compress_archive()
+        cluster_storage.compress_archive(enriched)
         cluster_storage.upload_and_rotate()

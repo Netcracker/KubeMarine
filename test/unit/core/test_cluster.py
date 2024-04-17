@@ -209,6 +209,50 @@ class LightClusterTest(unittest.TestCase):
         self.assertEqual(all_hosts[:1],
                          [node.get_host() for node in cluster.get_nodes_for_removal().get_ordered_members_list()])
 
+    def test_connection_enrichment(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['values'] = {'zone': 'A'}
+        inventory['cluster_name'] = 'test-cluster'
+
+        inventory['unsupported'] = True
+        inventory['node_defaults']['unsupported'] = True
+        inventory['nodes'][0].update({
+            'unsupported': True,
+            'name': 'control-plane-{{ cluster_name }}-{{ values.zone | lower }}-1',
+            'gateway': 'test-gateway'
+        })
+        inventory['gateway_nodes'] = [{
+            'name': 'test-gateway',
+            'address': '10.101.1.100',
+            'username': 'root',
+            'keyfile': '/dev/null'
+        }]
+
+        cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
+
+        self.assertEqual({'node_defaults', 'nodes', 'gateway_nodes', 'procedure_history', 'values', 'cluster_name'},
+                         set(cluster.inventory.keys()))
+        self.assertEqual({'keyfile', 'username', 'boot'},
+                         set(cluster.inventory['node_defaults'].keys()))
+        self.assertEqual({'keyfile', 'username', 'name', 'address', 'internal_address', 'connect_to', 'roles', 'gateway', 'boot'},
+                         set(cluster.inventory['nodes'][0].keys()))
+
+        self.assertEqual('control-plane-test-cluster-a-1', cluster.inventory['nodes'][0]['name'])
+
+        host = cluster.nodes['all'].get_host()
+        self.assertEqual('10.101.1.100', cluster.connection_pool.get_connection(host).gateway.host)
+
+    def test_legacy_role(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        del inventory['nodes'][0]['name']
+        # pylint: disable-next=implicit-str-concat
+        inventory['nodes'][0]['roles'] = ['balancer', 'm''a''s''t''e''r', 'worker']
+
+        cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
+
+        self.assertIn('control-plane', cluster.inventory['nodes'][0]['roles'])
+        self.assertEqual('control-plane-1', cluster.nodes['control-plane'].get_node_name())
+
 
 if __name__ == '__main__':
     unittest.main()

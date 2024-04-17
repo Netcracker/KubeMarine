@@ -23,6 +23,23 @@ from kubemarine.procedures import do
 
 
 class DoTest(unittest.TestCase):
+    def test_command_single_control_plane(self):
+        inventory = {
+            'unsupported': True,
+            'nodes': [{'roles': ['control-plane'], 'internal_address': '1.1.1.1', 'keyfile': '/dev/null'}]
+        }
+        context = do.create_context(['--', 'cat', '/etc/kubemarine/procedures/latest_dump/version'])
+        resources = demo.new_resources(inventory, context=context)
+
+        results = demo.create_hosts_result(['1.1.1.1'], stdout='v0.28.0\n', hide=False)
+        resources.fake_shell.add(results, 'sudo', ['cat /etc/kubemarine/procedures/latest_dump/version'])
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            flow.ActionsFlow([do.CLIAction(context)]).run_flow(resources, print_summary=False)
+
+        self.assertEqual('v0.28.0\n', buf.getvalue(), "Unexpected stdout output")
+
     def test_command_run_any_node(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         hosts = [node['address'] for node in inventory['nodes']]

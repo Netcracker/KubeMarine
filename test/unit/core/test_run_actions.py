@@ -39,13 +39,16 @@ class ActionsFlowTest(unittest.TestCase):
 
     def test_patch_inventory(self):
         def inventory_action(resources_: res.DynamicResources):
-            resources_.inventory()['p2'] = 'v2'
+            resources_.inventory()['p'] = 'v'
 
         action_ = test_utils.new_action('test', action=inventory_action, recreate_inventory=True)
 
-        resources = demo.FakeResources(self.context, {"p1": "v1"})
+        inventory = {
+            'nodes': [{'roles': ['control-plane'], 'internal_address': '1.1.1.1', 'keyfile': '/dev/null'}]
+        }
+        resources = demo.new_resources(inventory)
         flow.ActionsFlow([action_]).run_flow(resources, print_summary=False)
-        self.assertEqual(resources.inventory(), {"p1": "v1", "p2": "v2"})
+        self.assertEqual('v', resources.inventory()['p'])
 
     def test_patch_cluster(self):
         def cluster_action(resources_: res.DynamicResources):
@@ -465,50 +468,86 @@ class RunActionsTest(test_utils.CommonTest):
         for recreate_inventory in (False, True):
             with self.subTest(f"inventory recreated: {recreate_inventory}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
+                self.inventory['values'] = {'k': 'v1'}
                 self.prepare_context(procedure='migrate_kubemarine')
 
                 def default_enrichment_failed(_: KubernetesCluster) -> None:
                     raise Exception("test")
 
-                resources = self._new_resources()
+                resources = demo.FakeClusterResources(
+                        self.context, nodes_context=demo.generate_nodes_context(self.inventory))
                 resources.insert_enrichment_function(schema.verify_inventory, EnrichmentStage.FULL, default_enrichment_failed)
 
                 def inventory_action(resources_: res.DynamicResources, recreate_inventory=recreate_inventory):
                     if recreate_inventory:
-                        resources_.inventory().setdefault('values', {})['k'] = 'v'
+                        resources_.inventory().setdefault('values', {})['k'] = 'v2'
 
                 def cluster_action(resources_: res.DynamicResources):
                     resources_.cluster()
 
-                uploaded_archives = self._run_actions([
-                    test_utils.new_action("test_inventory1", action=inventory_action, recreate_inventory=recreate_inventory),
-                    test_utils.new_action("test_cluster1", action=cluster_action),
-                ], resources, exception_message="test")
-                # This is a subject for future change. Maybe use LIGHT cluster to preserve the inventory
-                self.assertEqual(0, len(uploaded_archives))
+                with test_utils.chdir(self.tmpdir):
+                    uploaded_archives = self._run_actions([
+                        test_utils.new_action("test_inventory1", action=inventory_action, recreate_inventory=recreate_inventory),
+                        test_utils.new_action("test_cluster1", action=cluster_action),
+                    ], resources, exception_message="test")
+
+                self.assertEqual(1, len(uploaded_archives))
+                self._check_local_archive(
+                    uploaded_archives[0],
+                    {'dump/procedure_parameters',
+                     'dump/cluster_initial.yaml',
+                     'cluster.yaml', 'version'})
+
+                inventory_string = self._extract(uploaded_archives[0], 'cluster.yaml')
+                inventory = yaml.safe_load(inventory_string)
+                expected_value = 'v2' if recreate_inventory else 'v1'
+                self.assertEqual(expected_value, inventory['values']['k'])
+
+                expected_dump_content = set(utils.ClusterStorage.PRESERVED_DUMP_FILES) \
+                                        - {'procedure.yaml', 'cluster.yaml', 'cluster_finalized.yaml'} | {'local.tar.gz'}
+                actual_dump_content = self._list_dump_content()
+                self.assertFalse(expected_dump_content - actual_dump_content)
 
     def test_inventory_action_succeeded_cluster_action_failed(self):
         for recreate_inventory in (False, True):
             with self.subTest(f"inventory recreated: {recreate_inventory}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
+                self.inventory['values'] = {'k': 'v1'}
                 self.prepare_context(procedure='migrate_kubemarine')
 
                 def inventory_action(resources_: res.DynamicResources, recreate_inventory=recreate_inventory):
                     if recreate_inventory:
-                        resources_.inventory().setdefault('values', {})['k'] = 'v'
+                        resources_.inventory().setdefault('values', {})['k'] = 'v2'
 
                 def cluster_action(resources_: res.DynamicResources):
                     resources_.cluster()
                     raise Exception("test")
 
-                resources = self._new_resources()
-                resources.context['make_finalized_inventory'] = False
-                uploaded_archives = self._run_actions([
-                    test_utils.new_action("test_inventory1", action=inventory_action, recreate_inventory=recreate_inventory),
-                    test_utils.new_action("test_cluster1", action=cluster_action),
-                ], resources, exception_message="test")
-                # This is a subject for future change. Maybe use LIGHT cluster to preserve the inventory
-                self.assertEqual(0, len(uploaded_archives))
+                resources = demo.FakeClusterResources(
+                        self.context, nodes_context=demo.generate_nodes_context(self.inventory))
+
+                with test_utils.chdir(self.tmpdir):
+                    uploaded_archives = self._run_actions([
+                        test_utils.new_action("test_inventory1", action=inventory_action, recreate_inventory=recreate_inventory),
+                        test_utils.new_action("test_cluster1", action=cluster_action),
+                    ], resources, exception_message="test")
+
+                self.assertEqual(1, len(uploaded_archives))
+                self._check_local_archive(
+                    uploaded_archives[0],
+                    {'dump/procedure_parameters',
+                     'dump/cluster_initial.yaml',
+                     'cluster.yaml', 'version'})
+
+                inventory_string = self._extract(uploaded_archives[0], 'cluster.yaml')
+                inventory = yaml.safe_load(inventory_string)
+                expected_value = 'v2' if recreate_inventory else 'v1'
+                self.assertEqual(expected_value, inventory['values']['k'])
+
+                expected_dump_content = set(utils.ClusterStorage.PRESERVED_DUMP_FILES) \
+                                        - {'procedure.yaml', 'cluster_finalized.yaml'} | {'local.tar.gz'}
+                actual_dump_content = self._list_dump_content()
+                self.assertFalse(expected_dump_content - actual_dump_content)
 
     def test_procedure_enrich_inventory_dump_cluster_state(self):
         for sequential in (False, True):
@@ -601,7 +640,8 @@ class RunActionsTest(test_utils.CommonTest):
 class ClusterEnrichOptimization(unittest.TestCase):
     @contextmanager
     def _expected_calls(self, expected_calls: int):
-        with test_utils.mock_call(defaults.compile_inventory, side_effect=defaults.compile_inventory) as run:
+        # pylint: disable-next=protected-access
+        with test_utils.mock_call(defaults._compile_inventory, side_effect=defaults._compile_inventory) as run:
             try:
                 yield
             finally:

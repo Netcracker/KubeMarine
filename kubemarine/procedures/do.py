@@ -20,7 +20,7 @@ from typing import List, Dict, Any
 
 from kubemarine.core import flow
 from kubemarine.core.action import Action
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 
@@ -39,7 +39,7 @@ class CLIAction(Action):
         self.remote_args: List[str] = context['remote_arguments']
 
     def run(self, res: DynamicResources) -> None:
-        cluster = res.cluster()
+        cluster = res.cluster(EnrichmentStage.LIGHT)
         executors_group = get_executors_group(cluster, self.do_args)
         if executors_group.is_empty():
             print('Failed to find any of specified nodes or groups')  # pylint: disable=bad-builtin

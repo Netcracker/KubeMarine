@@ -690,14 +690,18 @@ class ClusterStorage:
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
-    def compress_archive(self) -> None:
+    def compress_archive(self, enriched: bool) -> None:
         """
         This method compose dump files in the local archive.
         """
         context = self.context
         self.local_archive_path = get_dump_filepath(context, "local.tar.gz")
         with tarfile.open(self.local_archive_path, "w:gz") as tar:
-            for name in ClusterStorage.PRESERVED_DUMP_FILES:
+            dump_files = set(ClusterStorage.PRESERVED_DUMP_FILES)
+            if not enriched:
+                dump_files -= {'cluster.yaml', 'cluster_finalized.yaml'}
+
+            for name in dump_files:
                 source = get_dump_filepath(context, name)
                 if os.path.exists(source):
                     tar.add(source, 'dump/' + name)

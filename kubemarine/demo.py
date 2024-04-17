@@ -458,7 +458,7 @@ class FakeConnectionPool(connections.ConnectionPool):
                                         gateway: fabric.connection.Connection = None,
                                         inline_ssh_env: bool = True) -> fabric.connection.Connection:
         return FakeConnection(
-            ip, self.fake_shell, self.fake_fs,
+            ip, self.fake_shell, self.fake_fs, gateway=gateway,
             user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
             port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port'])
         )

@@ -382,6 +382,7 @@ class DynamicResources:
         # All other enrichment procedures should not connect to any node.
         return [
             # JSON validation
+            kubemarine.core.schema.verify_connections,
             kubemarine.core.schema.verify_inventory,
 
             # Early enrichment of procedure inventory for connections
@@ -408,7 +409,9 @@ class DynamicResources:
             # Enrichment of procedure inventory should be finished at this step.
 
             # Convert formatted inventory to native python objects, and merge defaults.
+            kubemarine.core.defaults.restrict_connections,
             kubemarine.core.cluster.KubernetesCluster.convert_formatted_inventory,
+            kubemarine.core.defaults.merge_connection_defaults,
             kubemarine.core.defaults.merge_defaults,
 
             # Pre-compilation
@@ -416,13 +419,14 @@ class DynamicResources:
             kubemarine.core.defaults.append_controlplain,
 
             # Jinja2 compilation
+            kubemarine.core.defaults.compile_connections,
             kubemarine.core.defaults.compile_inventory,
 
             # Early conversion and validation after compilation.
             # Also, complete minimal enrichment of connections.
             kubemarine.core.defaults.calculate_connect_to,
             kubemarine.core.defaults.verify_nodes,
-            kubemarine.core.defaults.apply_defaults,
+            kubemarine.core.defaults.apply_connection_defaults,
             kubemarine.core.defaults.calculate_nodegroups,
             kubemarine.core.defaults.remove_service_roles,
             # Enrichment of inventory for LIGHT stage should be finished at this step.
@@ -446,6 +450,7 @@ class DynamicResources:
 
             # Remained default enrichment.
             # Many functions depend on kubemarine.core.defaults.calculate_nodegroups
+            kubemarine.core.defaults.apply_defaults,
             kubemarine.packages.enrich_inventory,
             kubemarine.core.defaults.apply_registry,
             kubemarine.keepalived.enrich_inventory_apply_defaults,
@@ -455,6 +460,7 @@ class DynamicResources:
             # Depends on kubemarine.core.defaults.apply_registry
             kubemarine.kubernetes.enrich_inventory,
             kubemarine.admission.enrich_inventory,
+            # Depends on kubemarine.core.defaults.apply_defaults
             kubemarine.kubernetes_accounts.enrich_inventory,
             # Depends on kubemarine.kubernetes.enrich_inventory
             kubemarine.cri.enrich_inventory,
