@@ -131,7 +131,7 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.26
     crictl: v1.29.0
-  v1.28.7:
+  v1.28.8:
     calico: v3.27.0
     nginx-ingress-controller: v1.9.6
     kubernetes-dashboard: v2.7.0
