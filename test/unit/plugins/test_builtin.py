@@ -31,9 +31,9 @@ class ManifestsInstallationTest(unittest.TestCase):
             Identity("kubernetes-dashboard"): False,
             Identity("local-path-provisioner"): False,
         }
-        for id, expected_installed in expected_install_manifests.items():
-            self.assertEqual(expected_installed, builtin.is_manifest_installed(cluster, id),
-                             f"Manifest {id.name!r} is {'not' if expected_installed else 'unexpectedly'} to be installed")
+        for id_, expected_installed in expected_install_manifests.items():
+            self.assertEqual(expected_installed, builtin.is_manifest_installed(cluster, id_),
+                             f"Manifest {id_.name!r} is {'not' if expected_installed else 'unexpectedly'} to be installed")
 
         expected_pss_profiles = {
             'ingress-nginx': 'privileged',
@@ -53,8 +53,8 @@ class ManifestsInstallationTest(unittest.TestCase):
             Identity("calico"), Identity("calico", "apiserver"), Identity("nginx-ingress-controller"),
             Identity("kubernetes-dashboard"), Identity("local-path-provisioner")
         ]
-        for id in expected_install_manifests:
-            self.assertTrue(builtin.is_manifest_installed(cluster, id), f"Manifest {id.name!r} is not to be installed")
+        for id_ in expected_install_manifests:
+            self.assertTrue(builtin.is_manifest_installed(cluster, id_), f"Manifest {id_.name!r} is not to be installed")
 
         expected_pss_profiles = {
             'calico-apiserver': 'baseline',

@@ -15,13 +15,12 @@
 import io
 import os
 import re
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import ruamel.yaml
 import yaml
 from jinja2 import Template
 
-from kubemarine import kubernetes
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
@@ -45,8 +44,6 @@ provided_oob_policies = ["default", "host-network", "anyuid"]
 valid_modes = ['enforce', 'audit', 'warn']
 valid_versions_templ = r"^v1\.\d{1,2}$"
 
-loaded_oob_policies = {}
-
 ERROR_INCONSISTENT_INVENTORIES = "Procedure config and cluster config are inconsistent. Please check 'admission' option"
 ERROR_CHANGE_OOB_PSP_DISABLED = "OOB policies can not be configured when security is disabled"
 ERROR_PSS_BOTH_STATES_DISABLED = ("both 'pod-security' in procedure config and current config are 'disabled'. "
@@ -66,9 +63,6 @@ def is_pod_security_unconditional(cluster: KubernetesCluster) -> bool:
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory_psp(cluster: KubernetesCluster) -> None:
     inventory = cluster.inventory
-
-    global loaded_oob_policies
-    loaded_oob_policies = load_oob_policies_files()
 
     # validate custom
     custom_policies = inventory["rbac"]["psp"]["custom-policies"]
@@ -165,11 +159,11 @@ def verify_custom(custom_scope: Dict[str, List[dict]]) -> None:
         verify_custom_list(bindings_list, "binding")
 
 
-def verify_custom_list(custom_list: List[dict], type: str) -> None:
+def verify_custom_list(custom_list: List[dict], type_: str) -> None:
     for item in custom_list:
         # forbid using 'oob-' prefix in order to avoid conflicts of our policies and users policies
         if item["metadata"]["name"].startswith("oob-"):
-            raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
+            raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type_))
 
 
 def verify_version(owner: str, version: str, kubernetes_version: str) -> None:
@@ -302,7 +296,9 @@ def reconfigure_oob_policies(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug("Deleting all OOB policies...")
     first_control_plane.call(delete_privileged_policy)
-    first_control_plane.call(manage_policies, manage_type="delete", manage_scope=resolve_oob_scope(loaded_oob_policies, "all"))
+    first_control_plane.call(manage_policies,
+                             manage_type="delete",
+                             manage_scope=resolve_oob_scope(target_config, "all"))
 
     if target_state == "disabled":
         cluster.log.debug("Security disabled, OOB will not be recreated")
@@ -327,6 +323,8 @@ def reconfigure_plugin(cluster: KubernetesCluster) -> None:
 
 
 def restart_pods_task(cluster: KubernetesCluster) -> None:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     if cluster.context.get('initial_procedure') == 'manage_pss':
         # check if pods restart is enabled
         is_restart = cluster.procedure_inventory.get("restart-pods", False)
@@ -389,15 +387,17 @@ def manage_privileged_from_file(group: NodeGroup, filename: str, manage_type: st
     return group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
 
 
-def resolve_oob_scope(oob_policies_conf: Dict[str, Any], selector: str) -> Dict[str, List[dict]]:
+def resolve_oob_scope(oob_policies_conf: Dict[str, str], selector: str) -> Dict[str, List[dict]]:
     result: Dict[str, List[dict]] = {
         psp_list_option: [],
         roles_list_option: [],
         bindings_list_option: []
     }
 
+    loaded_oob_policies = load_oob_policies_files()
+
     for key, value in oob_policies_conf.items():
-        if value == selector or selector == "all":
+        if selector in (value, "all"):
             policy = loaded_oob_policies[key]
             if "psp" in policy:
                 result[psp_list_option].append(policy["psp"])
@@ -440,8 +440,6 @@ def manage_policies(group: NodeGroup, manage_type: str,
 def collect_policies_template(psp_list: Optional[List[dict]],
                               roles_list: Optional[List[dict]],
                               bindings_list: Optional[List[dict]]) -> str:
-    yaml = ruamel.yaml.YAML()
-
     buf = io.StringIO()
     if psp_list:
         for psp in psp_list:
@@ -477,11 +475,10 @@ def verify_pss_enrichment(cluster: KubernetesCluster) -> None:
         for namespace_item in procedure_config["namespaces"]:
             # check if the namespace has its own profiles
             if isinstance(namespace_item, dict):
-                namespace = list(namespace_item.keys())[0]
-                for item in list(namespace_item[namespace]):
-                    if namespace_item[namespace][item]:
-                        if item.endswith("version"):
-                            verify_version(item, namespace_item[namespace][item], kubernetes_version)
+                profiles = list(namespace_item.values())[0]
+                for item in profiles:
+                    if item.endswith("version"):
+                        verify_version(item, profiles[item], kubernetes_version)
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
             if item.endswith("version"):
@@ -524,7 +521,7 @@ def manage_pss(cluster: KubernetesCluster) -> None:
 
     # Extra args of API may change, need to reconfigure the API server.
     # See enrich_inventory_pss()
-    control_planes.call(kubernetes.components.reconfigure_components,
+    control_planes.call(components.reconfigure_components,
                         components=['kube-apiserver'], force_restart=force_restart)
 
     if target_state == 'disabled':
@@ -614,7 +611,7 @@ def label_namespace_pss(cluster: KubernetesCluster) -> None:
         namespaces_defaults = procedure_config.get("namespaces_defaults")
         if namespaces_defaults:
             for default_mode in namespaces_defaults:
-                 default_modes[default_mode] = namespaces_defaults[default_mode]
+                default_modes[default_mode] = namespaces_defaults[default_mode]
         for namespace in namespaces:
             # define name of namespace
             if isinstance(namespace, dict):
@@ -625,9 +622,9 @@ def label_namespace_pss(cluster: KubernetesCluster) -> None:
                 if default_modes:
                     # set labels that are set in default section
                     cluster.log.debug(f"Set PSS labels on {ns_name} namespace from defaults")
-                    for mode in default_modes:
+                    for mode, value in default_modes.items():
                         first_control_plane.sudo(f"kubectl label ns {ns_name} "
-                                f"pod-security.kubernetes.io/{mode}={default_modes[mode]} --overwrite")
+                                f"pod-security.kubernetes.io/{mode}={value} --overwrite")
                 if isinstance(namespace, dict):
                     # set labels that are set in namespaces section
                     cluster.log.debug(f"Set PSS labels on {ns_name} namespace")

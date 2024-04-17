@@ -14,16 +14,16 @@
 
 import configparser
 import io
-import paramiko
 import re
 import socket
 import time
 from typing import Dict, Tuple, Optional, List
 
+import paramiko
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, kubernetes, apparmor, sysctl, modprobe
+from kubemarine import selinux, apparmor, sysctl, modprobe
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -93,11 +93,11 @@ def detect_nodes_context(cluster: KubernetesCluster) -> None:
 
 
 def fetch_os_versions(cluster: KubernetesCluster) -> RunnersGroupResult:
-    group = cluster.make_group(cluster.nodes_context).get_accessible_nodes()
     '''
     For Red Hat, CentOS, Oracle Linux, and Ubuntu information in /etc/os-release /etc/redhat-release is sufficient but,
     Debian stores the full version in a special file. sed transforms version string, eg 10.10 becomes DEBIAN_VERSION="10.10"  
     '''
+    group = cluster.make_group(cluster.nodes_context).get_accessible_nodes()
 
     return group.run(
         "cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
@@ -191,8 +191,7 @@ def generate_etc_hosts_config(inventory: dict, etc_hosts_part: str = 'etc_hosts_
     max_len_ip = 0
 
     for ip in list(inventory['services'][etc_hosts_part].keys()):
-        if len(ip) > max_len_ip:
-            max_len_ip = len(ip)
+        max_len_ip = max(max_len_ip, len(ip))
 
     for ip, names in inventory['services'][etc_hosts_part].items():
         if isinstance(names, list):
@@ -333,6 +332,8 @@ def reboot_nodes(cluster: KubernetesCluster) -> None:
 
 
 def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupResult:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
@@ -482,7 +483,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
     if os_family in ['rhel', 'rhel8', 'rhel9'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
-        selinux_configured, selinux_result, selinux_parsed_result = \
+        selinux_configured, selinux_result, _ = \
             selinux.is_config_valid(group,
                                     state=selinux.get_expected_state(cluster.inventory),
                                     policy=selinux.get_expected_policy(cluster.inventory),

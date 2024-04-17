@@ -45,13 +45,14 @@ def connection_ssh_connectivity(cluster: KubernetesCluster) -> None:
         try:
             cluster.check_nodes_accessibility(skip_check_iaas=False)
         except KME0006 as e:
-            raise TestFailure(e.summary, hint=e.details)
+            raise TestFailure(e.summary, hint=e.details) from None
 
 
 def connection_ssh_latency_single(cluster: KubernetesCluster) -> None:
+    latency_cfg = static.GLOBALS['compatibility_map']['network']['connection']['latency']['single']
     with TestCase(cluster, '002',  'SSH', 'Latency - Single Thread',
-                  minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical'],
-                  recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended']) as tc:
+                  minimal=latency_cfg['critical'],
+                  recommended=latency_cfg['recommended']) as tc:
         i = 0
         measurements = []
         accessible_nodes = cluster.nodes['all'].get_accessible_nodes()
@@ -68,22 +69,23 @@ def connection_ssh_latency_single(cluster: KubernetesCluster) -> None:
                 cluster.log.debug('Connection to %s - %sms' % (node.get_node_name(), diff))
                 measurements.append(diff)
         average_latency = math.floor(sum(measurements) / accessible_nodes.nodes_amount() / 5)
-        if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical']:
+        if average_latency > latency_cfg['critical']:
             raise TestFailure("Very high latency: %sms" % average_latency,
                               hint="A very high latency was detected between the deploy node and cluster nodes. "
                                    "Check your network settings and status. It is necessary to reduce the latency to %sms."
-                                   % cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical'])
-        if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended']:
+                                   % latency_cfg['critical'])
+        if average_latency > latency_cfg['recommended']:
             raise TestWarn("High latency: %sms" % average_latency,
                            hint="The detected latency is higher than the recommended value (%sms). Check your network settings "
-                                "and status." % cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended'])
+                                "and status." % latency_cfg['recommended'])
         tc.success(results="%sms" % average_latency)
 
 
 def connection_ssh_latency_multiple(cluster: KubernetesCluster) -> None:
+    latency_cfg = static.GLOBALS['compatibility_map']['network']['connection']['latency']['multi']
     with TestCase(cluster, '003',  'SSH', 'Latency - Multi Thread',
-                  minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical'],
-                  recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended']) as tc:
+                  minimal=latency_cfg['critical'],
+                  recommended=latency_cfg['recommended']) as tc:
         i = 0
         measurements = []
         accessible_nodes = cluster.nodes['all'].get_accessible_nodes()
@@ -99,15 +101,15 @@ def connection_ssh_latency_multiple(cluster: KubernetesCluster) -> None:
             cluster.log.debug('Average latency at step %s - %sms' % (i, diff))
             measurements.append(diff)
         average_latency = math.floor(sum(measurements) / 10)
-        if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical']:
+        if average_latency > latency_cfg['critical']:
             raise TestFailure("Very high latency: %sms" % average_latency,
                               hint="A very high latency was detected between the deploy node and cluster nodes. "
                                    "Check your network settings and status. It is necessary to reduce the latency to %sms."
-                                   % cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical'])
-        if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended']:
+                                   % latency_cfg['critical'])
+        if average_latency > latency_cfg['recommended']:
             raise TestWarn("High latency: %sms" % average_latency,
                            hint="The detected latency is higher than the recommended value (%sms). Check your network settings "
-                                "and status." % cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended'])
+                                "and status." % latency_cfg['recommended'])
         tc.success(results="%sms" % average_latency)
 
 
@@ -133,9 +135,12 @@ def hardware_members_amount(cluster: KubernetesCluster, group_name: str) -> None
     if group_name == 'all':
         beauty_name = 'Total Node'
 
+    hardware_minimal = static.GLOBALS['compatibility_map']['hardware']['minimal'][group_name]
+    hardware_recommended = static.GLOBALS['compatibility_map']['hardware']['recommended'][group_name]
+
     with TestCase(cluster, '005',  'Hardware', '%ss Amount' % beauty_name,
-                  minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount'],
-                  recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['amount']) as tc:
+                  minimal=hardware_minimal['amount'],
+                  recommended=hardware_recommended['amount']) as tc:
         amount = 0
         if group_name == 'vip':
             amount = len(cluster.inventory.get('vrrp_ips', []))
@@ -148,32 +153,35 @@ def hardware_members_amount(cluster: KubernetesCluster, group_name: str) -> None
         if amount != 1:
             s = 's'
 
-        if amount < cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']:
+        if amount < hardware_minimal['amount']:
             beauty_name = group_name
             if group_name == 'all':
                 beauty_name = 'all node'
             raise TestFailure("Less than minimal. Detected %s item%s" % (amount, s),
                               hint="Increase the number of resources, so that the number of %ss in the cluster should not "
-                                   "be less than %s." % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
+                                   "be less than %s." % (beauty_name, hardware_minimal['amount']))
 
-        if amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['amount']:
+        if amount < hardware_recommended['amount']:
             beauty_name = group_name
             if group_name == 'all':
                 beauty_name = 'all node'
             raise TestWarn("Less than recommended. Detected %s item%s" % (amount, s),
                            hint="Increase the number of resources, so that the number of %ss in the cluster should not "
-                                "be less than %s." % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
+                                "be less than %s." % (beauty_name, hardware_minimal['amount']))
 
         tc.success("%s item%s" % (amount, s))
 
 
 def hardware_cpu(cluster: KubernetesCluster, group_name: str) -> None:
-    minimal_cpu = cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'] \
+    hardware_minimal = static.GLOBALS['compatibility_map']['hardware']['minimal'][group_name]
+    hardware_recommended = static.GLOBALS['compatibility_map']['hardware']['recommended'][group_name]
+
+    minimal_cpu = hardware_minimal['vcpu'] \
         if group_name == 'balancer' or cluster.nodes['all'].nodes_amount() > 1 \
-        else cluster.globals['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
+        else static.GLOBALS['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
     with TestCase(cluster, '006',  'Hardware', 'VCPUs Amount - %ss' % group_name.capitalize(),
                   minimal=minimal_cpu,
-                  recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']) as tc:
+                  recommended=hardware_recommended['vcpu']) as tc:
         sudo_nodes = cluster.make_group_from_roles([group_name]).get_sudo_nodes()
         if sudo_nodes.is_empty():
             return tc.success(results='Skipped')
@@ -186,10 +194,10 @@ def hardware_cpu(cluster: KubernetesCluster, group_name: str) -> None:
                 minimal_amount = amount
             if amount < minimal_cpu:
                 cluster.log.error('%s node %s has insufficient VCPUs: expected %s, but %s found.'
-                                  % (group_name.capitalize(), host, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'], amount))
-            elif amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']:
+                                  % (group_name.capitalize(), host, hardware_minimal['vcpu'], amount))
+            elif amount < hardware_recommended['vcpu']:
                 cluster.log.warning('%s node %s has less VCPUs than recommended: recommended %s, but %s found.'
-                                    % (group_name.capitalize(), host, cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu'], amount))
+                                    % (group_name.capitalize(), host, hardware_recommended['vcpu'], amount))
             else:
                 cluster.log.debug('%s node %s has enough VCPUs: %s' % (group_name.capitalize(), host, amount))
 
@@ -200,18 +208,21 @@ def hardware_cpu(cluster: KubernetesCluster, group_name: str) -> None:
         if minimal_amount < minimal_cpu:
             raise TestFailure("Less than minimal. Detected %s VCPU%s" % (minimal_amount, s),
                               hint="Increase the number of VCPUs in the node configuration to at least the minimum "
-                                   "value: %s VCPUs." % cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'])
-        if minimal_amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']:
+                                   "value: %s VCPUs." % hardware_minimal['vcpu'])
+        if minimal_amount < hardware_recommended['vcpu']:
             raise TestWarn("Less than recommended. Detected %s VCPU%s" % (minimal_amount, s),
                            hint="Increase the number of VCPUs in the node configuration up to %s VCPUs."
-                                % cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu'])
+                                % hardware_recommended['vcpu'])
         tc.success(results='%s VCPU%s' % (minimal_amount, s))
 
 
 def hardware_ram(cluster: KubernetesCluster, group_name: str) -> None:
+    hardware_minimal = static.GLOBALS['compatibility_map']['hardware']['minimal'][group_name]
+    hardware_recommended = static.GLOBALS['compatibility_map']['hardware']['recommended'][group_name]
+
     with TestCase(cluster, '007',  'Hardware', 'RAM Amount - %ss' % group_name.capitalize(),
-                  minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'],
-                  recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']) as tc:
+                  minimal=hardware_minimal['ram'],
+                  recommended=hardware_recommended['ram']) as tc:
         sudo_nodes = cluster.make_group_from_roles([group_name]).get_sudo_nodes()
         if sudo_nodes.is_empty():
             return tc.success(results='Skipped')
@@ -219,25 +230,25 @@ def hardware_ram(cluster: KubernetesCluster, group_name: str) -> None:
         cluster.log.verbose(results)
         minimal_amount: Optional[int] = None
         for host, result in results.items():
-            amount = math.floor(sum(map(lambda x: int(x), result.stdout.strip().split("\n"))) / 1000000)
+            amount = math.floor(sum(map(int, result.stdout.strip().split("\n"))) / 1000000)
             if minimal_amount is None or minimal_amount > amount:
                 minimal_amount = amount
-            if amount < cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram']:
+            if amount < hardware_minimal['ram']:
                 cluster.log.error('%s node %s has insufficient RAM: expected %sGB, but %sGB found.'
-                                  % (group_name.capitalize(), host, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'], amount))
-            elif amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']:
+                                  % (group_name.capitalize(), host, hardware_minimal['ram'], amount))
+            elif amount < hardware_recommended['ram']:
                 cluster.log.warning('%s node %s has less RAM than recommended: recommended %sGB, but %sGB found.'
-                                    % (group_name.capitalize(), host, cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram'], amount))
+                                    % (group_name.capitalize(), host, hardware_recommended['ram'], amount))
             else:
                 cluster.log.debug('%s node %s has enough RAM: %sGB' % (group_name.capitalize(), host, amount))
-        if minimal_amount < cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram']:
+        if minimal_amount < hardware_minimal['ram']:
             raise TestFailure("Less than minimal. Detected %sGB" % minimal_amount,
                               hint="Increase the number of RAM in the node configuration to at least the minimum "
-                                   "value: %sGB." % cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'])
-        if minimal_amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']:
+                                   "value: %sGB." % hardware_minimal['ram'])
+        if minimal_amount < hardware_recommended['ram']:
             raise TestWarn("Less than recommended. Detected %sGB" % minimal_amount,
                            hint="Increase the number of RAM in the node configuration up to %s GB."
-                                % cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram'])
+                                % hardware_recommended['ram'])
         tc.success(results='%sGB' % minimal_amount)
 
 
@@ -275,7 +286,8 @@ def system_distributive(cluster: KubernetesCluster) -> None:
 
         if detected_unsupported_os:
             raise TestFailure("Unsupported OS: %s" % ", ".join(detected_unsupported_os),
-                              hint="Reinstall the OS on the host to one of the supported: %s" % ", ".join(supported_distributives))
+                              hint="Reinstall the OS on the host to one of the supported: %s"
+                                   % ", ".join(supported_distributives))
 
         if detected_unsupported_version:
             raise TestFailure("Unsupported version: %s" % ", ".join(detected_unsupported_version),
@@ -302,7 +314,8 @@ def check_kernel_version(cluster: KubernetesCluster) -> None:
     """
     with TestCase(cluster, '015', "Software", "Kernel version") as tc:
         bad_results = {}
-        unstable_kernel_ubuntu: List[str] = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('unstable_kernel')
+        unstable_kernel_ubuntu: List[str] = cluster.globals['compatibility_map']['distributives']['ubuntu'][0] \
+            .get('unstable_kernel')
         unstable_kernel_centos: List[str] = []
         group = cluster.nodes['all'].get_accessible_nodes()
         result_group = group.run('uname -r')
@@ -328,8 +341,27 @@ def check_kernel_version(cluster: KubernetesCluster) -> None:
 def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '012', 'Software', 'Thirdparties Availability') as tc:
         detect_preinstalled_python(cluster)
-        broken = []
-        skipped_msgs = nodes_require_python(cluster)
+        check_resolv_conf(cluster)
+        broken: List[str] = []
+        warnings = nodes_require_python(cluster)
+
+        problem_handlers: Dict[str, List[str]] = {}
+
+        def resolve_problem_handler(host: str) -> List[str]:
+            handler = problem_handlers.get(host)
+            if handler is None:
+                resolv_conf_actual = cluster.nodes_context[host]['resolv_conf_is_actual']
+                if not resolv_conf_actual:
+                    warnings.append(f"resolv.conf is not installed for node {host}: "
+                                    f"Thirdparties can be unavailable. You can install resolv.conf using task "
+                                    f"`install --tasks prepare.dns.resolv_conf`")
+                    handler = warnings
+                else:
+                    handler = broken
+
+                problem_handlers[host] = handler
+
+            return handler
 
         # Load script for checking sources
         all_group = get_python_group(cluster, True)
@@ -348,8 +380,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
                 python_executable = cluster.nodes_context[host]['python']['executable']
                 res = node.run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
                                                 cluster.inventory['globals']['timeout_download']), warn=True)
+                problem_handler = resolve_problem_handler(host)
                 if res.is_any_failed():
-                    broken.append(f"{host}, {destination}: {res[host].stderr}")
+                    problem_handler.append(f"{host}, {destination}: {res[host].stderr}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -357,9 +390,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
 
         if broken:
             raise TestFailure('Required thirdparties are unavailable', hint=yaml.safe_dump(broken))
-        if skipped_msgs:
+        if warnings:
             raise TestWarn("Can't detect python version for some nodes",
-                           hint='\n'.join(skipped_msgs))
+                           hint='\n'.join(warnings))
         tc.success('All thirdparties are available')
 
 
@@ -782,7 +815,8 @@ def assign_ips(group: NodeGroup,
 
 
 @contextmanager
-def assign_random_ips(cluster: KubernetesCluster, group: NodeGroup, host_to_inf: Dict[str, str], subnet: str) -> Iterator[Dict[str, str]]:
+def assign_random_ips(cluster: KubernetesCluster, group: NodeGroup, host_to_inf: Dict[str, str], subnet: str) \
+        -> Iterator[Dict[str, str]]:
     cluster.log.debug(f"Assigning random IP addresses from {subnet} to the internal interface...")
 
     inet = ipaddress.ip_network(subnet)
@@ -1258,7 +1292,7 @@ def vips_connectivity(cluster: KubernetesCluster) -> None:
 
 
 def ipip_connectivity(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected') as tc,\
+    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected'), \
             suspend_firewalld(cluster):
 
         skipped_msgs = []
@@ -1278,11 +1312,11 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         if enc_type == "ipip":
             # Check if IPv6 addresses are used
             connect_to_ip = group.get_ordered_members_configs_list()[0]['internal_address']
-            if type(ipaddress.ip_address(connect_to_ip)) is not ipaddress.IPv4Address:
+            if utils.isipv(connect_to_ip, [6]):
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-            if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
+            if utils.isipv(ip, [6]):
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             failed_nodes = check_ipip_tunnel(group)
@@ -1373,7 +1407,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
 
 def fs_mount_options(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc:
+    with TestCase(cluster, '018', 'System', 'Filesystem mount options'):
 
         failed_nodes: Set[str] = set()
         cri_root = ""
@@ -1394,7 +1428,7 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
             else:
                 cri_root = "/var/lib/docker"
         if not cri_root:
-                raise TestWarn("Check cannot be completed, unknown CRI")
+            raise TestWarn("Check cannot be completed, unknown CRI")
         cluster.log.debug("Mount options check")
         # Check the mount options for filesystem where containerd root is located.
         # If containerd root doesn't exist the script check the parent directory and so forth.
@@ -1532,7 +1566,7 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
 
     # Final summary should be printed only to stdout with custom formatting
     # If test results are required for parsing, they can be found in the test results files
-    print(testsuite.get_final_summary())
+    testsuite.print_final_summary()
     testsuite.print_final_status(result.logger)
     make_reports(context, testsuite)
     return testsuite

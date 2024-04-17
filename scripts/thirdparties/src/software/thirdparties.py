@@ -21,6 +21,8 @@ from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
 
+# pylint: disable=bad-builtin
+
 ERROR_ASCENDING_VERSIONS = \
     "Third-parties should have non-decreasing versions. " \
     "Third-party '{thirdparty}' has version {older_version} for Kubernetes {older_k8s_version}, " \

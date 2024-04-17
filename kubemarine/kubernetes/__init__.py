@@ -21,7 +21,6 @@ from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
-import ipaddress
 
 from kubemarine import system, admission, etcd, packages, jinja
 from kubemarine.core import utils, static, summary, log, errors
@@ -184,7 +183,8 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     preflight_errors.extend(default_preflight_errors)
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
-    # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max since they define the same kernel variable
+    # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max
+    # since they define the same kernel variable
     version_key = utils.version_key(inventory["services"]["kubeadm"]["kubernetesVersion"])
     conntrack_max = inventory["services"]["sysctl"].get("net.netfilter.nf_conntrack_max")
     if version_key >= (1, 29, 0) and conntrack_max is not None:
@@ -275,7 +275,11 @@ def drain_nodes(group: NodeGroup, disable_eviction: bool = False,
 
     for node in group.get_ordered_members_list():
         node_name = node.get_node_name()
-        if node_name in stdout:
+
+        # Split stdout into lines
+        stdout_lines = stdout.split('\n')[1:]
+        # Check if node_name exactly matches any line
+        if node_name in stdout_lines:
             log.debug("Draining node %s..." % node_name)
             drain_cmd = prepare_drain_command(
                 cluster, node_name,
@@ -299,7 +303,11 @@ def delete_nodes(group: NodeGroup) -> RunnersGroupResult:
 
     for node in group.get_ordered_members_list():
         node_name = node.get_node_name()
-        if node_name in stdout:
+        
+        # Split stdout into lines
+        stdout_lines = stdout.split('\n')[1:]
+        # Check if node_name exactly matches any line
+        if node_name in stdout_lines:
             log.debug("Deleting node %s from the cluster..." % node_name)
             control_plane.sudo("kubectl delete node %s" % node_name, hide=False)
         else:
@@ -393,7 +401,7 @@ def local_admin_config(nodes: NodeGroup) -> Iterator[str]:
         with nodes.new_executor() as exe:
             for defer in exe.group.get_ordered_members_list():
                 internal_address = defer.get_config()['internal_address']
-                if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
+                if utils.isipv(internal_address, [6]):
                     internal_address = f"[{internal_address}]"
 
                 defer.sudo(
@@ -421,7 +429,7 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
     # Replace cluster FQDN with ip
     public_cluster_ip = cluster.inventory.get('public_cluster_ip')
     if public_cluster_ip:
-        if type(ipaddress.ip_address(public_cluster_ip)) is ipaddress.IPv6Address:
+        if utils.isipv(public_cluster_ip, [6]):
             public_cluster_ip = f"[{public_cluster_ip}]"
         cluster_name = cluster.inventory['cluster_name']
         kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)
@@ -575,7 +583,9 @@ def wait_for_nodes(group: NodeGroup) -> None:
             retries = retries - 1
             time.sleep(timeout)
 
-    raise Exception("Nodes did not become ready in the expected time, %s retries every %s seconds. Try to increase node.ready.retries parameter in globals: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#globals" % (retries, timeout))
+    raise Exception(f"Nodes did not become ready in the expected time, {retries} retries every {timeout} seconds. "
+                    "Try to increase node.ready.retries parameter in globals: "
+                    "https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#globals")
 
 
 def init_workers(group: NodeGroup) -> None:
@@ -685,7 +695,9 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     # put control-plane patches
     components.create_kubeadm_patches_for_node(cluster, first_control_plane)
 
-    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s' --patches=/etc/kubernetes/patches" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
+    flags = ("-f --certificate-renewal=true "
+             f"--ignore-preflight-errors='{cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']}' "
+             f"--patches=/etc/kubernetes/patches")
 
     drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
     first_control_plane.sudo(drain_cmd, hide=False)
@@ -1125,9 +1137,9 @@ def exec_running_nodes_report(cluster: KubernetesCluster) -> None:
                         and conditions.get('NetworkUnavailable', {}).get('status') == 'False':
                     ready += 1
 
-        property = summary.SummaryItem.CONTROL_PLANES if role == 'control-plane' else summary.SummaryItem.WORKERS
+        property_ = summary.SummaryItem.CONTROL_PLANES if role == 'control-plane' else summary.SummaryItem.WORKERS
         value = f'{ready}/{members}'
-        summary.schedule_report(cluster.context, property, value)
+        summary.schedule_report(cluster.context, property_, value)
 
 
 def get_nodes_description_cmd() -> str:

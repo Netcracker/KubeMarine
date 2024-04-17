@@ -85,11 +85,11 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
             log.debug('All ETCD members are healthy!')
             is_healthy = True
             break
-        else:
-            log.debug('Wait for ETCD cluster is not healthy!')
-            if sudo_time < timeout:
-                time.sleep(timeout - sudo_time)
-            retries -= 1
+
+        log.debug('Wait for ETCD cluster is not healthy!')
+        if sudo_time < timeout:
+            time.sleep(timeout - sudo_time)
+        retries -= 1
 
     if is_healthy:
         etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()

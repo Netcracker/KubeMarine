@@ -16,6 +16,8 @@ import io
 import unittest
 from typing import List
 from unittest import mock
+from test.unit.plugins import _AbstractManifestEnrichmentTest
+from test.unit import utils as test_utils
 
 import yaml
 
@@ -23,8 +25,6 @@ from kubemarine import demo, plugins
 from kubemarine.core import flow
 from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
-from test.unit.plugins import _AbstractManifestEnrichmentTest
-from test.unit import utils as test_utils
 
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
@@ -241,9 +241,11 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 self.assertEqual(expected_image, container['image'], "Unexpected calico-typha image")
                 self.assertEqual({"kubernetes.io/os": "something"}, template_spec['nodeSelector'],
                                  "Unexpected calico-typha nodeSelector")
-                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'}, template_spec['tolerations'],
+                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
+                              template_spec['tolerations'],
                               "Default calico-typha toleration is not present")
-                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}, template_spec['tolerations'],
+                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'},
+                              template_spec['tolerations'],
                               "Default calico-typha toleration is not present")
                 self.assertIn({"key": 'something', "effect": "NoSchedule"}, template_spec['tolerations'],
                               "Custom calico-typha toleration is not present")
@@ -454,11 +456,13 @@ class EnrichmentTest(unittest.TestCase):
 
 class RedeployIfNeeded(unittest.TestCase):
     def prepare_context(self, procedure: str):
+        # pylint: disable=attribute-defined-outside-init
         task = 'deploy.plugins' if procedure == 'add_node' else 'update.plugins'
         self.context = demo.create_silent_context(['fake_path.yaml', '--tasks', task], procedure=procedure)
         self.action = add_node.AddNodeAction() if procedure == 'add_node' else remove_node.RemoveNodeAction()
 
     def prepare_inventory(self, scheme: dict, procedure: str, changed_node_name: str):
+        # pylint: disable=attribute-defined-outside-init
         self.inventory = demo.generate_inventory(**scheme)
         self.inventory.setdefault('plugins', {})['calico'] = {
             'install': True,
@@ -562,6 +566,8 @@ class RedeployIfNeeded(unittest.TestCase):
                                      "Typha is not enabled in enriched inventory")
 
     def test_add_remove_balancer_redeploy_not_needed(self):
+        # pylint: disable=attribute-defined-outside-init
+
         scheme = {'balancer': ['balancer-1', 'balancer-2'],
                   'master': ['master-1', 'master-2'],
                   'worker': ['worker-1']}
@@ -576,6 +582,8 @@ class RedeployIfNeeded(unittest.TestCase):
         self._run_and_check(False)
 
     def test_add_remove_50th_kubernetes_node_redeploy_needed(self):
+        # pylint: disable=attribute-defined-outside-init
+
         for role in ('master', 'worker'):
             for typha_replicas_redefined in (False, True):
                 with self.subTest(f'Role: {role}, Typha replicas redefined: {typha_replicas_redefined}'):

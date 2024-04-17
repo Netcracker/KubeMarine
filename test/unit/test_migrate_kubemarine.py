@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Tuple, Iterator, Type, Union, Callable, Any, Dict
 from unittest import mock
+from test.unit import utils as test_utils
 
 from kubemarine import patches, demo, system
 from kubemarine.core import static, utils, flow, summary, errors
@@ -30,7 +31,8 @@ from kubemarine.procedures import migrate_kubemarine
 from kubemarine.procedures.migrate_kubemarine import (
     CriUpgradeAction, BalancerUpgradeAction, PluginUpgradeAction, ThirdpartyUpgradeAction
 )
-from test.unit import utils as test_utils
+
+# pylint: disable=protected-access
 
 
 def get_kubernetes_versions():
@@ -87,7 +89,9 @@ def get_patches_by_ids(ids: List[str]) -> List[Patch]:
     return patches_
 
 
-def generate_environment(kubernetes_version: str, scheme=demo.MINIHA_KEEPALIVED) -> Tuple[dict, dict]:
+def generate_environment(kubernetes_version: str, scheme: dict = None) -> Tuple[dict, dict]:
+    if scheme is None:
+        scheme = demo.MINIHA_KEEPALIVED
     inventory = demo.generate_inventory(**scheme)
     inventory['services']['kubeadm'] = {
         'kubernetesVersion': kubernetes_version
@@ -144,6 +148,8 @@ class PatchesResolvingTest(unittest.TestCase):
 
 class UpgradeCRI(unittest.TestCase):
     def prepare_environment(self, cri: str, os_name: str, os_version: str):
+        # pylint: disable=attribute-defined-outside-init
+
         self.kubernetes_version = get_kubernetes_versions()[-1]
         self.inventory, self.context = generate_environment(self.kubernetes_version)
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
@@ -260,7 +266,8 @@ class UpgradeCRI(unittest.TestCase):
                     if not global_section:
                         associations = associations['debian']
                     associations['containerd']['package_name'] = 'containerd-inventory'
-                    self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = procedure_associations
+                    self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] \
+                        = procedure_associations
 
                     self._run_and_check(expected_upgrade_required, EnrichmentStage.PROCEDURE)
 
@@ -271,22 +278,28 @@ class UpgradeCRI(unittest.TestCase):
 
                 redefined_package, expected_package = 'containerd-inventory', 'containerd-inventory'
                 if template:
-                    redefined_package += '={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
-                    expected_package += f"={static.GLOBALS['compatibility_map']['software']['containerd'][self.kubernetes_version]['version_debian']}"
+                    redefined_package += ('={{ globals.compatibility_map.software'
+                                          '.containerd[services.kubeadm.kubernetesVersion].version_debian }}')
+                    expected_package += "=" + static.GLOBALS['compatibility_map']['software']\
+                        ['containerd'][self.kubernetes_version]['version_debian']
 
                 redefined_associations = ['podman', redefined_package]
                 expected_associations = ['podman', expected_package]
 
                 self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
-                self.inventory['services']['packages']['associations']['containerd']['package_name'] = redefined_associations
-                self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = redefined_associations
+                self.inventory['services']['packages']['associations']\
+                    ['containerd']['package_name'] = redefined_associations
+                self.migrate_kubemarine['upgrade']['packages']['associations']\
+                    ['containerd']['package_name'] = redefined_associations
                 res = self._run_and_check(template, EnrichmentStage.PROCEDURE)
 
-                actual_package = res.working_inventory['services']['packages']['associations']['debian']['containerd']['package_name']
+                actual_package = res.working_inventory['services']['packages']['associations']['debian']\
+                    ['containerd']['package_name']
                 self.assertEqual(expected_associations, actual_package,
                                  "Package names were not compiled using procedure inventory")
 
-                actual_package = res.finalized_inventory['services']['packages']['associations']['debian']['containerd']['package_name']
+                actual_package = res.finalized_inventory['services']['packages']['associations']['debian']\
+                    ['containerd']['package_name']
                 self.assertEqual(expected_associations, actual_package,
                                  "Package names were not compiled using procedure inventory")
 
@@ -549,7 +562,9 @@ class UpgradeThirdparties(unittest.TestCase):
 
         res = self._run_and_check('upgrade_crictl', True, EnrichmentStage.PROCEDURE)
 
-        expected_crictl = f"crictl-{static.GLOBALS['compatibility_map']['software']['crictl'][self.kubernetes_version]['version']}"
+        expected_crictl_version = static.GLOBALS['compatibility_map']['software']\
+            ['crictl'][self.kubernetes_version]['version']
+        expected_crictl = f"crictl-{expected_crictl_version}"
 
         crictl = res.working_inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
         self.assertEqual(expected_crictl, crictl['source'],
@@ -634,7 +649,12 @@ class UpgradeThirdparties(unittest.TestCase):
 
 
 class UpgradeBalancers(unittest.TestCase):
-    def prepare_environment(self, os_name: str, os_version: str, scheme=demo.MINIHA_KEEPALIVED):
+    def prepare_environment(self, os_name: str, os_version: str, scheme: dict = None):
+        # pylint: disable=attribute-defined-outside-init
+
+        if scheme is None:
+            scheme = demo.MINIHA_KEEPALIVED
+
         self.inventory, self.context = generate_environment(get_kubernetes_versions()[-1], scheme=scheme)
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
         self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
@@ -721,7 +741,8 @@ class UpgradeBalancers(unittest.TestCase):
                         if not global_section:
                             associations = associations['debian']
                         associations[package]['package_name'] = f'{package}-inventory'
-                        self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = procedure_associations
+                        self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] \
+                            = procedure_associations
 
                         self._run_and_check(f'upgrade_{package}', expected_upgrade_required, EnrichmentStage.PROCEDURE)
 
@@ -741,11 +762,13 @@ class UpgradeBalancers(unittest.TestCase):
                     self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = redefined_package
                     res = self._run_and_check(f'upgrade_{package}', template, EnrichmentStage.PROCEDURE)
 
-                    actual_package = res.working_inventory['services']['packages']['associations']['debian'][package]['package_name']
+                    actual_package = res.working_inventory['services']['packages']['associations']['debian']\
+                        [package]['package_name']
                     self.assertEqual(expected_package, actual_package,
                                      "Package names were not compiled using procedure inventory")
 
-                    actual_package = res.finalized_inventory['services']['packages']['associations']['debian'][package]['package_name']
+                    actual_package = res.finalized_inventory['services']['packages']['associations']['debian']\
+                        [package]['package_name']
                     self.assertEqual(expected_package, actual_package,
                                      "Package names were not compiled using procedure inventory")
 
@@ -982,6 +1005,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
                         self.assertEqual(called, service in actual_called,
                                          f"Upgrade of {service!r} was {'not' if called else 'unexpectedly'} run")
                 else:
+                    # pylint: disable-next=stop-iteration-return
                     service, called = next((k, v) for k, v in expected_services.items())
                     self.assertEqual(called, run.called,
                                      f"Upgrade of {service!r} was {'not' if called else 'unexpectedly'} run")

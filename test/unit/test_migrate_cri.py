@@ -15,11 +15,11 @@
 import unittest
 from copy import deepcopy
 from typing import Tuple
+from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import errors, flow
 from kubemarine.procedures import migrate_cri
-from test.unit import utils as test_utils
 
 
 def generate_migrate_cri_environment() -> Tuple[dict, dict]:
@@ -72,7 +72,8 @@ class MigrateCriPackagesEnrichment(unittest.TestCase):
         inventory, context = generate_migrate_cri_environment()
         migrate_cri = self.prepare_procedure_inventory()
         cluster = demo.new_cluster(inventory, procedure_inventory=migrate_cri, context=context)
-        self.assertEqual('containerd', cluster.inventory['services']['packages']['associations']['rhel']['containerd']['package_name'],
+        self.assertEqual('containerd',
+                         cluster.inventory['services']['packages']['associations']['rhel']['containerd']['package_name'],
                          "Associations packages are enriched incorrectly")
 
     def test_final_inventory_enrich_global(self):

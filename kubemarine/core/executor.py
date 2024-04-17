@@ -18,14 +18,13 @@ import random
 import re
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from types import TracebackType
 from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable
 
 import fabric  # type: ignore[import-untyped]
 import fabric.transfer  # type: ignore[import-untyped]
-
-from concurrent.futures.thread import ThreadPoolExecutor
 
 import invoke
 
@@ -204,7 +203,6 @@ class RawExecutor:
             self.connection_pool = connection_pool
         else:
             self.connection_pool = cluster.connection_pool
-        self.inventory = cluster.inventory
         self._connections_queue: Dict[str, List[_PayloadItem]] = {}
         self._last_token = -1
         self._last_results: Dict[str, TokenizedResult] = {}
@@ -257,7 +255,7 @@ class RawExecutor:
             reparsed_results[host] = conn_results
 
             runner_exception = None
-            if isinstance(raw_result, invoke.UnexpectedExit) or isinstance(raw_result, invoke.CommandTimedOut):
+            if isinstance(raw_result, (invoke.UnexpectedExit, invoke.CommandTimedOut)):
                 runner_exception = raw_result
                 raw_result = raw_result.result
 
@@ -391,9 +389,9 @@ class RawExecutor:
                     batch[host] = actions[i]
             if not batch:
                 break
-            else:
-                i += 1
-                batches.append(batch)
+
+            i += 1
+            batches.append(batch)
 
         return batches
 
@@ -533,6 +531,7 @@ class RawExecutor:
         for host, payloads in batch.items():
             cxn = self.connection_pool.get_connection(host)
             do_type, args, kwargs = self._prepare_merged_action(host, payloads)
+            # pylint: disable-next=cell-var-from-loop
             safe_exec(futures, host, lambda: tpe.submit(getattr(cxn, do_type), *args, **kwargs))
 
         for host, future in futures.items():
@@ -540,6 +539,8 @@ class RawExecutor:
             # This makes usage of future timeout useless, as the operation is not stopped.
             # Instead, we always pass timeout for run/sudo and so have CommandTimedOut.
             # For put/get fabric & paramiko do not offer timeout, so transfer cannot be stopped currently.
+
+            # pylint: disable-next=cell-var-from-loop
             safe_exec(results, host, lambda: future.result(timeout=None))
 
         self._flush_logger_writers(batch)
@@ -607,14 +608,11 @@ class RawExecutor:
             return self._wait_for_boot_with_executor(left_nodes, TPE, timeout, initial_boot_history)
 
     def _wait_for_boot_with_executor(self, left_nodes: List[str], tpe: ThreadPoolExecutor,
-                                     timeout: int = None,
+                                     overridden_timeout: int = None,
                                      initial_boot_history: Mapping[str, RunnersResult] = None) -> HostToResult:
 
-        boot_config = self._get_boot_config()
-        if timeout is None:
-            timeout = boot_config['timeout']
-
-        delay_period = boot_config['defaults']['delay_period']
+        timeout = self._resolve_boot_timeout(left_nodes, overridden_timeout)
+        delay_period = static.GLOBALS['nodes']['boot']['defaults']['delay_period']
 
         if initial_boot_history is None:
             initial_boot_history = {}
@@ -641,6 +639,8 @@ class RawExecutor:
                               and result == initial_boot_history.get(host))]
 
             waited = (datetime.now() - time_start).total_seconds()
+            if left_nodes:
+                timeout = self._resolve_boot_timeout(left_nodes, overridden_timeout)
 
             if not left_nodes or waited >= timeout:
                 break
@@ -648,7 +648,7 @@ class RawExecutor:
             for host, exc in results.items():
                 if isinstance(exc, Exception) and not self._is_allowed_connection_exception(str(exc)):
                     self.logger.verbose("Unexpected exception at %s, node is considered as not booted: %s"
-                                             % (host, str(exc)))
+                                        % (host, str(exc)))
 
             self.logger.verbose("Nodes %s are not ready yet, remaining time to wait %i"
                                 % (left_nodes, timeout - waited))
@@ -664,10 +664,15 @@ class RawExecutor:
 
         return results
 
-    def _get_boot_config(self) -> dict:
-        boot_config = dict(self.inventory['globals']['nodes']['boot'])
-        boot_config.update(static.GLOBALS['nodes']['boot'])
-        return boot_config
+    def _resolve_boot_timeout(self, hosts: List[str], overridden_timeout: Optional[int]) -> int:
+        if overridden_timeout is not None:
+            return overridden_timeout
+
+        return max(self._get_node_boot_timeout(host) for host in hosts)
+
+    def _get_node_boot_timeout(self, host: str) -> int:
+        timeout: int = self.connection_pool.get_node(host)['boot']['timeout']
+        return timeout
 
     def _do_nopasswd(self, left_nodes: List[str], tpe: ThreadPoolExecutor, command: str) -> HostToResult:
         prompt = '[sudo] password: '

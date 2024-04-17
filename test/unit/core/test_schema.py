@@ -15,13 +15,13 @@ import glob
 import os
 import unittest
 from unittest import mock
+from test.unit import utils as test_utils
 
 import yaml
 
-from kubemarine import demo, coredns, __main__
+from kubemarine import demo, coredns, __main__, plugins
 from kubemarine.core import errors
 from kubemarine.procedures import install
-from test.unit import utils as test_utils
 
 
 class FinalizedInventoryValidation(unittest.TestCase):
@@ -55,8 +55,8 @@ class FinalizedInventoryValidation(unittest.TestCase):
         # check that generation of coredns does not break finalized inventory
         self._check_finalized_validation(finalized_inventory)
 
-    @mock.patch('kubemarine.plugins.install_plugin')
-    def test_plugins_installation_enriches_valid(self, install_plugin):
+    @mock.patch.object(plugins, plugins.install_plugin.__name__)
+    def test_plugins_installation_enriches_valid(self, _):
         inventory = demo.generate_inventory(**demo.MINIHA)
         cluster = demo.new_cluster(inventory)
         install.deploy_plugins(cluster)
@@ -74,7 +74,7 @@ class TestValidExamples(unittest.TestCase):
         for inventory_filepath in glob.glob(inventories_dir + "/**/*", recursive=True):
             if os.path.isdir(inventory_filepath) or 'cluster' not in os.path.basename(inventory_filepath):
                 continue
-            with open(inventory_filepath, 'r') as stream:
+            with open(inventory_filepath, 'r', encoding='utf-8') as stream:
                 inventory = yaml.safe_load(stream)
 
             # check that enrichment is successful and the inventory is valid against the schema
@@ -89,24 +89,23 @@ class TestValidExamples(unittest.TestCase):
         for inventory_filepath in glob.glob(inventories_dir + "/**/*", recursive=True):
             if os.path.isdir(inventory_filepath):
                 continue
-            with open(inventory_filepath, 'r') as stream:
+            with open(inventory_filepath, 'r', encoding='utf-8') as stream:
                 procedure_inventory = yaml.safe_load(stream)
 
             relpath = os.path.relpath(inventory_filepath, start=inventories_dir)
             for procedure in __main__.procedures.keys():
                 if procedure in os.path.basename(inventory_filepath):
+                    context = demo.create_silent_context(['fake.yaml'], procedure=procedure)
+                    inventory = demo.generate_inventory(**demo.MINIHA)
+
+                    # check that enrichment is successful and the inventory is valid against the schema
+                    try:
+                        demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
+                    except Exception as e:
+                        self.fail(f"Enrichment of {relpath} failed: {e}")
                     break
             else:
                 self.fail(f"Unknown procedure for inventory {relpath}")
-
-            context = demo.create_silent_context(['fake.yaml'], procedure=procedure)
-            inventory = demo.generate_inventory(**demo.MINIHA)
-
-            # check that enrichment is successful and the inventory is valid against the schema
-            try:
-                demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
-            except Exception as e:
-                self.fail(f"Enrichment of {relpath} failed: {e}")
 
 
 class TestErrorHeuristics(unittest.TestCase):

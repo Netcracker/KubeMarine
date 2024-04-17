@@ -20,11 +20,16 @@ import jinja2
 
 from kubemarine.core import log, utils
 
+FILTER = Callable[[str], Any]
+
 
 def new(_: log.EnhancedLogger, *,
         recursive_compiler: Callable[[str], str] = None,
-        precompile_filters: Dict[str, Callable[[str], Any]] = None) -> jinja2.Environment:
-    def _precompile(filter_: str, struct: str) -> str:
+        precompile_filters: Dict[str, FILTER] = None) -> jinja2.Environment:
+    def _precompile(filter_: str, struct: str, *args: Any, **kwargs: Any) -> str:
+        if args or kwargs:
+            raise ValueError(f"Filter {filter_!r} does not support extra arguments")
+
         if not isinstance(struct, str):
             raise ValueError(f"Filter {filter_!r} can be applied only on string")
 
@@ -41,10 +46,13 @@ def new(_: log.EnhancedLogger, *,
     precompile_filters['versionkey'] = utils.version_key
     precompile_filters['b64encode'] = lambda s: base64.b64encode(s.encode()).decode()
     precompile_filters['b64decode'] = lambda s: base64.b64decode(s.encode()).decode()
-    precompile_filters['url_quote'] = lambda u: quote_plus(u)
+    precompile_filters['url_quote'] = quote_plus
 
     for name, filter_ in precompile_filters.items():
-        env.filters[name] = lambda s, n=name, f=filter_: f(_precompile(n, s))
+        def make_filter(n: str, f: FILTER) -> FILTER:
+            return lambda s, *args, **kwargs: f(_precompile(n, s, *args, *kwargs))
+
+        env.filters[name] = make_filter(name, filter_)
 
     env.filters['toyaml'] = lambda data: yaml.dump(data, default_flow_style=False)
     env.tests['has_role'] = lambda node, role: role in node['roles']

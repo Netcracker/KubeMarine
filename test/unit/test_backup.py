@@ -13,23 +13,21 @@
 # limitations under the License.
 
 import gzip
-import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
 from typing import Optional
 from unittest import mock
+from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import utils, flow
 from kubemarine.procedures import backup
-from test.unit import utils as test_utils
 
 
-class TestBackupTasks(unittest.TestCase):
+class TestBackupTasks(test_utils.CommonTest):
     def setUp(self):
-        self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.hosts = [node['address'] for node in self.inventory['nodes']]
 
@@ -37,15 +35,15 @@ class TestBackupTasks(unittest.TestCase):
 
         self.args = self.context['execution_arguments']
         self.args['disable_dump'] = False
-        self.args['dump_location'] = self.tmpdir.name
-        test_utils.prepare_dump_directory(self.context)
+        self.args['dump_location'] = self.tmpdir
+        utils.prepare_dump_directory(self.context)
 
         self.fake_shell = demo.FakeShell()
         self.resources: Optional[demo.FakeResources] = None
 
-    def tearDown(self):
-        test_utils.prepare_dump_directory(self.context)
-        self.tmpdir.cleanup()
+    def run(self, *args, **kwargs):
+        with test_utils.temporary_directory(self):
+            return super().run(*args, **kwargs)
 
     def _run(self, procedure_inventory: dict):
         self.resources = test_utils.FakeResources(self.context, self.inventory,
@@ -76,7 +74,7 @@ class TestBackupTasks(unittest.TestCase):
         self.assertEqual(['nodes'], descriptor.get('nonnamespaced'),
                          "Not expected resulting list of non-namespaced resources")
 
-        resources_path = Path(self.tmpdir.name) / 'dump' / 'backup' / 'kubernetes_resources'
+        resources_path = Path(self.tmpdir) / 'dump' / 'backup' / 'kubernetes_resources'
         actual_files = {str(p.relative_to(resources_path)) for p in resources_path.glob("**/*.yaml")}
         expected_files = {str(Path(p)) for p in ['nodes.yaml', 'kube-system/configmaps.yaml',
                                                  'kube-system/configmaps.example.com.yaml',
@@ -187,7 +185,7 @@ class TestBackupTasks(unittest.TestCase):
         descriptor = self.resources.cluster_if_initialized().context['backup_descriptor']['kubernetes']['resources']
         self.assertEqual({}, descriptor, "Not expected resulting list of resources")
 
-        resources_path = Path(self.tmpdir.name) / 'dump' / 'backup' / 'kubernetes_resources'
+        resources_path = Path(self.tmpdir) / 'dump' / 'backup' / 'kubernetes_resources'
         actual_files = {str(p.relative_to(resources_path)) for p in resources_path.glob("**/*.yaml")}
         self.assertFalse(actual_files, "List of files is not empty")
 
@@ -225,7 +223,7 @@ class TestBackupTasks(unittest.TestCase):
 
     @contextmanager
     def _mock_download(self):
-        download_orig = backup.ExportKubernetesDownloader._download
+        download_orig = backup.ExportKubernetesDownloader._download  # pylint: disable=protected-access
 
         def download_stub(location: str, data: str):
             with gzip.open(location, 'wt', encoding='utf-8') as f:

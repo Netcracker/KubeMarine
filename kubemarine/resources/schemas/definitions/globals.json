@@ -108,19 +108,6 @@
                "description": "Timeout for node readiness check in seconds"
              }
            }
-         },
-         "boot": {
-           "type": "object",
-           "description": "Nodes boot settings",
-           "additionalProperties": false,
-           "properties": {
-             "timeout": {
-               "type": "integer",
-               "minimal": 1,
-               "default": 600,
-               "description": "Timeout for node reboot in seconds"
-             }
-           }
          }
       }
     }

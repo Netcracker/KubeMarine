@@ -175,7 +175,7 @@ class TestGroupCall(unittest.TestCase):
         self.cluster.fake_fs.emulate_latency = True
         with tempfile.TemporaryDirectory() as tempdir:
             file = os.path.join(tempdir, 'file.txt')
-            with open(file, 'w') as f:
+            with open(file, 'w', encoding='utf-8') as f:
                 f.write('a' * 100000)
 
             all_nodes = self.cluster.nodes["all"]

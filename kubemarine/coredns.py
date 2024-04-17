@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import io
 from typing import Union, List, Optional, Any, Dict, Tuple
 
 import yaml
 
 from kubemarine import system
 from kubemarine.core import utils
-
-import io
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import RunnersGroupResult
@@ -52,7 +51,7 @@ def proceed_section_keyvalue(data: Dict[str, Any], tabsize: int) -> str:
     return config
 
 
-def generate_nested_sections(type: str, data: Dict[str, Dict[str, Any]], tabsize: int) -> str:
+def generate_nested_sections(type_: str, data: Dict[str, Dict[str, Any]], tabsize: int) -> str:
     tab = " "*tabsize
     config = ''
 
@@ -78,28 +77,28 @@ def generate_nested_sections(type: str, data: Dict[str, Dict[str, Any]], tabsize
     for section in sections:
         section_name, _ = section
         section_value = data[section_name]
-        if type == 'kubernetes':
-            config += '\n' + tab + type
+        if type_ == 'kubernetes':
+            config += '\n' + tab + type_
             if section_value.get('zone'):
                 if isinstance(section_value['zone'], list):
                     section_value['zone'] = ' '.join(section_value['zone'])
                 config += ' ' + section_value['zone']
             config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
-        elif type == 'hosts':
-            config += '\n' + tab + type
+        elif type_ == 'hosts':
+            config += '\n' + tab + type_
             if section_value.get('file') and isinstance(section_value['file'], str):
                 config += ' ' + section_value['file']
             config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
-        elif type == 'template':
+        elif type_ == 'template':
             zones: Union[str, List[Optional[str]]] = [None]
             if section_value.get('zone'):
                 zones = section_value['zone']
                 if isinstance(zones, str):
                     zones = [zones]
             for zone in zones:
-                config += '\n' + tab + type
+                config += '\n' + tab + type_
                 if section_value.get('class'):
                     config += ' ' + section_value['class']
                 if section_value.get('type'):
@@ -109,7 +108,7 @@ def generate_nested_sections(type: str, data: Dict[str, Dict[str, Any]], tabsize
                 config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
         else:
-            config += '\n' + tab + type + ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2)\
+            config += '\n' + tab + type_ + ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) \
                       + '\n' + tab + '}'
 
     return config

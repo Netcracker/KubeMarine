@@ -377,7 +377,8 @@ class PluginUpgradePatch(_SoftwareUpgradePatch):
             f"""\
             Upgrade {self.plugin_name!r} for the following Kubernetes versions:
             {{versions_list}}
-            Roughly equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins disabled except the {self.plugin_name!r}.
+            Roughly equivalent to 'kubemarine install --tasks=deploy.plugins'
+            with all plugins disabled except the {self.plugin_name!r}.
             """.rstrip()
         ).format(versions_list=versions_list)
 
@@ -475,6 +476,8 @@ def new_parser() -> argparse.ArgumentParser:
 
 
 def run(context: dict) -> None:
+    # pylint: disable=bad-builtin
+
     args = context['execution_arguments']
 
     patches = load_patches()

@@ -14,12 +14,12 @@
 import re
 import unittest
 from copy import deepcopy
+from test.unit import utils
 
 from kubemarine import demo, admission, plugins
 from kubemarine.core import errors, flow
 from kubemarine.kubernetes import components
 from kubemarine.procedures import manage_pss
-from test.unit import utils
 
 
 class EnrichmentValidation(unittest.TestCase):
@@ -267,6 +267,8 @@ class RunTasks(unittest.TestCase):
                              "Unexpected apiserver extra args")
 
     def test_manage_pss_change_configuration_restart(self):
+        # pylint: disable=protected-access
+
         self.inventory['rbac']['pss']['pod-security'] = 'enabled'
         self.inventory['rbac']['pss']['defaults']['enforce'] = 'baseline'
         self.manage_pss['pss']['pod-security'] = 'enabled'
@@ -275,13 +277,13 @@ class RunTasks(unittest.TestCase):
         with utils.mock_call(admission.label_namespace_pss), \
                 utils.mock_call(admission.copy_pss), \
                 utils.mock_call(components._prepare_nodes_to_reconfigure_components), \
-                utils.mock_call(components._reconfigure_control_plane_component, return_value=False) as reconfigure_control_plane, \
+                utils.mock_call(components._reconfigure_control_plane_component, return_value=False) as cfg_ctrl_plane, \
                 utils.mock_call(components._update_configmap, return_value=True), \
                 utils.mock_call(components._restart_containers) as restart_containers, \
                 utils.mock_call(plugins.expect_pods) as expect_pods:
             self._run_tasks('manage_pss')
 
-            self.assertTrue(reconfigure_control_plane.called,
+            self.assertTrue(cfg_ctrl_plane.called,
                             "There should be an attempt to reconfigure kube-apiserver, but nothing is changed")
 
             self.assertTrue(restart_containers.called)

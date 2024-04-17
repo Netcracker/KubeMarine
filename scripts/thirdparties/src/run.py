@@ -22,6 +22,8 @@ from .software.plugins import ManifestResolver, Plugins, ManifestsEnrichment
 from .software.thirdparties import ThirdpartyResolver, Thirdparties
 from .tracker import SummaryTracker
 
+# pylint: disable=bad-builtin
+
 
 class Synchronization:
     def __init__(self,

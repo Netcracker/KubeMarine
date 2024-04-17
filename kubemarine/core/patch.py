@@ -21,7 +21,10 @@ from kubemarine.core.action import Action
 @total_ordering
 class _Priority(enum.Enum):
     INVENTORY_ONLY = 0
-    "The patch should only change the inventory. Enrichment is prohibited."
+    """
+    The patch may change the inventory.
+    The patch can run only LIGHT enrichment, and connect to nodes for read-only aims.
+    """
 
     SOFTWARE_UPGRADE = 1
     "This is a service patch that should be instantiated only automatically by migrate_kubemarine.py"
@@ -57,8 +60,8 @@ class Patch(ABC):
 
 class InventoryOnlyPatch(Patch, ABC):
     """
-    The patch should only change the inventory.
-    Enrichment is prohibited. Calling DynamicResources.cluster() is prohibited.
+    The patch may change the inventory.
+    Calling DynamicResources.cluster(EnrichmentStage.LIGHT) is allowed to connect to nodes for read-only aims.
 
     Patches if this type are executed first.
     """

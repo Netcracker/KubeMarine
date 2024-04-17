@@ -13,11 +13,11 @@
 # limitations under the License.
 import re
 import unittest
+from test.unit import utils as test_utils
 
 from kubemarine import demo, cri
 from kubemarine.core import errors
 from kubemarine.core.cluster import KubernetesCluster
-from test.unit import utils as test_utils
 
 
 class TestContainerdCriEnrichment(unittest.TestCase):

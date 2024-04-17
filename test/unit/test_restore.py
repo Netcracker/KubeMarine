@@ -13,44 +13,41 @@
 # limitations under the License.
 
 import os
-import tempfile
 import unittest
 from typing import List
-from unittest import mock
+from test.unit import utils as test_utils
 
 import yaml
 
 from kubemarine import demo, thirdparties
 from kubemarine.core import utils, static
 from kubemarine.procedures import restore, backup
-from test.unit import utils as test_utils
 
 
-class RestoreEnrichmentTest(unittest.TestCase):
+class RestoreEnrichmentTest(test_utils.CommonTest):
     def setUp(self):
-        self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
 
         self.context = self._create_context(['--without-act'])
-        test_utils.prepare_dump_directory(self.context)
+        utils.prepare_dump_directory(self.context)
 
-        self.restore_tmpdir = os.path.join(self.tmpdir.name, 'restore_test')
+        self.restore_tmpdir = os.path.join(self.tmpdir, 'restore_test')
         os.mkdir(self.restore_tmpdir)
 
-        self.backup_location = os.path.join(self.tmpdir.name, 'backup.tar.gz')
+        self.backup_location = os.path.join(self.tmpdir, 'backup.tar.gz')
         self.restore = demo.generate_procedure_inventory('restore')
         self.restore['backup_location'] = self.backup_location
 
-    def tearDown(self):
-        test_utils.prepare_dump_directory(self.context)
-        self.tmpdir.cleanup()
+    def run(self, *args, **kwargs):
+        with test_utils.temporary_directory(self):
+            return super().run(*args, **kwargs)
 
     def _create_context(self, args: List[str]) -> dict:
         context = demo.create_silent_context(['fake_path.yaml'] + args, procedure='restore')
 
         args = context['execution_arguments']
         args['disable_dump'] = False
-        args['dump_location'] = self.tmpdir.name
+        args['dump_location'] = self.tmpdir
 
         return context
 
@@ -59,7 +56,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
                                              procedure_inventory=self.restore,
                                              nodes_context=demo.generate_nodes_context(self.inventory))
 
-        restore.RestoreFlow()._run(resources)
+        restore.RestoreFlow()._run(resources)  # pylint: disable=protected-access
 
         return resources
 
@@ -112,7 +109,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self._pack_descriptor({})
         self._pack_data()
 
-        with mock.patch.object(thirdparties, thirdparties.install_thirdparty.__name__) as install_thirdparty:
+        with test_utils.mock_call(thirdparties.install_thirdparty):
             resources = self._run()
 
         thirdparties_section = resources.working_inventory['services']['thirdparties']

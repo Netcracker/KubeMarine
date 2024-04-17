@@ -14,8 +14,9 @@
 
 import json
 import pathlib
+from collections.abc import Hashable
 from textwrap import dedent
-from typing import List, Dict, Callable, Union, Sequence, Hashable
+from typing import List, Dict, Callable, Union, Sequence
 
 import jsonschema
 from ordered_set import OrderedSet
@@ -25,6 +26,22 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 
 
 @enrichment(EnrichmentStage.LIGHT)
+def verify_connections(cluster: KubernetesCluster) -> None:
+    inventory = utils.convert_native_yaml(cluster.inventory)
+    # Run restricted validation of sections that participate in the enrichment of connections.
+    # This is primarily needed for `do`, and `migrate_kubemarine` procedures.
+    _verify_inventory_by_schema(cluster, inventory, 'internal/connections')
+    context = cluster.context
+    args: dict = context['execution_arguments']
+    procedure = context["initial_procedure"]
+    if args.get('procedure_config') and procedure in ('add_node', 'remove_node'):
+        # Run full validation for add_node/remove_node
+        # It is currently not necessary to restrict validation to connections only as for inventory.
+        procedure_inventory = utils.convert_native_yaml(cluster.procedure_inventory)
+        _verify_inventory_by_schema(cluster, procedure_inventory, context["initial_procedure"])
+
+
+@enrichment(EnrichmentStage.FULL)
 def verify_inventory(cluster: KubernetesCluster) -> None:
     inventory = utils.convert_native_yaml(cluster.inventory)
     _verify_inventory_by_schema(cluster, inventory, 'cluster')
@@ -37,7 +54,9 @@ def verify_inventory(cluster: KubernetesCluster) -> None:
 
 
 def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, schema_name: str) -> None:
-    for_procedure = "" if schema_name == 'cluster' else f" for procedure '{schema_name}'"
+    for_procedure = ("" if schema_name == 'cluster'
+                     else " for connections" if schema_name == 'internal/connections'
+                     else f" for procedure '{schema_name}'")
 
     root_schema_resource = f'resources/schemas/{schema_name}.json'
     root_schema_path = utils.get_internal_resource_path(root_schema_resource)
@@ -300,13 +319,15 @@ def _verbose_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valida
 
 
 def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError) -> str:
+    # pylint: disable=too-many-return-statements
+
     if _validated_by(error, 'minProperties'):
         return f"Number of properties is less than the minimum of {error.validator_value!r}. " \
-               f"Property names: {[prop for prop in error.instance]!r}"
+               f"Property names: {list(error.instance)!r}"
 
     if _validated_by(error, 'maxProperties'):
         return f"Number of properties is greater than the maximum of {error.validator_value!r}. " \
-               f"Property names: {[prop for prop in error.instance]!r}"
+               f"Property names: {list(error.instance)!r}"
 
     if _validated_by(error, 'minItems'):
         return f"Number of items equal to {len(error.instance)} is less than the minimum of {error.validator_value!r}"
@@ -319,9 +340,9 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
         expected_types = [value] if isinstance(value, str) else value
         reprs = ", ".join(repr(type) for type in expected_types)
         try:
-            for type in validator.TYPE_CHECKER._type_checkers:
-                if validator.is_type(error.instance, type):  # type: ignore[no-untyped-call]
-                    return f"Actual instance type is {type!r}. Expected: {reprs}."
+            for type_ in validator.TYPE_CHECKER._type_checkers:  # pylint: disable=protected-access
+                if validator.is_type(error.instance, type_):  # type: ignore[no-untyped-call]
+                    return f"Actual instance type is {type_!r}. Expected: {reprs}."
         except (AttributeError, TypeError, jsonschema.exceptions.UnknownType):
             # In current 3rd-party version the error should not appear, but let's still fall back to default behaviour
             pass

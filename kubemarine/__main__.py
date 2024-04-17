@@ -25,6 +25,8 @@ import yaml
 
 from kubemarine import procedures as proc
 
+# pylint: disable=bad-builtin
+
 # Don't remove this line. The idna encoding
 # is used by getaddrinfo when dealing with unicode hostnames,
 # and in some cases, there appears to be a race condition
@@ -34,7 +36,7 @@ from kubemarine import procedures as proc
 # the encodings.idna is imported and registered in the codecs registry,
 # which will stop the LookupErrors from happening.
 # See: https://bugs.python.org/issue29288
-u''.encode('idna')
+u''.encode('idna')  # pylint: disable=redundant-u-string-prefix
 
 # Take pattern to resolve float used by ruamel instead of that is used by pyyaml.
 # https://sourceforge.net/p/ruamel-yaml/code/ci/0.17.21/tree/resolver.py#l43
@@ -185,7 +187,7 @@ def selftest() -> None:
 
     time_start = int(round(time.time() * 1000))
 
-    for procedure, procedure_details in procedures.items():
+    for procedure in procedures:
         print("\nImporting %s..." % procedure)
 
         if procedure in ['version', 'selftest']:

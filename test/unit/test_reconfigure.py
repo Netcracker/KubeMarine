@@ -14,11 +14,11 @@
 
 import re
 import unittest
+from test.unit import utils as test_utils
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import flow
 from kubemarine.procedures import reconfigure
-from test.unit import utils as test_utils
 
 
 class ReconfigureKubeadmEnrichment(unittest.TestCase):
@@ -241,7 +241,8 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
             ]
         }
         with self.assertRaisesRegex(
-                Exception, re.escape(kubernetes.ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(version=kubernetes_version))):
+                Exception, re.escape(kubernetes.ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(
+                    version=kubernetes_version))):
             self.new_cluster()
 
 

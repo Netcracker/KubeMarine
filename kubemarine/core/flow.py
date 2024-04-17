@@ -19,8 +19,7 @@ import sys
 import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from types import FunctionType
-from typing import Optional, List, Union, Sequence, Tuple, cast, Callable, Dict, Any
+from typing import Optional, List, Union, Sequence, Tuple, Dict, Any
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log, defaults
 
@@ -114,9 +113,8 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
                 with utils.open_external(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
 
-        if cluster is None:
-            # We currently do not support inventory preservation for actions that only change the inventory
-            successfully_performed = []
+        # Initialize connections early, in particular for inventory preservation.
+        resources.cluster(c.EnrichmentStage.LIGHT)
 
         try:
             logger.info(f"Running action '{act.identifier}'")
@@ -125,7 +123,7 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
             successfully_performed.append(act.identifier)
         except Exception:
             if successfully_performed:
-                _post_process_actions_group(resources, successfully_performed, failed=True)
+                _post_process_actions_group(resources, cluster, successfully_performed, failed=True)
 
             raise
 
@@ -140,19 +138,27 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
                     utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
 
             resources.recreate_inventory()
-            _post_process_actions_group(resources, successfully_performed)
+            _post_process_actions_group(resources, cluster, successfully_performed)
             successfully_performed = []
+            cluster = None
 
     if successfully_performed:
-        _post_process_actions_group(resources, successfully_performed)
+        _post_process_actions_group(resources, cluster, successfully_performed)
 
 
-def _post_process_actions_group(resources: res.DynamicResources, successfully_performed: List[str],
+def _post_process_actions_group(resources: res.DynamicResources, cluster: Optional[c.KubernetesCluster],
+                                successfully_performed: List[str],
                                 *,
                                 failed: bool = False) -> None:
-    if resources.cluster_if_initialized() is None:
-        return
+    previous_successful_cluster = cluster is not None
+    try:
+        if previous_successful_cluster:
+            _dump_inventory(resources, failed)
+    finally:
+        _preserve_inventory(resources, successfully_performed, failed=failed, enriched=previous_successful_cluster)
 
+
+def _dump_inventory(resources: res.DynamicResources, failed: bool) -> None:
     context = resources.context
 
     # If cluster is initialized, it is fully enriched at least to DEFAULT state.
@@ -161,22 +167,28 @@ def _post_process_actions_group(resources: res.DynamicResources, successfully_pe
     # * If successful, changes in the inventory should be moved to this state in DynamicResources.recreate_inventory().
     # * If failed, switch to this state effectively restores the cluster to the state after previous action succeeded.
     cluster = resources.cluster(c.EnrichmentStage.DEFAULT)
-    try:
-        if failed:
-            # Preserve effective inventory for the last succeeded action.
-            # For debug aims, cluster_procedure.yaml can still be used.
-            defaults.dump_inventory(cluster, context, 'cluster.yaml')
 
-        resources.dump_finalized_inventory(cluster)
-    finally:
-        context['successfully_performed'] = successfully_performed
-        context['status'] = 'failed' if failed else 'successful'
+    if failed:
+        # Preserve effective inventory for the last succeeded action.
+        # For debug aims, cluster_procedure.yaml can still be used.
+        defaults.dump_inventory(cluster, context, 'cluster.yaml')
 
-        if (resources.context['preserve_inventory']
-                and not resources.context['execution_arguments'].get('without_act', False)):
-            # If the main cluster is initialized, light cluster is initialized for sure
-            cluster = resources.cluster(c.EnrichmentStage.LIGHT)
-            cluster.preserve_inventory(context)
+    resources.dump_finalized_inventory(cluster)
+
+
+def _preserve_inventory(resources: res.DynamicResources, successfully_performed: List[str],
+                        *,
+                        failed: bool, enriched: bool) -> None:
+    context = resources.context
+
+    context['successfully_performed'] = successfully_performed
+    context['status'] = 'failed' if failed else 'successful'
+
+    if (resources.context['preserve_inventory']
+            and not resources.context['execution_arguments'].get('without_act', False)):
+        # Light cluster is always pre-initialized before running of any action.
+        cluster = resources.cluster(c.EnrichmentStage.LIGHT)
+        cluster.preserve_inventory(context, enriched=enriched)
 
 
 class TasksAction(action.Action):
@@ -219,8 +231,8 @@ class TasksAction(action.Action):
         proceed_cumulative_point(cluster, self.cumulative_points, END_OF_TASKS,
                                  force=args.get('force_cumulative_points', False))
 
-    def cluster(self, resources: res.DynamicResources) -> c.KubernetesCluster:
-        return resources.cluster()
+    def cluster(self, _res: res.DynamicResources) -> c.KubernetesCluster:
+        return _res.cluster()
 
 
 def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None) -> None:
@@ -232,6 +244,7 @@ def create_empty_context(args: dict, procedure: str) -> dict:
         "execution_arguments": deepcopy(args),
         'initial_procedure': procedure,
         'preserve_inventory': True,
+        'make_finalized_inventory': True,
         'load_inventory_silent': False,
         'runtime_vars': {},
         'result': ['summary_report'],
@@ -469,30 +482,6 @@ def parse_args(parser: argparse.ArgumentParser, arguments: list) -> argparse.Nam
     return args
 
 
-def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method: Callable) -> None:
-    _check_within_flow(cluster)
-
-    func = cast(FunctionType, point_method)
-    point_fullname = func.__module__ + '.' + func.__qualname__
-
-    if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
-        cluster.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
-        return
-
-    if point_fullname in cluster.context['execution_arguments']['exclude_cumulative_points_methods']:
-        cluster.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
-        return
-
-    scheduled_points = cluster.context.get('scheduled_cumulative_points', [])
-
-    if point_method not in scheduled_points:
-        scheduled_points.append(point_method)
-        cluster.context['scheduled_cumulative_points'] = scheduled_points
-        cluster.log.verbose('Method %s scheduled' % point_fullname)
-    else:
-        cluster.log.verbose('Method %s already scheduled' % point_fullname)
-
-
 def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
                              point_task_name: Union[str, object], force: bool = False) -> Dict[str, Any]:
     _check_within_flow(cluster)
@@ -529,14 +518,9 @@ def init_tasks_flow(cluster: c.KubernetesCluster) -> None:
 
 
 def add_task_to_proceeded_list(cluster: c.KubernetesCluster, task_path: str) -> None:
-    if not is_task_completed(cluster, task_path):
+    if not cluster.is_task_completed(task_path):
         cluster.context['proceeded_tasks'].append(task_path)
         utils.dump_file(cluster, "\n".join(cluster.context['proceeded_tasks'])+"\n", 'finished_tasks')
-
-
-def is_task_completed(cluster: c.KubernetesCluster, task_path: str) -> bool:
-    _check_within_flow(cluster)
-    return task_path in cluster.context['proceeded_tasks']
 
 
 def _check_within_flow(cluster: c.KubernetesCluster, check: bool = True) -> None:

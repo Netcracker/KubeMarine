@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import os
-import tempfile
 import unittest
 from typing import Dict, Optional, List
 from unittest import mock
+from test.unit import utils as test_utils
 
 from kubemarine import demo, plugins
 from kubemarine.core import utils, flow, action
@@ -24,28 +24,21 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import install, upgrade, migrate_kubemarine
 from kubemarine.procedures.migrate_kubemarine import ThirdpartyUpgradeAction, CriUpgradeAction, BalancerUpgradeAction, \
     PluginUpgradeAction
-from test.unit import utils as test_utils
 
 
-class TestEnvironmentVariables(unittest.TestCase):
+class TestEnvironmentVariables(test_utils.CommonTest):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.procedure_inventory = None
         self.nodes_context = demo.generate_nodes_context(self.inventory)
         self.resources: Optional[demo.FakeResources] = None
 
-        self.tmpdir = tempfile.TemporaryDirectory()
-
-    def tearDown(self):
-        test_utils.prepare_dump_directory(self.context)
-        self.tmpdir.cleanup()
-
     def prepare_context(self, args: list = None, procedure: str = 'install'):
-        self.context = demo.create_silent_context(args, procedure)
+        self.context = demo.create_silent_context(args, procedure)  # pylint: disable=attribute-defined-outside-init
         args = self.context['execution_arguments']
         args['disable_dump'] = False
-        args['dump_location'] = self.tmpdir.name
-        test_utils.prepare_dump_directory(self.context)
+        args['dump_location'] = self.tmpdir
+        utils.prepare_dump_directory(self.context)
 
     def _new_resources(self) -> demo.FakeResources:
         return test_utils.FakeResources(self.context, self.inventory,
@@ -59,6 +52,7 @@ class TestEnvironmentVariables(unittest.TestCase):
                 actions = [install.InstallAction()]
             flow.run_actions(self.resources, actions)
 
+    @test_utils.temporary_directory
     def test_simple_miscellaneous_env_variables(self):
         self.prepare_context(['--without-act'])
         self.inventory['values'] = {
@@ -78,10 +72,12 @@ class TestEnvironmentVariables(unittest.TestCase):
         inventory = self.resources.working_inventory
         self.assertEqual('value1', inventory['values']['variable'])
 
-        config = inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri".registry.configs."host".auth']
+        auth_path = 'plugins."io.containerd.grpc.v1.cri".registry.configs."host".auth'
+        config = inventory['services']['cri']['containerdConfig'][auth_path]
         self.assertEqual('me', config['username'])
         self.assertEqual('password123', config['password'])
 
+    @test_utils.temporary_directory
     def test_substring_jinja_env_variables(self):
         self.prepare_context(['--without-act'])
         self.inventory['plugins'] = {'my_plugin': {'installation': {'procedures': [
@@ -101,6 +97,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('test-image:1.2.3', values['image'])
         self.assertEqual('1.2.3', values['version'])
 
+    @test_utils.temporary_directory
     def test_expression_jinja_env_variables(self):
         self.prepare_context(['--without-act'])
         self.inventory['values'] = {
@@ -110,6 +107,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         inventory = self.resources.working_inventory
         self.assertEqual('not defined', inventory['values']['variable'])
 
+    @test_utils.temporary_directory
     def test_recursive_env_variables(self):
         self.prepare_context(['--without-act'])
         self.inventory['values'] = {
@@ -123,9 +121,10 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('value-recursive', inventory['values']['variable2'])
         self.assertEqual('value-recursive', inventory['values']['variable3'])
 
+    @test_utils.temporary_directory
     def test_plugin_template_apply_env_variables(self):
         self.prepare_context()
-        template_file = os.path.join(self.tmpdir.name, 'template.yaml.j2')
+        template_file = os.path.join(self.tmpdir, 'template.yaml.j2')
         with utils.open_external(template_file, 'w') as t:
             t.write('Some {{ env.ENV_VAR }}\n')
 
@@ -142,9 +141,10 @@ class TestEnvironmentVariables(unittest.TestCase):
         source = apply_source.call_args[0][1]['source'].getvalue()
         self.assertIn('Some env_value', source, "Env variable should be expanded")
 
-        compiled_template = utils.read_external(os.path.join(self.tmpdir.name, 'dump', 'template.yaml'))
+        compiled_template = utils.read_external(os.path.join(self.tmpdir, 'dump', 'template.yaml'))
         self.assertIn('Some env_value', compiled_template, "Env variable should be expanded in dump files.")
 
+    @test_utils.temporary_directory
     def test_kubernetes_version_env_variable(self):
         kubernetes_version = 'v1.28.4'
         self.prepare_context(['--without-act'])
@@ -156,11 +156,14 @@ class TestEnvironmentVariables(unittest.TestCase):
 
         inventory = self.resources.working_inventory
         self.assertEqual(kubernetes_version, inventory['services']['kubeadm']['kubernetesVersion'])
-        self.assertEqual(f'https://storage.googleapis.com/kubernetes-release/release/{kubernetes_version}/bin/linux/amd64/kubeadm',
+        expected_source = (f'https://storage.googleapis.com/kubernetes-release/release/'
+                           f'{kubernetes_version}/bin/linux/amd64/kubeadm')
+        self.assertEqual(expected_source,
                          inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
 
+    @test_utils.temporary_directory
     def test_kubernetes_version_upgrade_env_variable(self):
-        before, after = 'v1.27.8', 'v1.28.6'
+        before, after = 'v1.27.8', 'v1.28.8'
         self.prepare_context(['fake_path.yaml', '--without-act'], procedure='upgrade')
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
@@ -185,7 +188,10 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('containerd_new',
                          inventory['services']['packages']['associations']['rhel']['containerd']['package_name'])
 
+    @test_utils.temporary_directory
     def test_kubernetes_version_env_variable_migrate_kubemarine_upgrade_patches(self):
+        # pylint: disable=protected-access
+
         self.prepare_context(procedure='migrate_kubemarine')
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"

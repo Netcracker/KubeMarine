@@ -25,6 +25,8 @@ from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoft
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 
+# pylint: disable=bad-builtin
+
 ERROR_UNEXPECTED_IMAGE = "Image '{image}' for manifest '{manifest}' is not expected"
 ERROR_ASCENDING_VERSIONS = \
     "Plugins should have non-decreasing versions. " \
@@ -160,7 +162,7 @@ def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name:
 
     for extra_image in extra_images:
         version_key = f"{extra_image}-version"
-        for i, older_k8s_version in enumerate(k8s_versions):
+        for older_k8s_version in k8s_versions:
             newer_latest_patch_versions = [v for v in latest_patch_k8s_versions
                                            if utils.version_key(v) > utils.version_key(older_k8s_version)]
 
@@ -356,5 +358,6 @@ def try_manifest_enrichment(k8s_version: str, manifest_identity: Identity) -> No
         def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
             print(msg)
 
+    # pylint: disable-next=protected-access
     processor = builtin._get_manifest_processor(ConsoleLogger(), cluster.inventory, manifest_identity)
     processor.enrich()

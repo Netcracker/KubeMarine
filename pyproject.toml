@@ -64,6 +64,9 @@ mypy = [
     "types-pyinstaller==6.2.0.*",
     "types-requests==2.31.*"
 ]
+pylint = [
+    "pylint==3.1.*"
+]
 
 # Auxiliary executable roughly equivalent to python -m kubemarine
 # Allows to not worry about exact path to python executable on the client machine
@@ -95,6 +98,80 @@ push = true
 "kubemarine/version" = [
     '^{version}$'
 ]
+
+[tool.pylint.main]
+py-version = "3.7"
+init-hook = 'import sys; sys.path.append("scripts/thirdparties")'
+
+load-plugins = [
+    "pylint.extensions.bad_builtin"
+]
+
+# Without `fail-under`, pylint fails if at least one message is printed.
+# Still, do not remove `fail-on` section, because it has precedence over `disable`,
+# and thus prevents from accidental disabling.
+# Also, it contains inline recommendations about particular messages.
+fail-on = [
+    # Messages with numerical IDs `E\d+` or `F\d+`.
+    "E", "F",
+    # Use logging framework as much as possible instead of print().
+    "bad-builtin",
+    # https://github.com/pyinstaller/pyinstaller/issues/1687
+    "consider-using-sys-exit",
+    # Considered more error prone because we have __main__ startup dependent on the initial procedure.
+    "cyclic-import",
+    # Since we use ruamel.yaml, using of `type() == ` checks is considered more error prone.
+    "unidiomatic-typecheck",
+    # Consider using kubemarine.core.utils.open_(external|internal).
+    "unspecified-encoding",
+    # List of other warnings that are considered more error prone
+    "arguments-differ",
+    "arguments-renamed",
+    "cell-var-from-loop",
+    "implicit-str-concat",
+    "undefined-loop-variable",
+]
+
+[tool.pylint.format]
+max-line-length = 130
+
+[tool.pylint."messages control"]
+disable = [
+    # Refactor
+    "duplicate-code",
+    "inconsistent-return-statements",
+    "no-else-raise",
+    "no-else-return",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-public-methods",
+    "too-many-statements",
+    # Convention
+    "consider-using-f-string",
+    "import-outside-toplevel",
+    "invalid-name",
+    "missing-final-newline",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "trailing-newlines",
+    "trailing-whitespace",
+    "typevar-name-incorrect-variance",
+    # Warnings
+    "broad-exception-caught",
+    "broad-exception-raised",
+    "f-string-without-interpolation",
+    "fixme",
+    "redefined-outer-name",
+    "unnecessary-pass",
+]
+
+[tool.pylint.deprecated_builtins]
+bad-functions = ["print"]
 
 [tool.mypy]
 files = ["kubemarine", "scripts"]

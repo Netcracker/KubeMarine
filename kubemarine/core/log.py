@@ -16,10 +16,9 @@ import logging
 import os
 import sys
 from abc import ABC, abstractmethod
+from typing import Any, List, Optional, cast, Dict, Union
 
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import-untyped]
-
-from typing import Any, List, Optional, cast, Dict, Union
 
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
@@ -197,14 +196,14 @@ class LogHandler:
                  colorize: bool = False,
                  correct_newlines: bool = False,
                  filemode: str = 'a',
-                 format: str = DEFAULT_FORMAT,
+                 format_: str = DEFAULT_FORMAT,
                  datefmt: str = None,
                  header: str = None,
                  **kwargs: Union[str, bool, int]):
 
         self._colorize = colorize
         self._correct_newlines = correct_newlines
-        self._format = format
+        self._format = format_
         self._datefmt = datefmt
         self._header = header
 
@@ -256,7 +255,8 @@ class LogHandler:
             self._target = target
             # Output produced by remote commands might contain characters which cannot be encoded on Windows deployer.
             # Specify explicitly utf-8 encoding which is native to the remote machines.
-            self.handler = FileHandlerWithHeader(self._formatter, self._target, mode=filemode, header=self._header, encoding='utf-8')
+            self.handler = FileHandlerWithHeader(self._formatter, self._target,
+                                                 mode=filemode, header=self._header, encoding='utf-8')
 
         if level not in LOGGING_LEVELS_BY_NAME:
             raise Exception(f'Failed to create logger - unknown logging level: "{level}"')
@@ -264,7 +264,8 @@ class LogHandler:
         self.handler.setLevel(self._level)
 
     def __str__(self) -> str:
-        return f'target: {self._target}, level: {LOGGING_NAMES_BY_LEVEL[self._level]}, colorize: {self._colorize}, datefmt: {self._datefmt}, format: {self._format}'
+        return (f'target: {self._target}, level: {LOGGING_NAMES_BY_LEVEL[self._level]}, '
+                f'colorize: {self._colorize}, datefmt: {self._datefmt}, format: {self._format}')
 
     def append_to_logger(self, logger: EnhancedLogger) -> None:
         logger.addHandler(self.handler)
@@ -338,7 +339,7 @@ def parse_log_argument(argument: str) -> LogHandler:
         if parameter == '':
             continue
         value: Union[str, bool, int]
-        key, value, *rest = parameter.split('=')
+        key, value, *_ = parameter.split('=')
         if key == 'level':
             level = value
         else:
@@ -362,12 +363,12 @@ def get_dump_debug_filepath(context: dict) -> Optional[str]:
     return os.path.join(args['dump_location'], 'dump', 'debug.log')
 
 
-def init_log_from_context_args(globals: dict, context: dict, name: str) -> Log:
+def init_log_from_context_args(globals_: dict, context: dict, name: str) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
-    :param globals: parsed globals collection
+    :param globals_: parsed globals collection
     :param context: context holding execution arguments.
-    :param raw_inventory: parsed but not yet enriched inventory
+    :param name: desirable logger name
     :return: Initialized Log, based on all parsed logging arguments
     """
 
@@ -388,10 +389,10 @@ def init_log_from_context_args(globals: dict, context: dict, name: str) -> Log:
     debug_filepath = get_dump_debug_filepath(context)
     if debug_filepath:
         handlers.append(LogHandler(target=debug_filepath,
-                                   **globals['logging']['default_targets']['dump']))
+                                   **globals_['logging']['default_targets']['dump']))
 
     if not stdout_specified:
-        stdout_settings = globals['logging']['default_targets']['stdout']
+        stdout_settings = globals_['logging']['default_targets']['stdout']
         handlers.append(LogHandler(target='stdout', **stdout_settings))
 
     log = Log(name, handlers)

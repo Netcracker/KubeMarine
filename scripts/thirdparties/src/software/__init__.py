@@ -23,6 +23,8 @@ from kubemarine.procedures import migrate_kubemarine
 from ..shell import info, run
 from ..tracker import SummaryTracker, ChangesTracker
 
+# pylint: disable=bad-builtin
+
 YAML = utils.yaml_structure_preserver()
 SOFTWARE_UPGRADE_PATH = migrate_kubemarine.SOFTWARE_UPGRADE_PATH
 
@@ -88,7 +90,7 @@ class CompatibilityMap:
                 print(f"Deleted '{software_name}.{key}' from {self.name}")
 
         sorted_map = utils.map_sorted(software_mapping, key=utils.version_key)
-        if not (sorted_map is software_mapping):
+        if sorted_map is not software_mapping:
             self.compatibility_map[software_name] = sorted_map
             print(f"Reordered {software_name!r} in {self.name}")
 

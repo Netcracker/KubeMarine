@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import io
+import ipaddress
 import sys
 import time
 from collections import OrderedDict
@@ -22,7 +23,7 @@ from typing import List, Dict, Optional, Union
 
 import yaml
 import ruamel.yaml
-import ipaddress
+from deepdiff import DeepDiff  # type: ignore[import-untyped]
 
 from ordered_set import OrderedSet
 
@@ -42,7 +43,6 @@ from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.kubernetes.object import KubernetesObject
 from kubemarine.coredns import generate_configmap
-from deepdiff import DeepDiff  # type: ignore[import-untyped]
 
 
 def services_status(cluster: KubernetesCluster, service_type: str) -> None:
@@ -53,7 +53,7 @@ def services_status(cluster: KubernetesCluster, service_type: str) -> None:
             group = cluster.make_group_from_roles(['balancer'])
         elif service_type == 'keepalived':
             group = cluster.make_group_from_roles(['keepalived'])
-        elif service_type == 'docker' or service_type == "containerd" or service_type == 'kubelet':
+        elif service_type in ('docker', 'containerd', 'kubelet'):
             group = cluster.make_group_from_roles(['control-plane', 'worker'])
 
         if group.is_empty():
@@ -399,7 +399,7 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
                 cluster.log.verbose('Temporary path: %s' % random_path)
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
                 # Load thirdparty to temporary dir
-                remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
+                remote_commands += "&& sudo curl -k -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
                 results = first_control_plane.sudo(remote_commands, warn=True)
                 if results.is_any_failed():
                     host = first_control_plane_host
@@ -468,7 +468,9 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
                 unpack_dir = config['unpack']
                 extension = path.split('.')[-1]
                 if extension == 'zip': 
-                    res = group.sudo(' unzip -qq -l %s | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
+                    res = group.sudo(
+                                 # for each file in archive
+                                 ' unzip -qq -l %s | awk \'NF > 3 { print $4 }\' | while read file_name; do '
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo unzip -p %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
                                  '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
@@ -601,7 +603,8 @@ def kubernetes_nodes_condition(cluster: KubernetesCluster, condition_type: str) 
 
 def get_not_running_pods(cluster: KubernetesCluster) -> str:
     # Completed pods should be excluded from the list as well
-    get_pods_cmd = 'kubectl get pods -A --field-selector status.phase!=Running | awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed || true'
+    get_pods_cmd = ('kubectl get pods -A --field-selector status.phase!=Running '
+                    '| awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed || true')
     result = cluster.nodes['control-plane'].get_any_member().sudo(get_pods_cmd)
     cluster.log.verbose(result)
     return list(result.values())[0].stdout.strip()
@@ -657,19 +660,25 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
         else:
             # check dashboard service 
             cluster.log.debug('Check kubernetes-dashboard service...')
+            control_plane = cluster.nodes['control-plane'].get_first_member()
             i = 0
             while not test_service_succeeded and i < retries:
                 i += 1
-                results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl get svc -n kubernetes-dashboard kubernetes-dashboard -o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
-                for control_plane, result in results.items():
+                results = control_plane.sudo(
+                    "kubectl get svc -n kubernetes-dashboard kubernetes-dashboard "
+                    "-o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
+                for result in results.values():
                     if result.failed:
                         cluster.log.debug(f'Can not get dashboard service IP: {result.stderr} ')
-                        raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
-                found_url = result.stdout
+                        raise TestFailure("not available",
+                                          hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
+                found_url = results.get_simple_out()
                 if ipaddress.ip_address(found_url).version == 4:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443 -s -S  -w "%{{http_code}}"', warn=True)
+                    check_url = control_plane.sudo(
+                        f'curl -k -I https://{found_url}:443 -s -S  -w "%{{http_code}}"', warn=True)
                 else:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I https://[{found_url}]:443 -s -S -w "%{{http_code}}"', warn=True)
+                    check_url = control_plane.sudo(
+                        f'curl -g -k -I https://[{found_url}]:443 -s -S -w "%{{http_code}}"', warn=True)
                 status = list(check_url.values())[0].stdout
                 lst = status.split('\n')
                 if lst[len(lst)-1] == '200':
@@ -685,17 +694,24 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
             i = 0
             while not test_ingress_succeeded and test_service_succeeded and i < retries:
                 i += 1
-                results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl -n kubernetes-dashboard get ingress kubernetes-dashboard -o=jsonpath=\"{.spec.rules[0].host}\"", warn=True)
-                for control_plane, result in results.items():
+                results = control_plane.sudo(
+                    "kubectl -n kubernetes-dashboard get ingress kubernetes-dashboard "
+                    "-o=jsonpath=\"{.spec.rules[0].host}\"", warn=True)
+                for result in results.values():
                     if result.failed:
                         cluster.log.debug(f'Can not get dashboard ingress hostname: {result.stderr} ')
-                        raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
-                found_url = result.stdout
+                        raise TestFailure("not available",
+                                          hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
+                found_url = results.get_simple_out()
                 
                 if ipaddress.ip_address(ingress_ip).version == 4:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I -L --resolve {found_url}:443:{ingress_ip} https://{found_url} -s -S -w "%{{http_code}}"', warn=True)
+                    check_url = control_plane.sudo(
+                        f'curl -k -I -L --resolve {found_url}:443:{ingress_ip} https://{found_url} '
+                        f'-s -S -w "%{{http_code}}"', warn=True)
                 else:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I -L --resolve "{found_url}:443:{ingress_ip}" https://{found_url} -s -S -w "%{{http_code}}"', warn=True)
+                    check_url = control_plane.sudo(
+                        f'curl -g -k -I -L --resolve "{found_url}:443:{ingress_ip}" https://{found_url} '
+                        f'-s -S -w "%{{http_code}}"', warn=True)
                 status = list(check_url.values())[0].stdout
                 lst = status.split('\n')
                 if lst[len(lst)-1] == '200':
@@ -788,7 +804,8 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
                     if pid_max < required_pid_max:
                         nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
                 else:
-                    cluster.log.error("podPidsLimit is set to unlimited in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
+                    cluster.log.error("podPidsLimit is set to unlimited in the /var/lib/kubelet/config.yaml "
+                                      f"for node '{node_name}'")
                     nodes_failed_pid_max_check[node_name] = [pid_max, -1]
             else:
                 cluster.log.error("No podPidsLimit set in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
@@ -796,13 +813,12 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
 
         if nodes_failed_pid_max_check:
             output = "The requirement for the 'pid_max' value is not met for nodes:\n"
-            for node_name in nodes_failed_pid_max_check:
-                if nodes_failed_pid_max_check[node_name][1] == -1:
+            for node_name, pid_max_check in nodes_failed_pid_max_check.items():
+                if pid_max_check[1] == -1:
                     output += ("For node %s podPidsLimit is unlimited" % node_name)
                 else:
                     output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
-                               % (node_name, nodes_failed_pid_max_check[node_name][0],
-                                  nodes_failed_pid_max_check[node_name][1]))
+                               % (node_name, pid_max_check[0], pid_max_check[1]))
             raise TestFailure(output)
         tc.success(results="pid_max correctly installed on all nodes")
 
@@ -819,7 +835,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
-        selinux_configured, selinux_result, selinux_parsed_result = \
+        _, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
                                     state=selinux.get_expected_state(cluster.inventory),
                                     policy=selinux.get_expected_policy(cluster.inventory),
@@ -877,7 +893,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
         group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
-        selinux_configured, selinux_result, selinux_parsed_result = \
+        selinux_configured, selinux_result, _ = \
             selinux.is_config_valid(group,
                                     state=selinux.get_expected_state(cluster.inventory),
                                     policy=selinux.get_expected_policy(cluster.inventory),
@@ -1030,7 +1046,7 @@ def etcd_health_status(cluster: KubernetesCluster) -> None:
             cluster.log.verbose('Failed to load and parse ETCD status')
             raise TestFailure('invalid',
                               hint=f"ETCD not ready, please check"
-                                   f" because of {e} ")
+                                   f" because of {e} ") from None
         cluster.log.debug(etcd_health_status)
         tc.success(results='healthy')
 
@@ -1224,18 +1240,20 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
             if plugin == 'nginx-ingress-controller':
                 entities_to_check['ingress-nginx'] = {"DaemonSet": {"ingress-nginx-controller": {"version": expected_version}}}
             if plugin == 'local-path-provisioner':
-                entities_to_check['local-path-storage'] = {"Deployment": {"local-path-provisioner": {"version": expected_version}}}
+                entities_to_check['local-path-storage'] = {"Deployment": {
+                    "local-path-provisioner": {"version": expected_version}}}
             if plugin == 'kubernetes-dashboard':
                 image = plugin_item['metrics-scraper']['image']
                 image = image.split('@sha256:')[0]
                 expected_metrics_scrapper_version = image.split(':')[-1]
-                entities_to_check['kubernetes-dashboard'] = {"Deployment": {"kubernetes-dashboard": {"version": expected_version},
-                                                                            "dashboard-metrics-scraper": {"version": expected_metrics_scrapper_version}}}
+                entities_to_check['kubernetes-dashboard'] = {"Deployment": {
+                    "kubernetes-dashboard": {"version": expected_version},
+                    "dashboard-metrics-scraper": {"version": expected_metrics_scrapper_version}}}
 
         for namespace, types_dict in entities_to_check.items():
-            for type, services in types_dict.items():
+            for kind, services in types_dict.items():
                 for service_name, properties in services.items():
-                    k8s_object = KubernetesObject(cluster, type, service_name, namespace)
+                    k8s_object = KubernetesObject(cluster, kind, service_name, namespace)
                     k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
                     if not k8s_object.is_reloaded():
                         stderr = str(k8s_object).rstrip('\n')
@@ -1286,23 +1304,24 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
             if plugin == 'local-path-provisioner':
                 entities_to_check['local-path-storage'] = {"Deployment": ["local-path-provisioner"]}
             if plugin == 'kubernetes-dashboard':
-                entities_to_check['kubernetes-dashboard'] = {"Deployment": ["kubernetes-dashboard", "dashboard-metrics-scraper"]}
+                entities_to_check['kubernetes-dashboard'] = {"Deployment": [
+                    "kubernetes-dashboard", "dashboard-metrics-scraper"]}
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
         for namespace, types_dict in entities_to_check.items():
-            for type, services in types_dict.items():
-                if type == 'DaemonSet':
+            for kind, services in types_dict.items():
+                if kind == 'DaemonSet':
                     for service in services:
                         daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
-                        ready = daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
-                        if not ready:
+                        daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True)
+                        if not daemon_set.is_actual_and_ready():
                             not_ready_entities.append(service)
-                elif type == 'Deployment':
+                elif kind == 'Deployment':
                     for service in services:
                         deployment = Deployment(cluster, name=service, namespace=namespace)
-                        ready = deployment.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
-                        if not ready:
+                        deployment.reload(control_plane=first_control_plane, suppress_exceptions=True)
+                        if not daemon_set.is_actual_and_ready():
                             not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
             tc.success(results='valid')
@@ -1333,8 +1352,8 @@ def _check_calico_env(cluster: KubernetesCluster, manifest_: manifest.Manifest) 
             stderr = str(k8s_object).rstrip('\n')
             failed_messages.append(f"failed to load {service_name}: {stderr}")
             continue
-        else:
-            actual_env = get_envs(k8s_object.obj)
+
+        actual_env = get_envs(k8s_object.obj)
 
         expected_obj = manifest_.get_obj(f"{type_}_{service_name}", patch=False)
         buf = io.StringIO()
@@ -1353,7 +1372,8 @@ def _check_calico_env(cluster: KubernetesCluster, manifest_: manifest.Manifest) 
 
 def calico_config_check(cluster: KubernetesCluster) -> None:
     '''
-    This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
+    This test checks the configuration of the `calico-node` envs,
+    Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
     :param cluster: KubernetesCluster object
     :return: None
     '''
@@ -1376,7 +1396,7 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
         calico_config = yaml.safe_load(result.get_simple_out())
         cni_network_config = yaml.safe_load(calico_config["data"]["cni_network_config"])
         ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        if utils.isipv(ip, [4]):
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv4"]
         else:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv6"]
@@ -1384,7 +1404,8 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
         if ddiff:
             cluster.log.debug("'cni_network_config.plugins[0].ipam' of calico-config ConfigMap is outdated:")
             utils.print_diff(cluster.log, ddiff)
-            failed_messages.append("'cni_network_config.plugins[0].ipam' of calico-config ConfigMap is outdated. Check DEBUG logs for details.")
+            failed_messages.append("'cni_network_config.plugins[0].ipam' of calico-config ConfigMap is outdated. "
+                                   "Check DEBUG logs for details.")
 
         # Check calicoctl and calico version match, and check ipam problems.
         result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'")
@@ -1506,7 +1527,8 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
             )
             raise TestFailure('invalid', hint=yaml.safe_dump(broken))
 
-        kube_admission_status = 'PSS is "enabled", default profile is "%s"' % cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
+        kube_admission_status = ('PSS is "enabled", default profile is "%s"'
+                                 % cluster.inventory["rbac"]["pss"]["defaults"]["enforce"])
         cluster.log.debug(kube_admission_status)
         tc.success(results='enabled')
 
@@ -1810,7 +1832,7 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files
-    print(testsuite.get_final_summary(show_minimal=False, show_recommended=False))
+    testsuite.print_final_summary(show_minimal=False, show_recommended=False)
     testsuite.print_final_status(result.logger)
     check_iaas.make_reports(context, testsuite)
     return testsuite

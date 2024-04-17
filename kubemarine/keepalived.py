@@ -124,11 +124,11 @@ def enrich_inventory_apply_defaults(cluster: KubernetesCluster) -> None:
                 record['interface'] = autodetect_interface(cluster, record['name'])
 
 
-def get_all_balancer_names(inventory: dict, *, final: bool = True) -> List[str]:
+def get_all_balancer_names(inventory: dict) -> List[str]:
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
-    for i, node in enumerate(inventory['nodes']):
+    for node in inventory['nodes']:
         if 'balancer' in node['roles']:
             default_names.append(node['name'])
 
@@ -146,7 +146,7 @@ def enrich_inventory_calculate_nodegroup(cluster: KubernetesCluster) -> None:
     # Calculate group, where keepalived should be installed:
     names = []
 
-    for i, item in enumerate(inventory['vrrp_ips']):
+    for item in inventory['vrrp_ips']:
         for record in item['hosts']:
             names.append(record['name'])
 
