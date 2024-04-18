@@ -208,6 +208,10 @@ def kube_proxy_overwrites_higher_system_values(cluster: KubernetesCluster) -> bo
     return kubernetes_minor_release_at_least(cluster.inventory, "v1.29")
 
 
+def kubeadm_writes_resolv_conf_per_node(cluster: KubernetesCluster) -> bool:
+    return kubernetes_minor_release_at_least(cluster.inventory, "v1.31")
+
+
 def kubernetes_minor_release_at_least(inventory: dict, minor_version: str) -> bool:
     kubernetes_version = inventory["services"]["kubeadm"]["kubernetesVersion"]
     return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key(minor_version)
@@ -496,8 +500,11 @@ def patch_kubelet_configmap(control_plane: AbstractGroup[RunResult]) -> None:
 
     :param control_plane: control plane to operate on
     """
-    # Make sure to check kubeadm_kubelet in the inventory.
     cluster: KubernetesCluster = control_plane.cluster
+    if kubeadm_writes_resolv_conf_per_node(cluster):
+        return
+
+    # Make sure to check kubeadm_kubelet in the inventory.
     kubeadm_config = KubeadmConfig(cluster)
     if 'resolvConf' in kubeadm_config.maps['kubelet-config']:
         return
