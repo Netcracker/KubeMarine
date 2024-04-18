@@ -58,25 +58,33 @@
     },
     "OneOfNodesGroupsSpec": {
       "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "groups": {
-              "type": "array"
-            }
-          },
-          "required": ["groups"]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "nodes": {
-              "type": "array"
-            }
-          },
-          "required": ["nodes"]
-        }
+        {"$ref": "#/definitions/GroupsSpec"},
+        {"$ref": "#/definitions/NodesSpec"}
       ]
+    },
+    "AnyOfNodesGroupsSpec": {
+      "anyOf": [
+        {"$ref": "#/definitions/GroupsSpec"},
+        {"$ref": "#/definitions/NodesSpec"}
+      ]
+    },
+    "GroupsSpec": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array"
+        }
+      },
+      "required": ["groups"]
+    },
+    "NodesSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array"
+        }
+      },
+      "required": ["nodes"]
     }
   }
 }

@@ -20,7 +20,7 @@ Using this module you can generate new sysctl configs, install and apply them.
 import io
 from typing import Dict, Union, Optional, List, cast
 
-from kubemarine.core import utils
+from kubemarine.core import utils, inventory
 from kubemarine.core.cluster import KubernetesCluster, enrichment, EnrichmentStage
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult
 
@@ -35,32 +35,60 @@ WARN_PID_MAX_LOWER_DEFAULT = ("The 'kernel.pid_max' value = {value!r} for node {
 
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
-    _convert_inventory(cluster.inventory)
-
-    _apply_common_defaults(cluster)
+    # Set global default 'kernel.pid_max', and create inventory patches
     _apply_default_pid_max(cluster)
 
+    # Strip obsolete blank values, and strtoint()
+    # This should only affect formatting, but not further enrichment.
+    _format_inventory(cluster.inventory, [])
+    for i, patch in enumerate(cluster.inventory['patches']):
+        _format_inventory(patch, ['patches', i])
+
+    # Fill KubernetesCluster.nodes_inventory with sysctl settings
+    inventory.patch_inventory(cluster, ['services', 'sysctl'])
+
+    # Convert settings for each node and apply defaults
+    _convert_inventory(cluster)
+    _apply_common_defaults(cluster)
+
+    # Other verifications
     _verify_pid_max(cluster)
 
 
-def _convert_inventory(inventory: dict) -> None:
-    sysctl_config: Dict[str, Union[str, int, dict]] = inventory.get('services', {}).get('sysctl', {})
+def _format_inventory(config: dict, path: List[Union[str, int]]) -> None:
+    sysctl_config: Dict[str, Union[str, int, dict]] = config.get('services', {}).get('sysctl', {})
+    path = path + ['services', 'sysctl']
 
     for key in sysctl_config:
-        _convert_value(sysctl_config, key)
+        _format_value(sysctl_config, key, path)
+
+
+def _format_value(sysctl_config: Dict[str, Union[str, int, dict]], key: str, path: List[Union[str, int]]) -> None:
+    value = sysctl_config[key]
+    if isinstance(value, str):
+        # Obsolete approach to render values.
+        value = value.strip()
+        if value == '':
+            sysctl_config[key] = value
+        else:
+            sysctl_config[key] = _strtoint(value, path + [key])
+
+
+def _convert_inventory(cluster: KubernetesCluster) -> None:
+    for node in cluster.nodes['all'].get_ordered_members_list():
+        host = node.get_host()
+        sysctl_config: Dict[str, Union[str, int, dict]] = cluster.nodes_inventory[host]['services']['sysctl']
+
+        for key in sysctl_config:
+            _convert_value(sysctl_config, key)
 
 
 def _convert_value(sysctl_config: Dict[str, Union[str, int, dict]], key: str) -> None:
     value = sysctl_config[key]
     install: Optional[bool] = None
-    if isinstance(value, str):
-        # Obsolete approach to render values.
-        value = value.strip()
-        if value == '':
-            value = 0
-            install = False
-        else:
-            value = _strtoint(value, ['services', 'sysctl', key])
+    if isinstance(value, str):  # value == ''
+        value = 0
+        install = False
 
     if isinstance(value, int):
         sysctl_config[key] = value = {
@@ -79,26 +107,53 @@ def _strtoint(value: str, path: List[Union[str, int]]) -> int:
 
 
 def _apply_common_defaults(cluster: KubernetesCluster) -> None:
-    sysctl_config: Dict[str, dict] = cluster.inventory.get('services', {}).get('sysctl', {})
+    for node in cluster.nodes['all'].get_ordered_members_list():
+        host = node.get_host()
+        sysctl_config: Dict[str, dict] = cluster.nodes_inventory[host]['services']['sysctl']
 
-    for key, value in sysctl_config.items():
-        if value.get('groups') is None and value.get('nodes') is None:
-            value['groups'] = ['control-plane', 'worker', 'balancer']
+        for key, value in sysctl_config.items():
+            if value.get('groups') is None and value.get('nodes') is None:
+                value['groups'] = ['control-plane', 'worker', 'balancer']
 
-        value.setdefault('install', True)
+            value.setdefault('install', True)
 
-        if value.get('nodes') is not None:
-            all_nodes_names = cluster.nodes['all'].get_nodes_names()
-            unknown_nodes = set(value['nodes']) - set(all_nodes_names)
-            if unknown_nodes:
-                # Only warn instead of raising an error to allow remove & add the same node.
-                cluster.log.warning(
-                    f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
-                    f"provided for kernel parameter {key!r}. ")
+            if value.get('nodes') is not None:
+                all_nodes_names = cluster.nodes['all'].get_nodes_names()
+                unknown_nodes = set(value['nodes']) - set(all_nodes_names)
+                if unknown_nodes:
+                    # Only warn instead of raising an error to allow remove & add the same node.
+                    cluster.log.warning(
+                        f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
+                        f"provided for kernel parameter {key!r}. ")
 
 
 def _apply_default_pid_max(cluster: KubernetesCluster) -> None:
-    cluster.inventory['services']['sysctl']['kernel.pid_max'].setdefault('value', _get_pid_max(cluster))
+    inventory_ = cluster.inventory
+
+    global_pid_max = inventory_['services']['sysctl']['kernel.pid_max']
+    if not isinstance(global_pid_max, dict) or 'value' in global_pid_max:
+        # If custom value is provided, it should be spread across the specified nodes only
+        # unless explicitly overridden in the patches
+        return
+
+    global_pid_max.setdefault('value', _get_pid_max(cluster))
+
+    # If kubelet config for some node has different maxPods or podPidsLimit,
+    # calculate kernel.pid_max for this node and register it in the default patch.
+    nodes_different_value: Dict[int, List[str]] = {}
+    for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
+        node_pid_max = _get_pid_max(cluster, node)
+        if node_pid_max != global_pid_max['value']:
+            nodes_different_value.setdefault(node_pid_max, []).append(node.get_node_name())
+
+    for pid_max, nodes in nodes_different_value.items():
+        inventory_patch = {
+            'nodes': nodes,
+            'services': {'sysctl': {
+                'kernel.pid_max': pid_max
+            }}
+        }
+        inventory_['patches'].insert(0, inventory_patch)
 
 
 def _verify_pid_max(cluster: KubernetesCluster) -> None:
@@ -119,7 +174,8 @@ def _verify_pid_max(cluster: KubernetesCluster) -> None:
 
 
 def get_parameter(cluster: KubernetesCluster, node: AbstractGroup[RunResult], key: str) -> Optional[int]:
-    config = cluster.inventory['services']['sysctl'].get(key, {})
+    host = node.get_host()
+    config = cluster.nodes_inventory[host]['services']['sysctl'].get(key, {})
 
     group = cluster.create_group_from_groups_nodes_names(
         config.get('groups', []), config.get('nodes', []))
@@ -135,8 +191,9 @@ def make_config(cluster: KubernetesCluster, node: AbstractGroup[RunResult]) -> s
     """
     Converts parameters from inventory['services']['sysctl'] to a string in the format of sysctl.conf.
     """
+    host = node.get_host()
     config = ""
-    for key in cluster.inventory['services']['sysctl']:
+    for key in cluster.nodes_inventory[host]['services']['sysctl']:
         value = get_parameter(cluster, node, key)
         if value is not None:
             config += "%s = %s\n" % (key, value)

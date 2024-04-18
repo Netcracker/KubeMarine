@@ -25,6 +25,7 @@ import kubemarine.audit
 import kubemarine.controlplane
 import kubemarine.core.cluster
 import kubemarine.core.defaults
+import kubemarine.core.inventory
 import kubemarine.core.schema
 import kubemarine.cri
 import kubemarine.cri.containerd
@@ -451,6 +452,7 @@ class DynamicResources:
 
             # Remained default enrichment.
             # Many functions depend on kubemarine.core.defaults.calculate_nodegroups
+            kubemarine.core.inventory.verify_inventory_patches,
             kubemarine.core.defaults.apply_defaults,
             kubemarine.packages.enrich_inventory,
             kubemarine.core.defaults.apply_registry,

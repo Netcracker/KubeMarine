@@ -591,6 +591,9 @@ def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], An
         # kernel parameters are actually not always represented as integers
         (['services', 'sysctl', '*', 'value'], utils.strtoint),
         (['services', 'sysctl', '*', 'install'], utils.strtobool),
+        # kernel parameters are actually not always represented as integers
+        (['patches', '*', 'services', 'sysctl', '*', 'value'], utils.strtoint),
+        (['patches', '*', 'services', 'sysctl', '*', 'install'], utils.strtobool),
         (['plugins', '*', 'install'], utils.strtobool),
         (['plugins', 'calico', 'typha', 'enabled'], utils.strtobool),
         (['plugins', 'calico', 'typha', 'replicas'], utils.strtoint),

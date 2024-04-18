@@ -281,7 +281,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
-        self.assertFalse(finalized_inventory['services']['sysctl']['net.netfilter.nf_conntrack_max']['install'],
+        self.assertEqual('', finalized_inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
                          "Finalized services.sysctl should have blank net.netfilter.nf_conntrack_max")
         self.assertIsNone(finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
                           "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
@@ -387,6 +387,26 @@ class PrimitiveValuesAsString(unittest.TestCase):
             'install': '{{ "false" }}'
         }
 
+        inventory['patches'] = [{
+            'groups': ['control-plane', 'worker', 'balancer'],
+            'services': {'sysctl': {
+                'custom_parameter4':
+                    """
+                    {% if true %}
+                    4
+                    {% endif %}
+                    """,
+                'custom_parameter5': {
+                    'value': "{% if true %}5{% endif %}",
+                    'install': '{{ "true" }}'
+                },
+                'custom_parameter6': {
+                    'value': 6,
+                    'install': '{{ "false" }}'
+                }
+            }}
+        }]
+
         inventory.setdefault('plugins', {}).setdefault('kubernetes-dashboard', {})['install'] = "{{ true }}"
         context = demo.create_silent_context()
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
@@ -403,11 +423,18 @@ class PrimitiveValuesAsString(unittest.TestCase):
             self.assertEqual(1, sysctl.get_parameter(cluster, node, 'custom_parameter1'))
             self.assertEqual(2, sysctl.get_parameter(cluster, node, 'custom_parameter2'))
             self.assertIsNone(sysctl.get_parameter(cluster, node, 'custom_parameter3'))
+            self.assertEqual(4, sysctl.get_parameter(cluster, node, 'custom_parameter4'))
+            self.assertEqual(5, sysctl.get_parameter(cluster, node, 'custom_parameter5'))
+            self.assertIsNone(sysctl.get_parameter(cluster, node, 'custom_parameter3'))
 
             sysctl_config = sysctl.make_config(cluster, node)
             self.assertIn('custom_parameter1 = 1', sysctl_config)
             self.assertIn('custom_parameter2 = 2', sysctl_config)
             self.assertNotIn('custom_parameter3', sysctl_config)
+
+            self.assertIn('custom_parameter4 = 4', sysctl_config)
+            self.assertIn('custom_parameter5 = 5', sysctl_config)
+            self.assertNotIn('custom_parameter6', sysctl_config)
 
         self.assertEqual(True, inventory['plugins']['kubernetes-dashboard']['install'])
 

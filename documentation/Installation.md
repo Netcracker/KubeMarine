@@ -56,6 +56,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
+    - [patches](#patches)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
@@ -1077,7 +1078,7 @@ vrrp_ips:
     maintenance-type: "not bind"
 ```
 
-### Services
+### services
 
 In the `services` section, you can configure the service settings. The settings are described in the following sections.
 
@@ -2767,6 +2768,8 @@ The following settings are supported in the extended format:
 
 **Note**: If no groups or nodes are specified, then the parameter is installed on all nodes.
 
+**Note**: Per-node [patches](#patches) are also supported for this section.
+
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
@@ -3802,6 +3805,36 @@ services:
       maintenance_mode: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
+
+### patches
+
+It is possible to override the resulting configuration for specific nodes using `patches`.
+This allows to either override default parameters for specific nodes, or provide different settings for different nodes.
+
+For example:
+
+```yaml
+patches:
+  - groups: [control-plane, worker]
+    services:
+      sysctl:
+        net.ipv4.conf.default.arp_ignore: 0
+  - groups: [balancer]
+    services:
+      sysctl:
+        net.ipv4.conf.default.arp_ignore: 2
+```
+
+The patches in the list are merged with the global configuration one by one.
+Thus, the same settings have precedence in the last patch if overridden few times for the same node.
+
+The following settings are supported:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**groups**|yes*|`None`|The list of group names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
+|**nodes**|yes*|`None`|The list of node names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
+|**services.sysctl**|no| |Manage the Linux Kernel parameters for the specified nodes in a patch. For more information, see [sysctl](#sysctl).|
 
 ### RBAC Admission
 

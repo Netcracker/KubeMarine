@@ -146,6 +146,7 @@ class _EnrichmentProducts:
     context: Optional[dict]
     procedure_inventory: Optional[dict]
 
+    nodes_inventory: Dict[str, dict] = dataclasses.field(default_factory=dict)
     nodes: Dict[str, Dict[str, NodeGroup]] = dataclasses.field(default_factory=dict)
 
     formatted_inventory: Optional[dict] = None
@@ -307,6 +308,17 @@ class KubernetesCluster(Environment):
         Should be changed only during the enrichment.
         """
         return self._products.inventory
+
+    @property
+    def nodes_inventory(self) -> Dict[str, dict]:
+        """
+        The resulting inventory describing specific nodes.
+        The inventory can be derived from the main `inventory` only,
+        and should not depend on other sources of information.
+
+        Should be changed only during the enrichment.
+        """
+        return self._products.nodes_inventory
 
     @property
     def context(self) -> dict:
