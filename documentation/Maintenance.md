@@ -801,6 +801,7 @@ Also pay attention to the following:
 * System configurations like `selinux`, `modprobe`, `sysctl`, and others should be verified and configured only on new nodes.
 * Only new nodes can be rebooted.
 * The file `/etc/hosts` is updated and uploaded to all nodes in the cluster.
+* If there are some offline workers during the procedure, you should exclude `prepare.dns.etc_hosts` task and update `/etc/hosts` on new nodes manually.
 
 **Note**: It is not possible to change a node's role by adding an existing node again with a new role. You have to remove the node and add it again.
 
@@ -923,6 +924,7 @@ Also pay attention to the following:
   such hosts are ignored with warnings.
 * The file `/etc/hosts` is updated and uploaded to all remaining nodes in the cluster. The control plane address may change.
 * This procedure only removes nodes and does not restore nodes to their original state. Packages, configurations, and Thirdparties are also not deleted.
+* If there are some offline workers during the procedure, you should exclude `update.etc_hosts` task.
 
 Removing a node from a Kubernetes cluster is done in the following order:
 

@@ -66,8 +66,11 @@ def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GRO
 
 
 def system_prepare_check_sudoer(cluster: KubernetesCluster) -> None:
+    group = cluster.make_group_from_roles(['control-plane', 'balancer']).include_group(cluster.get_new_nodes_or_self())
     not_sudoers = []
     for host, node_context in cluster.nodes_context.items():
+        if host not in group.nodes:
+            continue
         access_info = node_context['access']
         if access_info['online'] and access_info['sudo'] == 'Root':
             cluster.log.debug("%s online and has root" % host)
@@ -218,6 +221,10 @@ def system_prepare_dns_resolv_conf(group: NodeGroup) -> None:
 
 
 def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
+    remained_offline = cluster.nodes['all'].get_online_nodes(False)
+    if not remained_offline.is_empty():
+        raise Exception("Nodes %s are not reachable" % remained_offline.get_hosts())
+
     config = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
     config += system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
 

@@ -531,13 +531,18 @@ class KubernetesCluster(Environment):
         procedure: str = self.context['initial_procedure']
         if procedure == 'check_iaas' and skip_check_iaas:
             return
+        
+        if procedure == 'remove_node':
+            group = self.make_group_from_roles(['control-plane', 'balancer'])
+        else:
+            group = self.make_group_from_roles(['control-plane', 'balancer']).include_group(self.get_new_nodes_or_self())
 
-        # Check that only subset of nodes for removal can be offline
-        remained_offline = self.nodes['all'].get_online_nodes(False)
+        # Check that nodes are online
+        remained_offline = group.get_online_nodes(False)
 
-        # Check that all online nodes are accessible.
-        all_nodes = self._get_all_nodes()
-        inaccessible_online = all_nodes.get_online_nodes(True).exclude_group(all_nodes.get_accessible_nodes())
+        # Check that nodes are accessible.
+        nodes = group.include_group(self.get_changed_nodes())
+        inaccessible_online = nodes.get_online_nodes(True).exclude_group(nodes.get_accessible_nodes())
 
         if not remained_offline.is_empty() or not inaccessible_online.is_empty():
             raise KME0006(remained_offline.get_hosts(), inaccessible_online.get_hosts())
