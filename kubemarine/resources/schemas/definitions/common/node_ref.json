@@ -57,12 +57,14 @@
       "minItems": 1
     },
     "OneOfNodesGroupsSpec": {
+      "type": "object",
       "oneOf": [
         {"$ref": "#/definitions/GroupsSpec"},
         {"$ref": "#/definitions/NodesSpec"}
       ]
     },
     "AnyOfNodesGroupsSpec": {
+      "type": "object",
       "anyOf": [
         {"$ref": "#/definitions/GroupsSpec"},
         {"$ref": "#/definitions/NodesSpec"}

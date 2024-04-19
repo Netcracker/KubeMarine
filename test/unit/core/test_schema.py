@@ -132,6 +132,18 @@ class TestErrorHeuristics(unittest.TestCase):
         with self.assertRaisesRegex(errors.FailException, r"Property name 'unsupported_property' is not one of \[.*]"):
             demo.new_cluster(inventory)
 
+    def test_oneOf_property_sets_required(self):
+        """
+        patches section is an example where at least one of property sets is required ("groups" or "nodes")
+        Specify unexpected property to check correctly generated error.
+        See kubemarine.core.schema._unnest_required_subschema_errors
+        """
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['patches'] = [{}]
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"At least one of the following property sets is required: \['groups'], \['nodes']"):
+            demo.new_cluster(inventory)
+
     def test_raise_max_relevant_from_subschema(self):
         """
         'vrrp_ips' section is an example where each item can be either string or object.
@@ -221,6 +233,63 @@ class TestErrorHeuristics(unittest.TestCase):
 
         with self.assertRaisesRegex(errors.FailException, "Property name 'kind' is unexpected"):
             demo.new_cluster(inventory, procedure_inventory=reconfigure, context=context)
+
+    def test_empty_registry(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['registry'] = {}
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"One of the following property sets is required: \['endpoints'], \['address']"):
+            demo.new_cluster(inventory)
+
+    def test_registry_one_not_required_property(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['registry'] = {'ssl': False}
+        with self.assertRaisesRegex(errors.FailException, r"'address' is a required property"):
+            demo.new_cluster(inventory)
+
+        inventory['registry'] = {'thirdparties': 'test'}
+        with self.assertRaisesRegex(errors.FailException, r"'endpoints' is a required property"):
+            demo.new_cluster(inventory)
+
+    def test_gateway_missed_credentials(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['gateway_nodes'] = [{
+            'name': 'test-gateway',
+            'address': '10.101.1.100',
+            'username': 'root',
+        }]
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"One of the following property sets is required: \['keyfile'], \['password']"):
+            demo.new_cluster(inventory)
+
+    def test_kubeadm_patches_missed_nodes_selector(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm_patches'] = {
+            'kubelet': [{'patch': {}}]
+        }
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"One of the following property sets is required: \['groups'], \['nodes']"):
+            demo.new_cluster(inventory)
+
+    def test_modprobe_item_empty_dict(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('modprobe', {})['debian'] = [{}]
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"'modulename' is a required property"):
+            demo.new_cluster(inventory)
+
+    def test_audit_cluster_policy_missed_level(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['audit'] = {
+            'cluster_policy': {
+                "rules": [
+                    {"verbs": []}
+                ]
+            }
+        }
+        with self.assertRaisesRegex(errors.FailException,
+                                    r"'level' is a required property"):
+            demo.new_cluster(inventory)
 
 
 if __name__ == '__main__':
