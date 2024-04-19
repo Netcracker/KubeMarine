@@ -1373,19 +1373,22 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         group.put(binary_check_path, f"{ipip_check}.gz")
         group.sudo(f"gzip -d {ipip_check}.gz")
         group.sudo(f"sudo chmod +x {ipip_check}")
-        # Run transmitters
-        cluster.log.debug("Run transmitters")
-        with group.new_executor() as exe:
-            for node_exe in exe.group.get_ordered_members_list():
-                host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{trns_cmd[host_int]}")
-        # Run receivers and get results
-        cluster.log.debug("Run receivers")
-        with group.new_executor() as exe:
-            for node_exe in exe.group.get_ordered_members_list():
-                host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
+        # Run the check on nodes one by one to avoid some `false positive` results
+        for node in group.get_ordered_members_list():
+            host = node.get_config()['internal_address']
+            name = node.get_config()['name']
+            # Run transmitter
+            node.sudo(f"{trns_cmd[host]}")
+            cluster.log.debug(f"Run transmitter on {name}")
+            # Run receivers
+            with group.new_executor() as exe:
+                for node_exe in exe.group.get_ordered_members_list():
+                    host_int = node_exe.get_config()['internal_address']
+                    if host_int != host:
+                        cluster.log.debug(f"Run receivers on {node_exe.get_config()['name']}")
+                        node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
 
+        # Get results
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)
             item_list: Set[str] = set()
