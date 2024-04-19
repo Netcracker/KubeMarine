@@ -531,14 +531,20 @@ def verify_system(cluster: KubernetesCluster) -> None:
         log.debug('Modprobe verification skipped - origin setup task was not completed')
 
     if cluster.is_task_completed('prepare.system.sysctl'):
-        log.debug("Verifying kernel parameters...")
-        sysctl_valid = sysctl.is_valid(group)
-        if not sysctl_valid:
-            raise Exception("Required kernel parameters are not presented")
-        else:
-            log.debug("Required kernel parameters are presented")
+        verify_sysctl(group)
     else:
         log.debug('Kernel parameters verification skipped - origin setup task was not completed')
+
+
+def verify_sysctl(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+
+    cluster.log.debug("Verifying kernel parameters...")
+    sysctl_valid = sysctl.is_valid(group)
+    if not sysctl_valid:
+        raise Exception("Required kernel parameters are not presented")
+    else:
+        cluster.log.debug("Required kernel parameters are presented")
 
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:

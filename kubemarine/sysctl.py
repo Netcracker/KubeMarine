@@ -91,7 +91,7 @@ def reload(group: NodeGroup) -> RunnersGroupResult:
     """
     Reloads sysctl configuration in the specified group.
     """
-    return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf')
+    return group.sudo('sysctl --system')
 
 
 def get_pid_max(inventory: dict) -> int:
