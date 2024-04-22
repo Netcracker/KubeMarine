@@ -727,10 +727,6 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
 
     copy_admin_config(cluster.log, first_control_plane)
 
-    # In some versions, kubeadm reverts resolvConf to the default during `upgrade apply`
-    # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
-    first_control_plane.call(components.patch_kubelet_configmap)
-
     expect_kubernetes_version(cluster, version, apply_filter=node_name)
     components.wait_for_pods(first_control_plane)
     exclude_node_from_upgrade_list(first_control_plane, node_name)

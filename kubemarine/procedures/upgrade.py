@@ -21,6 +21,7 @@ from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
+from kubemarine.kubernetes import components
 from kubemarine.procedures import install
 
 
@@ -104,10 +105,15 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     }
 
     kubernetes.upgrade_first_control_plane(upgrade_group, cluster, **drain_kwargs)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
+
+    # In some versions, kubeadm reverts resolvConf to the default during `upgrade apply`
+    # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
+    first_control_plane.call(components.patch_kubelet_configmap)
 
     kubernetes.upgrade_other_control_planes(upgrade_group, cluster, **drain_kwargs)
 
