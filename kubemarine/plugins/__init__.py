@@ -997,6 +997,8 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
         Apply yamls as is or
         renders and applies templates that match the config 'source' key.
     """
+    from kubemarine.core import defaults  # pylint: disable=cyclic-import
+
     log = cluster.log
     do_render = config.get('do_render', True)
 
@@ -1015,9 +1017,10 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
             if split_extension[1] == ".j2":
                 source_filename = split_extension[0]
 
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars'], 'env': kos.Environ()}
+            render_vars = {'runtime_vars': cluster.context['runtime_vars'], 'env': kos.Environ()}
             with utils.open_utf8(file, 'r') as template_stream:
-                generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
+                env = defaults.Environment(log, cluster.inventory)
+                generated_data = env.from_string(template_stream.read()).render(**render_vars)
 
             utils.dump_file(cluster, generated_data, source_filename)
             source = io.StringIO(generated_data)

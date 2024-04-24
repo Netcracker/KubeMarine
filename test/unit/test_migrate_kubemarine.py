@@ -1012,7 +1012,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
 
     @contextmanager
     def _assert_raises_kme(self):
-        with self.assertRaisesRegex(errors._BaseKME, "KME"):
+        with self.assertRaisesRegex(errors.BaseKME, "KME"):
             try:
                 yield
             except errors.FailException as e:

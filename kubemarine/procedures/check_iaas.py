@@ -26,10 +26,11 @@ from contextlib import contextmanager, nullcontext, AbstractContextManager
 from typing import List, Dict, cast, Match, Iterator, Optional, Tuple, Set, Union
 
 import yaml
+from jinja2 import Template
 from ordered_set import OrderedSet
 
 from kubemarine.core import flow, utils, static
-from kubemarine import system, packages, jinja, thirdparties
+from kubemarine import system, packages, thirdparties
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME0006
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -979,11 +980,11 @@ def get_stop_listener_cmd(port_listener: str) -> str:
            "&& if [ ! -z $pid ]; then sudo kill -9 $pid; echo \"killed pid $pid for port $port\"; fi"
 
 
-def install_client(cluster: KubernetesCluster, group: DeferredGroup, proto: str, mtu: int, timeout: int) -> str:
+def install_client(group: DeferredGroup, proto: str, mtu: int, timeout: int) -> str:
     check_script = utils.read_internal('resources/scripts/simple_port_client.py')
     udp_client = utils.get_remote_tmp_path(ext='py')
     for node in group.get_ordered_members_list():
-        rendered_script = jinja.new(cluster.log).from_string(check_script).render({
+        rendered_script = Template(check_script).render({
             'proto': proto,
             'timeout': timeout,
             'mtu': mtu,
@@ -1006,7 +1007,7 @@ def check_connect_between_all_nodes(cluster: KubernetesCluster,
 
     group = get_python_group(cluster, True).get_accessible_nodes().new_defer()
     timeout = static.GLOBALS['connection']['defaults']['timeout']
-    port_client = install_client(cluster, group, proto, mtu, timeout)
+    port_client = install_client(group, proto, mtu, timeout)
 
     connectivity_ports = get_ports_connectivity(cluster, proto).get(subnet_type, {}).get('output', {})
 
@@ -1136,7 +1137,7 @@ def install_listeners(cluster: KubernetesCluster,
                 host = node.get_host()
                 bind_address = host_to_ip[host]
                 ip_version = ipaddress.ip_address(bind_address).version
-                rendered_script = jinja.new(logger).from_string(check_script).render({
+                rendered_script = Template(check_script).render({
                     'proto': proto,
                     'address': bind_address,
                     'ip_version': ip_version,
