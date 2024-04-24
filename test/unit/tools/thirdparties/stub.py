@@ -157,6 +157,7 @@ class FakeSynchronization(Synchronization):
     def __init__(self,
                  compatibility: FakeInternalCompatibility,
                  kubernetes_versions: FakeKubernetesVersions,
+                 images_resolver: FakeKubernetesImagesResolver,
                  manifest_resolver=FAKE_CACHED_MANIFEST_RESOLVER,
                  manifests_enrichment=NoneManifestsEnrichment(),
                  upgrade_config=FakeUpgradeConfig(),
@@ -164,7 +165,7 @@ class FakeSynchronization(Synchronization):
         super().__init__(
             compatibility,
             kubernetes_versions,
-            FakeKubernetesImagesResolver(),
+            images_resolver,
             manifest_resolver,
             FakeThirdpartyResolver(),
             manifests_enrichment,
