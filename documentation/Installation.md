@@ -259,6 +259,8 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 
 **Warning**: Do not use unattended-upgrade to automatically update packages besides security updates.
 
+**Note**: Kubemarine disables unattended-upgrades for some packages. See [associations](#associations) for more information;
+
 **Note**: Since this mechanism is launched once a day at a random time, it may coincide with the work of other package managers (apt, aptitude, dpkg, and so on), resulting in an error in these package managers. In this case, the simplest solution is to wait for the completion of the unattended-upgrades process and restart apt, aptitude, or dpkg.
 
 **Preconfigured**
@@ -2210,6 +2212,13 @@ The following associations are used by default:
   This behavior can be changed by setting the `cache_versions` option to "false".
   The package versions are then used only with the template from the `associations` section.
   The option can be used both in global `services.packages` and in specific associations sections.
+* 'cache_versions' is installed to 'false' for following packages:
+  * openssl;
+  * curl;
+  * unzip;
+  * kmod;
+  * semanage;
+* Kubemarine disables `unattended_upgrades` for packages on Ubuntu/Debian nodes with "true" `cache_versions` option.
 
 The following is an example of overriding docker associations:
 

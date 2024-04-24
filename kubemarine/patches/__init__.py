@@ -23,11 +23,13 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.boot_timeout_per_node import TimeoutPerNode
+from kubemarine.patches.disable_unattended_upgrade import DisableUnattendedUpgrades
 from kubemarine.patches.strong_cipher_suits_for_kubelet import UpdatekubeletCipherSuites
 
 patches: List[Patch] = [
     TimeoutPerNode(),
-    UpdatekubeletCipherSuites(),  # Add the new patch to the list
+    UpdatekubeletCipherSuites(),
+    DisableUnattendedUpgrades()  # Add the new patch to the list
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

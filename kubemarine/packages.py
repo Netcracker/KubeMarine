@@ -13,7 +13,7 @@
 # limitations under the License.
 import re
 from typing import List, Dict, Tuple, Optional, Union, Mapping, Set
-
+from io import StringIO
 from typing_extensions import Protocol
 
 from kubemarine import yum, apt, jinja
@@ -457,6 +457,24 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
             return package
     else:
         return detected_package_versions[0]
+
+
+def disable_unattended_upgrade(group: NodeGroup):
+    cluster: KubernetesCluster = group.cluster
+    if group.get_nodes_os() != 'debian':
+        cluster.log.debug("Skipped - unattended upgrades are supported only on Ubuntu/Debian os family")
+        return
+
+    packages_per_node = get_all_managed_packages_for_group(group=group, inventory=cluster.inventory,
+                                                           ensured_association_only=True)
+
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            packages = list(map(lambda package: get_package_name(node.get_nodes_os(), package),
+                                packages_per_node[node.get_host()]))
+            unattended_upgrade_config = 'Unattended-Upgrade::Package-Blacklist { %s };\n' % " ".join(map(lambda package: '"%s";' % package, packages))
+            node.put(StringIO(unattended_upgrade_config), '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine',
+                     sudo=True, backup=True)
 
 
 def get_associations_os_family_keys() -> Set[str]:

@@ -253,6 +253,11 @@ def system_prepare_package_manager_configure(group: NodeGroup) -> None:
 
 
 @_applicable_for_new_nodes_with_roles('all')
+def system_prepare_package_manager_disable_unattended_upgrades(group: NodeGroup) -> None:
+    group.call(packages.disable_unattended_upgrade)
+
+
+@_applicable_for_new_nodes_with_roles('all')
 def system_prepare_package_manager_manage_packages(group: NodeGroup) -> None:
     group.call_batch([
         manage_mandatory_packages,
@@ -511,6 +516,7 @@ tasks = OrderedDict({
         },
         "package_manager": {
             "configure": system_prepare_package_manager_configure,
+            "disable_unattended_upgrades": system_prepare_package_manager_disable_unattended_upgrades,
             "manage_packages": system_prepare_package_manager_manage_packages
         },
         "ntp": {
