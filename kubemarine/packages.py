@@ -459,7 +459,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
         return detected_package_versions[0]
 
 
-def disable_unattended_upgrade(group: NodeGroup):
+def disable_unattended_upgrade(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if group.get_nodes_os() != 'debian':
         cluster.log.debug("Skipped - unattended upgrades are supported only on Ubuntu/Debian os family")
@@ -470,9 +470,10 @@ def disable_unattended_upgrade(group: NodeGroup):
 
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
-            packages = list(map(lambda package: get_package_name(node.get_nodes_os(), package),
+            packages = list(map(lambda package: get_package_name(group.get_nodes_os(), package),
                                 packages_per_node[node.get_host()]))
-            unattended_upgrade_config = 'Unattended-Upgrade::Package-Blacklist { %s };\n' % " ".join(map(lambda package: '"%s";' % package, packages))
+            unattended_upgrade_config = 'Unattended-Upgrade::Package-Blacklist { %s };\n' % " ".join(
+                map(lambda package: '"%s";' % package, packages))
             node.put(StringIO(unattended_upgrade_config), '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine',
                      sudo=True, backup=True)
 

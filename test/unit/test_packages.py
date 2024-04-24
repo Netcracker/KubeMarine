@@ -370,9 +370,9 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(cluster.inventory, 'debian', 'audit')['package_name'],
                          "auditd was not detected")
-        self.assertEqual('kmod=27-1ubuntu2.1',
+        self.assertEqual('kmod',
                          package_associations(cluster.inventory, 'debian', 'kmod')['package_name'],
-                         "kmod was not detected")
+                         "kmod should be default because cache_versions=false for it")
         self.assertEqual({'curl2', 'unzip2'}, set(self._packages_include(cluster.inventory)),
                          "Custom packages versions should be not detected when adding node")
 
@@ -467,33 +467,33 @@ class CacheVersions(unittest.TestCase):
                          "curl was not detected")
 
     def test_skip_cache_versions_not_managed(self):
-        default_kmod = ASSOCIATIONS_DEFAULTS['debian']['kmod']['package_name']
+        default_conntrack = ASSOCIATIONS_DEFAULTS['debian']['conntrack']['package_name']
         default_docker = ASSOCIATIONS_DEFAULTS['debian']['docker']['package_name'][0]
 
-        set_mandatory_off(self.inventory, 'kmod')
+        set_mandatory_off(self.inventory, 'conntrack')
         cluster = self._new_cluster()
         utils.stub_associations_packages(cluster, {
-            'kmod': {host: 'kmod=27-1ubuntu2.1' for host in self.initial_hosts},
+            'conntrack': {host: 'conntrack=1:1.4.6-2build2' for host in self.initial_hosts},
             'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.initial_hosts},
             'docker-ce': {host: 'docker-ce=1' for host in self.initial_hosts},
         })
 
         cache_installed_packages(cluster)
 
-        self.assertEqual(default_kmod,
-                         package_associations(cluster.inventory, 'debian', 'kmod')['package_name'],
-                         "kmod should be default because automatic management is off")
-        self.assertEqual('curl=7.68.0-1ubuntu2.14',
+        self.assertEqual(default_conntrack,
+                         package_associations(cluster.inventory, 'debian', 'conntrack')['package_name'],
+                         "conntrack should be default because automatic management is off")
+        self.assertEqual('curl',
                          package_associations(cluster.inventory, 'debian', 'curl')['package_name'],
-                         "curl was not detected")
+                         "curl should be default because cache_version is disabled for it")
         self.assertEqual(default_docker,
                          package_associations(cluster.inventory, 'debian', 'docker')['package_name'][0],
                          "docker should be default because cluster is based on containerd")
 
         finalized_inventory = utils.make_finalized_inventory(cluster, stub_cache_packages=False)
-        self.assertEqual(default_kmod,
-                         package_associations(finalized_inventory, 'debian', 'kmod')['package_name'],
-                         "kmod should be default because automatic management is off")
+        self.assertEqual(default_conntrack,
+                         package_associations(finalized_inventory, 'debian', 'conntrack')['package_name'],
+                         "conntrack should be default because automatic management is off")
         self.assertEqual('curl=7.68.0-1ubuntu2.14',
                          package_associations(finalized_inventory, 'debian', 'curl')['package_name'],
                          "curl was not detected")
