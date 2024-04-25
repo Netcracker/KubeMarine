@@ -21,7 +21,7 @@ import unittest
 from contextlib import contextmanager
 from copy import deepcopy
 from types import FunctionType
-from typing import Dict, Iterator, Callable, cast, Any, List, Optional, Union
+from typing import Dict, Iterator, Callable, cast, Any, List, Optional, Union, Type
 from unittest import mock
 
 import yaml
@@ -157,11 +157,26 @@ def assert_raises_kme(test: unittest.TestCase, code: str, *, escape: bool = Fals
     msg_pattern = str(exception)
     if escape:
         msg_pattern = re.escape(msg_pattern)
-    with test.assertRaisesRegex(type(exception), msg_pattern):
-        try:
-            yield
-        except errors.FailException as e:
+
+    with assert_raises_regex(test, type(exception), msg_pattern):
+        yield
+
+
+@contextmanager
+def assert_raises_regex(test: unittest.TestCase, expected_exception: Type[Exception], expected_regex: str):
+    with test.assertRaisesRegex(expected_exception, expected_regex), unwrap_fail():
+        yield
+
+
+@contextmanager
+def unwrap_fail():
+    try:
+        yield
+    except errors.FailException as e:
+        if e.reason is not None:
             raise e.reason
+
+        raise
 
 
 @contextmanager

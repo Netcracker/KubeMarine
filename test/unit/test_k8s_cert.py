@@ -18,7 +18,7 @@ from unittest import mock
 from test.unit import utils as test_utils
 
 from kubemarine import demo, plugins
-from kubemarine.core import flow, errors
+from kubemarine.core import flow
 from kubemarine.plugins import nginx_ingress
 from kubemarine.procedures import cert_renew
 
@@ -94,15 +94,12 @@ class IngressNginxCertTest(unittest.TestCase):
         return self.cert_renew.setdefault('nginx-ingress-controller', {})
 
     def _run_and_check(self, called: bool) -> demo.FakeResources:
-        with mock.patch.object(plugins, plugins.install_plugin.__name__) as run:
+        with mock.patch.object(plugins, plugins.install_plugin.__name__) as run, test_utils.unwrap_fail():
             resources = test_utils.FakeResources(self.context, self.inventory,
                                                  procedure_inventory=self.cert_renew,
                                                  nodes_context=demo.generate_nodes_context(self.inventory))
             try:
                 flow.run_actions(resources, [cert_renew.CertRenewAction()])
-            except errors.FailException as e:
-                if e.reason is not None:
-                    raise e.reason
             finally:
                 self.assertEqual(called, run.called)
 

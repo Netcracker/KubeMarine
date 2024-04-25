@@ -25,7 +25,7 @@ from test.unit import utils as test_utils
 import yaml
 
 from kubemarine import demo, kubernetes, testsuite, procedures
-from kubemarine.core import flow, errors, action, utils, schema, resources as res, summary, defaults
+from kubemarine.core import flow, action, utils, schema, resources as res, summary, defaults
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import upgrade, install, check_iaas, check_paas, migrate_kubemarine
@@ -116,11 +116,8 @@ class RunActionsTest(test_utils.CommonTest):
         if exception_message is None:
             flow.run_actions(resources, actions)
         else:
-            with self.assertRaisesRegex(Exception, exception_message):
-                try:
-                    flow.run_actions(resources, actions)
-                except errors.FailException as e:
-                    raise e.reason
+            with test_utils.assert_raises_regex(self, Exception, exception_message):
+                flow.run_actions(resources, actions)
 
         return resources.cluster(EnrichmentStage.LIGHT).uploaded_archives
 
