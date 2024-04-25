@@ -470,10 +470,9 @@ def disable_unattended_upgrade(group: NodeGroup) -> None:
 
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
-            packages = list(map(lambda package: get_package_name(group.get_nodes_os(), package),
-                                packages_per_node[node.get_host()]))
+            packages = [get_package_name(node.get_nodes_os(), package) for package in packages_per_node[node.get_host()]]
             unattended_upgrade_config = 'Unattended-Upgrade::Package-Blacklist { %s };\n' % " ".join(
-                map(lambda package: '"%s";' % package, packages))
+                ['"%s";' % package for package in packages])
             node.put(StringIO(unattended_upgrade_config), '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine',
                      sudo=True, backup=True)
 

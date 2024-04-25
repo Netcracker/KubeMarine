@@ -169,7 +169,11 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str) -> Non
         hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
         if not hosts_to_packages:
             raise TestWarn(f"No nodes to check {pckg_alias!r} version")
-        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False)
+        packages_section = cluster.inventory['services']['packages']
+        global_cache_versions = packages_section['cache_versions']
+        package_associations = packages_section['associations'].get(cluster.get_os_family(), {}).get(pckg_alias, {})
+        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False,
+                                warn_on_bad_result=not package_associations.get('cache_versions', global_cache_versions))
 
         if pckg_alias in ["haproxy", "keepalived", "containerd", "docker"]:
             recommended_system_package_versions(cluster, pckg_alias)
@@ -218,6 +222,7 @@ def check_packages_versions(cluster: KubernetesCluster, tc: TestCase, hosts_to_p
     :param tc: current test case object
     :param hosts_to_packages: hosts where to check packages
     :param warn_on_bad_result: if true then uses Warning instead of Failure. Default False.
+    :param raise_successful: if true, successful test result will be risen. Default True.
     """
     bad_results = []
     good_results = []

@@ -661,6 +661,24 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual({'curl2=7.*'}, set(self._packages_include(finalized_inventory)),
                          "Custom packages should be default because multiple OS versions are detected")
 
+    def test_unattended_upgrades(self):
+        cluster = self._new_cluster()
+        balancers_config = 'Unattended-Upgrade::Package-Blacklist { "haproxy"; "keepalived"; };\n'
+        master_worker_config = 'Unattended-Upgrade::Package-Blacklist { "containerd"; "auditd"; "conntrack"; "iptables"; };\n'
+        packages.disable_unattended_upgrade(cluster.nodes['all'])
+
+        for node in cluster.make_group_from_roles(['balancer']).get_ordered_members_list():
+            unattended_upgrades_config = cluster.fake_fs.read(node.get_host(),
+                                                              '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine')
+            self.assertIsNotNone(unattended_upgrades_config)
+            self.assertEqual(balancers_config, unattended_upgrades_config,
+                             'Wrong unattended-upgrade config on balancer')
+        for node in cluster.make_group_from_roles(['master', 'worker']).get_ordered_members_list():
+            unattended_upgrades_config = cluster.fake_fs.read(node.get_host(),
+                                                              '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine')
+            self.assertIsNotNone(unattended_upgrades_config)
+            self.assertEqual(master_worker_config, unattended_upgrades_config, 'Wrong unattended-upgrade config on master/worker')
+
 
 if __name__ == '__main__':
     unittest.main()
