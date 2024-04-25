@@ -22,13 +22,8 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.boot_timeout_per_node import TimeoutPerNode
 from kubemarine.patches.disable_unattended_upgrade import DisableUnattendedUpgrades
-from kubemarine.patches.strong_cipher_suits_for_kubelet import UpdatekubeletCipherSuites
-
 patches: List[Patch] = [
-    TimeoutPerNode(),
-    UpdatekubeletCipherSuites(),
     DisableUnattendedUpgrades()  # Add the new patch to the list
 ]
 """
