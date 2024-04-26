@@ -56,6 +56,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
+    - [patches](#patches)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
@@ -1079,7 +1080,7 @@ vrrp_ips:
     maintenance-type: "not bind"
 ```
 
-### Services
+### services
 
 In the `services` section, you can configure the service settings. The settings are described in the following sections.
 
@@ -2584,46 +2585,80 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *OS specific*: Yes
 
-The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version and OS family):
+The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system.
+By default, the following modules are loaded:
 
-IPv4:
-```yaml
-services:
-  modprobe:
-    rhel:
-    - br_netfilter
-    rhel8:
-    - br_netfilter
-    debian:
-    - br_netfilter
-```
-
-IPv6:
-```yaml
-services:
-  modprobe:
-    rhel:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack_ipv6
-    - nf_nat_masquerade_ipv6
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-    rhel8:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack
-    - nf_nat
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-    debian:
-    - br_netfilter
-    - ip6table_filter
-    - nf_conntrack
-    - nf_nat
-    - nf_reject_ipv6
-    - nf_defrag_ipv6
-```
+<table style="width: 1000px">
+<colgroup>
+<col style="width: 100px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 150px">
+<col style="width: 300px">
+</colgroup>
+<thead>
+  <tr>
+    <th scope="col" rowspan="2">IP version</th>
+    <th scope="col" colspan="4">OS families</th>
+    <th scope="col" rowspan="2">Note</th>
+  </tr>
+  <tr>
+    <th scope="col">rhel</th>
+    <th scope="col">rhel8</th>
+    <th scope="col">rhel9</th>
+    <th scope="col">debian</th>
+  </tr>
+</thead>
+<tbody align="center">
+  <tr>
+    <th scope="row" rowspan="2">IPv4</th>
+    <td colspan="4">br_netfilter</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_conntrack</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <th scope="row" rowspan="8">IPv6</th>
+    <td colspan="4">br_netfilter</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td colspan="3">nf_conntrack</td>
+    <td align="left">Loaded on roles: <code>control-plane</code>, <code>worker</code></td>
+  </tr>
+  <tr>
+    <td>nf_conntrack_ipv6</td>
+    <td colspan="3"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">ip6table_filter</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td colspan="3">nf_nat</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>nf_nat_masquerade_ipv6</td>
+    <td colspan="3"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_reject_ipv6</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="4">nf_defrag_ipv6</td>
+    <td></td>
+  </tr>
+</tbody>
+</table>
 
 If necessary, you can redefine or add [List Merge Strategy](#list-merge-strategy) to the standard list of Kernel modules to load. For example (Debian OS family):
 
@@ -2634,6 +2669,31 @@ services:
       - my_own_module1
       - my_own_module2
 ```
+
+There is also an extended format that allows to choose nodes on which the modules should be loaded. For example:
+
+```yaml
+services:
+  modprobe:
+    debian:
+      - modulename: my_own_module1
+        groups: [control-plane, worker]
+      - modulename: my_own_module2
+        nodes: [balancer-1, balancer-2]
+```
+
+The following settings are supported in the extended format:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**modulename**|**yes**| |Module name.|
+|**groups**|no|`None`|The list of group names in whose hosts the module should be loaded.|
+|**nodes**|no|`None`|The list of node names where the module should be loaded.|
+|**install**|no|`true`|Whether the module is managed (installed, checked) by Kubemarine.|
+
+**Note**: You can specify nodes and groups at the same time.
+
+**Note**: If no groups or nodes are specified, then the module is loaded on all nodes.
 
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
@@ -2663,9 +2723,9 @@ The `services.sysctl` section manages the Linux Kernel parameters for all hosts 
 |net.ipv6.conf.all.forwarding|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.ip_nonlocal_bind|1|Presented only when IPv6 detected in node IP|
 |net.netfilter.nf_conntrack_max|1000000||
-|kernel.panic|10||
-|vm.overcommit_memory|1||
-|kernel.panic_on_oops|1||
+|kernel.panic|10|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
+|vm.overcommit_memory|1|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
+|kernel.panic_on_oops|1|Presented only if `services.kubeadm_kubelet.protectKernelDefaults` is `true` (default value)|
 |kernel.pid_max|calculated| If this parameter is not explicitly indicated in the `cluster.yaml`, then this value is calculated by this formula: `maxPods * podPidsLimit + 2048` |
 
 Constant value equal to `2048` means the maximum number of processes that the system can require during run (only processes of the Linux virtual machine itself are implied). This value have been established empirically.
@@ -2673,6 +2733,9 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 **Note**: You can also define the `kernel.pid_max` value by your own, but you need to be sure that it is at least greater than the result of the expression: `maxPods * podPidsLimit + 2048`. For more information about the `podPidsLimit` and `maxPods` values, refer to the [kubeadm_kubelet](#kubeadm_kubelet) section. 
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
+
+**Note**: All default parameters are installed only on `control-plane`, `worker` nodes,
+except `net.ipv4.ip_nonlocal_bind`, and `net.ipv6.ip_nonlocal_bind` that are installed on `balancer` nodes only by default.
 
 **Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
@@ -2685,6 +2748,36 @@ services:
     net.ipv4.ip_forward: 0
     net.ipv4.ip_nonlocal_bind: 0
 ```
+
+There is also an extended format that allows to choose nodes on which the parameters should be managed.
+For example:
+
+```yaml
+services:
+  sysctl:
+    net.netfilter.nf_conntrack_max:
+      value: 1000000
+      groups: [control-plane, worker]
+      nodes: [balancer-1]
+      install: true
+    vm.max_map_count:
+      value: 262144
+```
+
+The following settings are supported in the extended format:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**value**|**yes**| |The value of the parameter. The property is mandatory for custom parameters, and calculated for standard parameters. To learn how values are calculated for the standard parameters, refer to their description in the previous table.|
+|**groups**|no|`None`|The list of group names to whose hosts the parameter should be set.|
+|**nodes**|no|`None`|The list of node names where the parameter should be set.|
+|**install**|no|`true`|Whether the parameter is managed (installed, checked) by Kubemarine. The property is `true` for custom parameters by default, and calculated for standard parameters. To learn what parameters are installed by default, refer to their description in the previous table.|
+
+**Note**: You can specify nodes and groups at the same time.
+
+**Note**: If no groups or nodes are specified, then the parameter is installed on all nodes.
+
+**Note**: Per-node [patches](#patches) are also supported for this section.
 
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
@@ -3721,6 +3814,36 @@ services:
       maintenance_mode: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
+
+### patches
+
+It is possible to override the resulting configuration for specific nodes using `patches`.
+This allows to either override default parameters for specific nodes, or provide different settings for different nodes.
+
+For example:
+
+```yaml
+patches:
+  - groups: [control-plane, worker]
+    services:
+      sysctl:
+        net.ipv4.conf.default.arp_ignore: 0
+  - groups: [balancer]
+    services:
+      sysctl:
+        net.ipv4.conf.default.arp_ignore: 2
+```
+
+The patches in the list are merged with the global configuration one by one.
+Thus, the same settings have precedence in the last patch if overridden few times for the same node.
+
+The following settings are supported:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**groups**|yes*|`None`|The list of group names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
+|**nodes**|yes*|`None`|The list of node names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
+|**services.sysctl**|no| |Manage the Linux Kernel parameters for the specified nodes in a patch. For more information, see [sysctl](#sysctl).|
 
 ### RBAC Admission
 

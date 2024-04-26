@@ -23,7 +23,7 @@
           "description": "Switch for the command execution from the sudoer"
         },
         "groups": {
-          "$ref": "../../common/node_ref.json#/definitions/Roles",
+          "$ref": "../../common/node_ref.json#/definitions/DeprecatedRoles",
           "description": "List of groups on which the shell command should be executed"
         },
         "nodes": {

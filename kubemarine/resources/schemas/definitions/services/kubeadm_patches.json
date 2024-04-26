@@ -69,7 +69,11 @@
                 "type": "object",
                 "properties": {
                   "patch": {
-                    "$ref": "#/definitions/patch"
+                    "allOf": [{"$ref": "#/definitions/patch"}],
+                    "properties": {
+                      "podPidsLimit": {"$ref": "kubeadm_kubelet.json#/definitions/PodPidsLimit"},
+                      "maxPods": {"$ref": "kubeadm_kubelet.json#/definitions/MaxPods"}
+                    }
                   },
                   "groups": {
                     "$ref": "../common/node_ref.json#/definitions/KubernetesRoles"

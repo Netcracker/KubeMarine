@@ -139,6 +139,7 @@ def system_prepare_system_sysctl(group: NodeGroup) -> None:
     group.call_batch([
         sysctl.configure,
         sysctl.reload,
+        system.verify_sysctl,
     ])
 
     cluster.schedule_cumulative_point(system.reboot_nodes)

@@ -22,8 +22,11 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.preserve_compatibility_kernel import PreserveCompatibilityKernel
+
 from kubemarine.patches.disable_unattended_upgrade import DisableUnattendedUpgrades
 patches: List[Patch] = [
+    PreserveCompatibilityKernel(),
     DisableUnattendedUpgrades()  # Add the new patch to the list
 ]
 """

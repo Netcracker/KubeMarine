@@ -3,22 +3,90 @@
   "type": "object",
   "description": "Manage the Linux Kernel parameters for all hosts in a cluster",
   "properties": {
-    "net.bridge.bridge-nf-call-iptables": {"type": ["string", "integer"], "default": 1},
-    "net.ipv4.ip_forward": {"type": ["string", "integer"], "default": 1},
-    "net.ipv4.ip_nonlocal_bind": {"type": ["string", "integer"], "default": 1},
-    "net.ipv4.conf.all.route_localnet": {"type": ["string", "integer"], "default": 1},
-    "net.bridge.bridge-nf-call-ip6tables": {"type": ["string", "integer"]},
-    "net.ipv6.conf.all.forwarding": {"type": ["string", "integer"]},
-    "net.ipv6.ip_nonlocal_bind": {"type": ["string", "integer"]},
-    "kernel.panic": {"type": ["string", "integer"], "default": 10},
-    "vm.overcommit_memory": {"type": ["string", "integer"], "default": 1},
-    "kernel.panic_on_oops": {"type": ["string", "integer"], "default": 1},
+    "net.bridge.bridge-nf-call-iptables": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
+    "net.ipv4.ip_forward": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
+    "net.ipv4.ip_nonlocal_bind": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
+    "net.ipv4.conf.all.route_localnet": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
+    "net.bridge.bridge-nf-call-ip6tables": {
+      "$ref": "#/definitions/GenericValue"
+    },
+    "net.ipv6.conf.all.forwarding": {
+      "$ref": "#/definitions/GenericValue"
+    },
+    "net.ipv6.ip_nonlocal_bind": {
+      "$ref": "#/definitions/GenericValue"
+    },
+    "net.netfilter.nf_conntrack_max": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1000000
+    },
+    "kernel.panic": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 10
+    },
+    "vm.overcommit_memory": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
+    "kernel.panic_on_oops": {
+      "$ref": "#/definitions/GenericValue",
+      "default": 1
+    },
     "kernel.pid_max": {
-      "type": ["string", "integer"],
+      "$ref": "#/definitions/GenericValue",
       "description": "If this parameter is not explicitly indicated in the cluster.yaml, then this value is calculated by this formula: maxPods * podPidsLimit + 2048"
     }
   },
   "additionalProperties": {
-    "type": ["string", "integer"]
+    "$ref": "#/definitions/GenericValue"
+  },
+  "definitions": {
+    "SimpleValue": {
+      "type": ["string", "integer"],
+      "description": "The value can be an integer value, or template string to be rendered as an integer value"
+    },
+    "FilteredValue": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "$ref": "#/definitions/SimpleValue"
+        },
+        "groups": {
+          "$ref": "../common/node_ref.json#/definitions/Roles",
+          "default": ["worker", "control-plane", "balancer"],
+          "description": "The list of group names to whose hosts the parameter should be set"
+        },
+        "nodes": {
+          "$ref": "../common/node_ref.json#/definitions/Names",
+          "description": "The list of node names where the parameter should be set"
+        },
+        "install": {
+          "type": ["string", "boolean"],
+          "default": "true",
+          "description": "Whether the parameter is managed (installed, checked) by Kubemarine"
+        }
+      },
+      "required": ["value"],
+      "additionalProperties": false
+    },
+    "GenericValue": {
+      "oneOf": [
+        {"$ref": "#/definitions/SimpleValue"},
+        {"$ref": "#/definitions/FilteredValue"}
+      ],
+      "description": "The value can be an integer value, template string to be rendered as an integer value, or dictionary with the value and additional parameters."
+    }
   }
 }

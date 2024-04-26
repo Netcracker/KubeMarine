@@ -15,7 +15,7 @@
 import io
 import re
 from textwrap import dedent
-from typing import List, Optional, Dict, Callable, Sequence
+from typing import List, Optional, Dict, Callable, Sequence, Union
 
 import yaml
 from jinja2 import Template
@@ -24,7 +24,7 @@ from ordered_set import OrderedSet
 from kubemarine import plugins, system
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeConfig, NodeGroup, DeferredGroup, CollectorCallback, AbstractGroup, RunResult
+from kubemarine.core.group import NodeGroup, DeferredGroup, CollectorCallback, AbstractGroup, RunResult
 from kubemarine.core.yaml_merger import override_merger
 from kubemarine.kubernetes.object import KubernetesObject
 
@@ -1093,14 +1093,16 @@ def _delete_pods(cluster: KubernetesCluster, node: AbstractGroup[RunResult],
 
 
 # function to get dictionary of flags to be patched for a given control plane item and a given node
-def _get_patched_flags_for_section(inventory: dict, patch_section: str, node: NodeConfig) -> Dict[str, str]:
+def get_patched_flags_for_section(cluster: KubernetesCluster,
+                                  patch_section: str, group: AbstractGroup[RunResult]) -> Dict[str, Union[str, bool, int]]:
+    node = group.get_config()
     flags = {}
 
-    for n in inventory['services']['kubeadm_patches'][patch_section]:
-        if n.get('groups') is not None and list(set(node['roles']) & set(n['groups'])):
-            for arg, value in n['patch'].items():
-                flags[arg] = value
-        if n.get('nodes') is not None and node['name'] in n['nodes']:
+    for n in cluster.inventory['services']['kubeadm_patches'][patch_section]:
+        group = cluster.create_group_from_groups_nodes_names(
+            n.get('groups', []), n.get('nodes', []))
+
+        if group.has_node(node['name']):
             for arg, value in n['patch'].items():
                 flags[arg] = value
 
@@ -1124,8 +1126,7 @@ def _create_kubeadm_patches_for_component_on_node(cluster: KubernetesCluster, no
         node.sudo(f'{component_patches} -delete')
 
     # read patch content from inventory and upload patch files to a node
-    node_config = node.get_config()
-    patched_flags = _get_patched_flags_for_section(cluster.inventory, patch_constants['section'], node_config)
+    patched_flags = get_patched_flags_for_section(cluster, patch_constants['section'], node)
     if patched_flags:
         if component == 'kubelet':
             template_filename = 'templates/patches/kubelet.yaml.j2'

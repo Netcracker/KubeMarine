@@ -22,7 +22,7 @@ from typing import List, Dict, Iterator, Any, Optional
 import yaml
 from jinja2 import Template
 
-from kubemarine import system, admission, etcd, packages, jinja
+from kubemarine import system, admission, etcd, packages, jinja, sysctl
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import Token
@@ -43,6 +43,8 @@ ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded onl
 ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET = "Patches for kubelet are not supported in Kubernetes {version}"
 
 ERROR_UPGRADE_UNEXPECTED_PROPERTY='Unexpected %s properties in the procedure inventory for upgrade.'
+
+ERROR_AMBIGUOUS_CONNTRACK_MAX = "Detected ambiguous 'net.netfilter.nf_conntrack_max' value: {values}"
 
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
@@ -183,11 +185,24 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     preflight_errors.extend(default_preflight_errors)
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
+    enrich_kube_proxy(cluster)
+
+
+def enrich_kube_proxy(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
     # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max
     # since they define the same kernel variable
-    version_key = utils.version_key(inventory["services"]["kubeadm"]["kubernetesVersion"])
-    conntrack_max = inventory["services"]["sysctl"].get("net.netfilter.nf_conntrack_max")
-    if version_key >= (1, 29, 0) and conntrack_max is not None:
+    kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
+    conntrack_max_values = {
+        sysctl.get_parameter(cluster, node, 'net.netfilter.nf_conntrack_max')
+        for node in kubernetes_nodes.get_ordered_members_list()}
+
+    if len(conntrack_max_values) > 1:
+        raise Exception(ERROR_AMBIGUOUS_CONNTRACK_MAX.format(values=conntrack_max_values))
+
+    conntrack_max = next(iter(conntrack_max_values), None)
+    if components.kube_proxy_overwrites_higher_system_values(cluster) and conntrack_max is not None:
         inventory["services"]["kubeadm_kube-proxy"]["conntrack"]["min"] = conntrack_max
     else:
         inventory["services"]["kubeadm_kube-proxy"]["conntrack"].pop("min",None)

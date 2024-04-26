@@ -77,7 +77,7 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.29")):
 
         # Defaults of KubeProxyConfiguration have changed.
-        # See services.kubeadm_kube-proxy.conntrack.min section of defaults.yaml
+        # See kubernetes.enrich_kube_proxy()
         def edit_kube_proxy_conntrack_min(kube_proxy_cm: dict) -> dict:
             expected_conntrack: dict = cluster.inventory['services']['kubeadm_kube-proxy']['conntrack']
             if 'min' not in expected_conntrack:
