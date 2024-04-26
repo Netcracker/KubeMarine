@@ -32,21 +32,33 @@ fi
 
 # If any pod configuration detected
 if [ -n "${ETCD_POD_CONFIG}" ]; then
-  ETCD_IMAGE=$(echo "${ETCD_POD_CONFIG}" | grep ' image:' | awk '{print $2; exit}')
-  ETCD_MOUNTS=""
-  ETCD_MOUNTS_RAW=$(echo "${ETCD_POD_CONFIG}" | grep ' mountPath: ')
-  ETCD_CERT=$(echo "${ETCD_POD_CONFIG}" | grep '\- --cert-file' | sed s/=/\\n/g | sed -n 2p)
-  ETCD_KEY=$(echo "${ETCD_POD_CONFIG}" | grep '\- --key-file' | sed s/=/\\n/g | sed -n 2p)
-  ETCD_CA=$(echo "${ETCD_POD_CONFIG}" | grep '\- --trusted-ca-file' | sed s/=/\\n/g | sed -n 2p)
-  ETCD_ENDPOINTS=$(echo "${ETCD_POD_CONFIG}" | grep '\- --initial-cluster=' | sed -e 's/\s*- --initial-cluster=//g' -e "s/[a-zA-Z0-9\.-]*=//g" -e "s/2380/2379/g")
-  while IFS= read -r line; do
-      volume=$(echo "${line}" | awk '{print $3; exit}')
-      if [ "$CONT_RUNTIME" == "ctr" ]; then
-        ETCD_MOUNTS="${ETCD_MOUNTS} -mount type=bind,src=${volume},dst=${volume},options=rbind:rw"
-      else
-        ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
-      fi
-  done <<< "${ETCD_MOUNTS_RAW}"
+  if [ -z "${ETCD_IMAGE}" ];then
+    ETCD_IMAGE=$(echo "${ETCD_POD_CONFIG}" | grep ' image:' | awk '{print $2; exit}')
+  fi
+  if [ -z "${ETCD_CERT}" ];then
+    ETCD_CERT=$(echo "${ETCD_POD_CONFIG}" | grep '\- --cert-file' | sed s/=/\\n/g | sed -n 2p)
+  fi
+  if [ -z "${ETCD_KEY}" ];then
+    ETCD_KEY=$(echo "${ETCD_POD_CONFIG}" | grep '\- --key-file' | sed s/=/\\n/g | sed -n 2p)
+  fi
+  if [ -z "${ETCD_CA}" ];then
+    ETCD_CA=$(echo "${ETCD_POD_CONFIG}" | grep '\- --trusted-ca-file' | sed s/=/\\n/g | sed -n 2p)
+  fi
+  if [ -z "${ETCD_ENDPOINTS}" ];then
+    ETCD_ENDPOINTS=$(echo "${ETCD_POD_CONFIG}" | grep '\- --initial-cluster=' | sed -e 's/\s*- --initial-cluster=//g' -e "s/[a-zA-Z0-9\.-]*=//g" -e "s/2380/2379/g")
+  fi
+  if [ -z "${ETCD_MOUNTS}" ];then
+    ETCD_MOUNTS=""
+    ETCD_MOUNTS_RAW=$(echo "${ETCD_POD_CONFIG}" | grep ' mountPath: ')
+    while IFS= read -r line; do
+        volume=$(echo "${line}" | awk '{print $3; exit}')
+        if [ "$CONT_RUNTIME" == "ctr" ]; then
+          ETCD_MOUNTS="${ETCD_MOUNTS} -mount type=bind,src=${volume},dst=${volume},options=rbind:rw"
+        else
+          ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
+        fi
+    done <<< "${ETCD_MOUNTS_RAW}"
+  fi
 
   # User can override some of our "default" etcdctl args (see cases).
   # If user passed his own arg, then our "default" arg will be NULLed.
