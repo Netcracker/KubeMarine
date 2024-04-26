@@ -71,6 +71,13 @@
     "values": {
       "type": "object",
       "description": "Section to hold custom variables to be used in Jinja2 templates."
+    },
+    "patches": {
+      "type": "array",
+      "description": "Override the resulting configuration for specific nodes. The patches in the list are merged with the global configuration one by one. Thus, the same settings have precedence in the last patch if overridden few times for the same node.",
+      "items": {
+        "$ref": "definitions/patch.json"
+      }
     }
   },
   "required": ["nodes", "cluster_name"],

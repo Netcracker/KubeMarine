@@ -21,7 +21,7 @@
           "description": "Privilege escalation switch. Enables -b argument."
         },
         "groups": {
-          "$ref": "../../common/node_ref.json#/definitions/Roles",
+          "$ref": "../../common/node_ref.json#/definitions/DeprecatedRoles",
           "description": "Targeted list of groups, passed to Ansible as --limit argument"
         },
         "nodes": {

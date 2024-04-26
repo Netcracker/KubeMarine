@@ -35,7 +35,7 @@
       "allOf": [{"$ref": "#/definitions/AccessProperties"}],
       "properties": {
         "roles": {
-          "$ref": "common/node_ref.json#/definitions/Roles",
+          "$ref": "common/node_ref.json#/definitions/DeprecatedRoles",
           "description": "Cluster member roles"
         },
         "control_endpoint": {

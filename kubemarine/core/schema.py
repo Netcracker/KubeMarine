@@ -16,7 +16,7 @@ import json
 import pathlib
 from collections.abc import Hashable
 from textwrap import dedent
-from typing import List, Dict, Callable, Union, Sequence
+from typing import List, Dict, Callable, Union, cast
 
 import jsonschema
 from ordered_set import OrderedSet
@@ -133,6 +133,7 @@ def _unnest_errors(error: jsonschema.ValidationError) -> None:
     subschemas_errors = list(errors_by_subschema.values())
     _unnest_type_subschema_errors(error, subschemas_errors)
     _unnest_enum_subschema_errors(error, subschemas_errors)
+    _unnest_required_subschema_errors(error, subschemas_errors)
 
 
 def _descend_errors(error: jsonschema.ValidationError) -> List[jsonschema.ValidationError]:
@@ -186,7 +187,7 @@ def _unnest_type_subschema_errors(error: jsonschema.ValidationError,
                 break
         else:  # not found error with "type" validation failed for root instance.
             break
-    else:  # not found subschema not containing the necessary error, i. e. all subschemas has necessary error
+    else:  # not found subschema not containing the necessary error, i.e. all subschemas have necessary error
         reprs = ", ".join(repr(type) for type in expected_types)
         for child in error.context:
             child.parent = None
@@ -211,7 +212,7 @@ def _unnest_enum_subschema_errors(error: jsonschema.ValidationError,
                 break
         else:  # not found error with "enum" validation failed for root instance.
             break
-    else:  # not found subschema not containing the necessary error, i. e. all subschemas has necessary error
+    else:  # not found subschema not containing the necessary error, i.e. all subschemas have necessary error
         for child in error.context:
             child.parent = None
         error.context = []
@@ -219,6 +220,48 @@ def _unnest_enum_subschema_errors(error: jsonschema.ValidationError,
         error.validator_value = list(expected_elems)
         error.schema_path[-1] = "enum"
         error.message = f"{error.instance!r} is not one of {list(expected_elems)!r}"
+        subschemas_errors.clear()
+
+
+def _unnest_required_subschema_errors(error: jsonschema.ValidationError,
+                                      subschemas_errors: List[List[jsonschema.ValidationError]]) -> None:
+    if not error.context:
+        return
+
+    required_sets: List[List[str]] = []
+    for errs in subschemas_errors:
+        if len(errs) > 1:
+            # Support only the case when all subschema failed with the only 'required' validation.
+            # This is a common pattern if "at least one property from the set is required" requirement
+            # is moved to the separate "allOf (anyOf (required prop1, required prop2)) subschema.
+            break
+        for child in errs:
+            if (_validated_by(child, "required") and len(child.relative_path) == 0
+                    and list(child.schema_path)[1:] == ["required"] and len(child.validator_value) > 0
+                    and child.validator_value != ['<<']):
+                if isinstance(child.validator_value[0], str):
+                    required_sets.append(child.validator_value)
+                else:
+                    required_sets.extend(child.validator_value)
+                break
+        else:  # not found error with "required" validation failed for root instance.
+            break
+    # not found subschema not containing the only necessary error,
+    # i.e. all subschemas have the only necessary error
+    else:
+        initial_validator = cast(str, error.validator)
+
+        for child in error.context:
+            child.parent = None
+
+        error.context = []
+        error.validator = "required"  # type: ignore[assignment]
+        # This breaks original typing.
+        # Access to the validator_value should always be guarded with extra isinstance() checks.
+        error.validator_value = required_sets
+        error.schema_path[-1] = "required"
+        error.message = (f"{'One' if initial_validator == 'oneOf' else 'At least one'} "
+                         f"of the following property sets is required: {', '.join(map(str, required_sets))}")
         subschemas_errors.clear()
 
 
@@ -272,7 +315,7 @@ def _apply_required_and_optional_properties_heuristic(error: jsonschema.Validati
     # Resolve oneOf|anyOf(object, object) ambiguity.
     # Currently only 'registry' section has such schema.
     # The chosen priority is:
-    # 1. If all required properties are present, than the error has lower relevance.
+    # 1. If all required properties are present, then the error has lower relevance.
     # 2. Otherwise, calculate proportion of matched properties.
 
     # By default, consider all required properties are present, and no properties are matched
@@ -301,19 +344,19 @@ def _error_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Validati
     return dedent(
         f"""\
         {_friendly_msg(validator, error)}
-        On inventory{_convert_to_indices(error.absolute_path)}
+        On inventory{utils.pretty_path(error.absolute_path)}
         """.rstrip()
     )
 
 
 def _verbose_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError) -> str:
-    schema_path = _convert_to_indices(list(error.absolute_schema_path)[:-1])
+    schema_path = utils.pretty_path(list(error.absolute_schema_path)[:-1])
     return dedent(
         f"""\
         {_friendly_msg(validator, error)}
         
         Failed validating {error.validator!r} in {schema_path}
-        On inventory{_convert_to_indices(error.absolute_path)}
+        On inventory{utils.pretty_path(error.absolute_path)}
         """.rstrip()
     )
 
@@ -362,9 +405,3 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
 
 def _validated_by(error: jsonschema.ValidationError, expected: str) -> bool:
     return error.validator == expected  # type: ignore[comparison-overlap]
-
-
-def _convert_to_indices(path: Sequence[Union[str, int]]) -> str:
-    if not path:
-        return ""
-    return f"[{']['.join(repr(p) for p in path)}]"

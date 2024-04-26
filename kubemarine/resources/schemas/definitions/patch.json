@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "allOf": [
+    {"$ref": "common/node_ref.json#/definitions/AnyOfNodesGroupsSpec"},
+    {"$ref": "#/definitions/Patch"}
+  ],
+  "definitions": {
+    "Patch": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "$ref": "common/node_ref.json#/definitions/Roles",
+          "default": ["worker", "control-plane", "balancer"],
+          "description": "The list of group names to apply the patch to"
+        },
+        "nodes": {
+          "$ref": "common/node_ref.json#/definitions/Names",
+          "description": "The list of node names to apply the patch to"
+        },
+        "services": {
+          "type": "object",
+          "description": "Configure settings of different services",
+          "properties": {
+            "sysctl": {
+              "$ref": "services/sysctl.json",
+              "description": "Manage the Linux Kernel parameters for the specified nodes in a patch"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

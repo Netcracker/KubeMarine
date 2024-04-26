@@ -1,14 +1,25 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "definitions": {
-    "Role": {
+    "DeprecatedRole": {
       "enum": ["worker", "control-plane", "master", "balancer"]
+    },
+    "Role": {
+      "enum": ["worker", "control-plane", "balancer"]
     },
     "Kubernetes": {
       "enum": ["worker", "control-plane"]
     },
     "ControlPlane": {
       "enum": ["control-plane"]
+    },
+    "DeprecatedRoles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/DeprecatedRole"
+      },
+      "uniqueItems": true,
+      "minItems": 1
     },
     "Roles": {
       "type": "array",
@@ -46,26 +57,36 @@
       "minItems": 1
     },
     "OneOfNodesGroupsSpec": {
+      "type": "object",
       "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "groups": {
-              "type": "array"
-            }
-          },
-          "required": ["groups"]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "nodes": {
-              "type": "array"
-            }
-          },
-          "required": ["nodes"]
-        }
+        {"$ref": "#/definitions/GroupsSpec"},
+        {"$ref": "#/definitions/NodesSpec"}
       ]
+    },
+    "AnyOfNodesGroupsSpec": {
+      "type": "object",
+      "anyOf": [
+        {"$ref": "#/definitions/GroupsSpec"},
+        {"$ref": "#/definitions/NodesSpec"}
+      ]
+    },
+    "GroupsSpec": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array"
+        }
+      },
+      "required": ["groups"]
+    },
+    "NodesSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array"
+        }
+      },
+      "required": ["nodes"]
     }
   }
 }
