@@ -35,6 +35,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, CollectorCallback
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
+from kubemarine.packages import get_package_name
 from kubemarine.plugins import calico, builtin, manifest
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static, utils
@@ -169,11 +170,7 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str) -> Non
         hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
         if not hosts_to_packages:
             raise TestWarn(f"No nodes to check {pckg_alias!r} version")
-        packages_section = cluster.inventory['services']['packages']
-        global_cache_versions = packages_section['cache_versions']
-        package_associations = packages_section['associations'].get(cluster.get_os_family(), {}).get(pckg_alias, {})
-        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False,
-                                warn_on_bad_result=not package_associations.get('cache_versions', global_cache_versions))
+        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False)
 
         if pckg_alias in ["haproxy", "keepalived", "containerd", "docker"]:
             recommended_system_package_versions(cluster, pckg_alias)
@@ -221,38 +218,49 @@ def check_packages_versions(cluster: KubernetesCluster, tc: TestCase, hosts_to_p
     :param cluster: main cluster object
     :param tc: current test case object
     :param hosts_to_packages: hosts where to check packages
-    :param warn_on_bad_result: if true then uses Warning instead of Failure. Default False.
+    :param warn_on_bad_result: if true then bad results raises Warning instead of Failure. Default False.
     :param raise_successful: if true, successful test result will be risen. Default True.
     """
     bad_results = []
+    warn_results = []
     good_results = []
 
     packages_map = pckgs.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
+    packages_section = cluster.inventory['services']['packages']
+    global_cache_versions = packages_section['cache_versions']
     for package, version_map in packages_map.items():
+        package_associations = packages_section['associations'].get(cluster.get_os_family(), {}).get(
+            get_package_name(cluster.get_os_family(), package), {})
         if len(version_map) != 1:
             cluster.log.debug(f"Package {package} has different versions:")
             cluster.log.debug(version_map)
-            bad_results.append(package)
-
-        version = list(version_map.keys())[0]
-        if "not installed" in version:
-            cluster.log.debug(f"Package {package} is not installed on some nodes:")
-            cluster.log.debug(version_map[version])
-            bad_results.append(package)
-        else:
-            package_name = package.replace("*", "")
-            if version.startswith(package_name):
-                good_results.append(version)
+            if global_cache_versions and package_associations.get('cache_versions', True):
+                bad_results.append(package)
             else:
-                bad_results.append(f"Actual version: {version} doesn't match expected package version: {package}")
+                warn_results.append(package)
 
+        for version in version_map.keys():
+            if "not installed" in version:
+                cluster.log.debug(f"Package {package} is not installed on some nodes:")
+                cluster.log.debug(version_map[version])
+                bad_results.append(package)
+            else:
+                package_name = package.replace("*", "")
+                if version.startswith(package_name):
+                    good_results.append(version)
+                else:
+                    cluster.log.debug(f"Actual version: {version} doesn't match expected package version: {package} on "
+                                      f"nodes: {version_map[version]}")
+                    bad_results.append(package)
 
-    if bad_results:
+    if bad_results and not warn_on_bad_result:
         hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
                        f'system: {bad_results}\n'
-        if warn_on_bad_result:
-            raise TestWarn("detected incorrect packages versions", hint=hint_message)
         raise TestFailure("detected incorrect packages versions", hint=hint_message)
+    if warn_results or (warn_on_bad_result and bad_results):
+        hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
+                       f'system: {bad_results + warn_results}\n'
+        raise TestWarn("detected incorrect packages versions", hint=hint_message)
     cluster.log.debug(f"installed packages: {good_results}")
     if raise_successful:
         tc.success("all packages have correct versions")
