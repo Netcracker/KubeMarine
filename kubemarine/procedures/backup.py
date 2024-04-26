@@ -409,7 +409,13 @@ class ExportKubernetesParser:
         items_by_resource: Dict[str, List[str]] = {}
 
         def append_item(api_version: str, kind: str, item: str) -> None:
-            resource_name = next(r['name'] for r in resources if r['apiVersion'] == api_version and r['kind'] == kind)
+            resource_name = next(
+                r['name'] for r in resources
+                if r['apiVersion'] == api_version
+                and (r['kind'] == kind
+                     or kind in ('ValidatingAdmissionPolicyList', 'ValidatingAdmissionPolicyBindingList')
+                     and r['kind'] == kind.rstrip('List'))
+            )
             items_by_resource.setdefault(resource_name, []).append(item)
 
         with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
