@@ -630,6 +630,10 @@ def convert_primitive(struct: Primitive, path: Sequence[Index], primitives_confi
 
 
 class NodePrimitives(jinja.JinjaNode):
+    """
+    A Node that both compiles template strings and converts primitive values in the underlying `dict` or `list`.
+    """
+
     def __init__(self, delegate: Union[dict, list], *,
                  path: jinja.Path, env: jinja.Environment,
                  primitives_config: PrimitivesConfig):
@@ -658,9 +662,16 @@ class NodePrimitives(jinja.JinjaNode):
 
 
 class NodesCustomization:
+    """
+    Customize access to the particular sections of the inventory.
+    """
+
     # pylint: disable=no-self-argument
 
     def __init__(nodes) -> None:
+        # The classes below should customize access to the sections of the inventory,
+        # while preserving the global behaviour of Node implementations: NodePrimitives, JinjaNode, Node.
+
         class Kubeadm(Node):
             def descend(self, index: Index) -> Union[Primitive, Node]:
                 child: Union[Primitive, Node] = super().descend(index)
@@ -697,11 +708,27 @@ class NodesCustomization:
 
 
 class Environment(jinja.Environment):
+    """
+    Environment that supports recursive compilation and on-the-fly conversion of primitive values.
+
+    It also customizes access to the particular sections of the inventory.
+    """
+
     def __init__(self, logger: log.EnhancedLogger, recursive_values: dict,
                  *,
                  recursive_compile: bool = False,
                  recursive_extra: Dict[str, Any] = None,
                  primitives_config: PrimitivesConfig = None):
+        """
+        Instantiate new environment and set default filters.
+
+        :param logger: EnhancedLogger
+        :param recursive_values: The render values access to which should be customized.
+                                 They may also be automatically converted and compiled if necessary.
+        :param recursive_compile: Flag that enables recursive compilation.
+        :param recursive_extra: If recursive compilation occurs, these render values are supplied to the template.
+        :param primitives_config: List of sections and convertors of primitive values.
+        """
         self.recursive_compile = recursive_compile
         self.primitives_config = primitives_config
         super().__init__(logger, recursive_values, recursive_extra=recursive_extra)

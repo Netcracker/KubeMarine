@@ -29,6 +29,10 @@ FILTER = Callable[[str], Any]
 
 
 class JinjaNode(MutableNode):
+    """
+    A Node that compiles template strings in the underlying `dict` or `list` on-the-fly during access to its items.
+    """
+
     def __init__(self, delegate: Union[dict, list],
                  *, path: Path, env: 'Environment'):
         super().__init__(delegate)
@@ -49,6 +53,10 @@ class JinjaNode(MutableNode):
 
 
 class Context(jinja2.runtime.Context):
+    """
+    An entry point from the jinja templates to the recursively compiled sections of inventory.
+    """
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.environment: Environment = self.environment
@@ -65,9 +73,20 @@ class Context(jinja2.runtime.Context):
 
 
 class Environment(jinja2.Environment):
+    """
+    Jinja environment that supports recursive compilation.
+    """
+
     context_class = Context
 
     def __init__(self, logger: log.EnhancedLogger, recursive_values: dict, *, recursive_extra: Dict[str, Any] = None):
+        """
+        Instantiate new environment and set default filters.
+
+        :param logger: EnhancedLogger
+        :param recursive_values: If templates access to these values, they are automatically compiled if necessary.
+        :param recursive_extra: If recursive compilation occurs, these render values are supplied to the template.
+        """
         super().__init__()
         self.logger = logger
 
@@ -110,9 +129,24 @@ class Environment(jinja2.Environment):
         self.filters['is_false'] = lambda v: not utils.strtobool(v)
 
     def create_root(self, delegate: dict) -> Node:
+        """
+        Create the root wrapper over the recursively compiled container (inventory).
+
+        :param delegate: the root container
+        :return: the root wrapper
+        """
         return JinjaNode(delegate, path=Path(), env=self)
 
     def compile_string(self, struct: str, path: Path) -> str:
+        """
+        Compiles template string at the specified inventory `path`.
+        It is called both while going over the inventory,
+        and recursively if variables are accessed from templates.
+
+        :param struct: template string
+        :param path: path of sections in the inventory
+        :return: compiled string
+        """
         if path in self._compiled:
             return struct
 
