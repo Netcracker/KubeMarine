@@ -23,9 +23,11 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.preserve_compatibility_kernel import PreserveCompatibilityKernel
+from kubemarine.patches.reinstall_etcdctl_thirdparty import ReinstallEtcdctl
 
 patches: List[Patch] = [
     PreserveCompatibilityKernel(),
+    ReinstallEtcdctl(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
