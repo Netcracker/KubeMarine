@@ -377,22 +377,37 @@ def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory
 
     relevant_group = relevant_group.intersection_group(group)
 
-    global_cache_versions = packages_section['cache_versions']
     for node in relevant_group.get_ordered_members_list():
         os_family = node.get_nodes_os()
-        package_associations = packages_section['associations'].get(os_family, {}).get(association_name, {})
-        packages = package_associations.get('package_name', [])
+        packages = get_association_packages(cluster, os_family, association_name)
 
-        if isinstance(packages, str):
-            packages = [packages]
-
-        if ensured_association_only and not (global_cache_versions and package_associations.get('cache_versions', True)):
+        if ensured_association_only and not cache_versions_enabled(cluster, os_family, association_name):
             packages = []
 
         if packages:
             hosts_to_packages[node.get_host()] = packages
 
     return hosts_to_packages
+
+
+def get_association_packages(cluster: KubernetesCluster, os_family: str, association_name: str) -> List[str]:
+    packages_section = cluster.inventory['services']['packages']
+    package_associations = packages_section['associations'].get(os_family, {}).get(association_name, {})
+    packages: Union[str, List[str]] = package_associations.get('package_name', [])
+
+    if isinstance(packages, str):
+        packages = [packages]
+
+    return packages
+
+
+def cache_versions_enabled(cluster: KubernetesCluster, os_family: str, association_name: str) -> bool:
+    packages_section = cluster.inventory['services']['packages']
+    global_cache_versions = packages_section['cache_versions']
+    specific_cache_versions: bool = packages_section['associations'] \
+        .get(os_family, {}).get(association_name, {}).get('cache_versions', True)
+
+    return global_cache_versions and specific_cache_versions
 
 
 def _cache_package_associations(group: NodeGroup, inventory: dict,
