@@ -1325,8 +1325,8 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
             raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
 
         if failed_nodes:
-            raise TestFailure(f"Check firewall settings for all nodes in the cluster, IP in IP traffic is not allowed between nodes.",
-                              hint='\n'.join(failed_nodes))
+            raise TestFailure(f"Check firewall settings for all nodes in the cluster, "
+                              "IP in IP traffic is not allowed between nodes.", hint='\n'.join(failed_nodes))
 
 
 def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
