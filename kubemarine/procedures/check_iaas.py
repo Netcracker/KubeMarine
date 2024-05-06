@@ -1384,11 +1384,11 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         recv_neighbor_node[nodes_list[1]['name']] = nodes_list[0]['name']
         trns_neighbor_host = nodes_list[1]['internal_address']
         trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
-                         f"-ext {trns_neighbor_host} -dport {random_port} " \
+                         f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
                          f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
         host = nodes_list[1]['internal_address']
-        recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -dport {random_port} " \
-                         f"-msg {msg} -timeout 3 2> /dev/null"
+        recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport} " \
+                         f"-dport {random_dport} -msg {msg} -timeout 3 2> /dev/null"
 
     try:
         collector = CollectorCallback(group.cluster)
