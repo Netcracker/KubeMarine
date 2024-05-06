@@ -2779,6 +2779,8 @@ The following settings are supported in the extended format:
 
 **Note**: Per-node [patches](#patches) are also supported for this section.
 
+**Note**: Kernel parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
@@ -3844,6 +3846,8 @@ The following settings are supported:
 |**groups**|yes*|`None`|The list of group names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
 |**nodes**|yes*|`None`|The list of node names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
 |**services.sysctl**|no| |Manage the Linux Kernel parameters for the specified nodes in a patch. For more information, see [sysctl](#sysctl).|
+
+**Note**: New patches can be appended after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
 ### RBAC Admission
 

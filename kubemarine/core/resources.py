@@ -408,6 +408,8 @@ class DynamicResources:
             kubemarine.cri.enrich_upgrade_inventory,
             kubemarine.cri.containerd.enrich_migrate_cri_inventory,
             kubemarine.plugins.nginx_ingress.cert_renew_enrichment,
+            kubemarine.sysctl.enrich_reconfigure_inventory,
+            kubemarine.core.inventory.enrich_reconfigure_inventory,
             # Enrichment of procedure inventory should be finished at this step.
 
             # Convert formatted inventory to native python objects, and merge defaults.

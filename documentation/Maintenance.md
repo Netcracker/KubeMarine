@@ -1012,7 +1012,7 @@ To change the operating system on an already running cluster:
 This procedure is aimed to reconfigure the cluster.
 
 It is supposed to reconfigure the cluster as a generalized concept described by the inventory file.
-Though, currently the procedure supports to reconfigure only Kubeadm-managed settings.
+Though, currently the procedure supports to reconfigure only Kubeadm-managed settings, and `services.sysctl`.
 If you are looking for how to reconfigure other settings, consider the following:
 
 - Probably some other [maintenance procedure](#provided-procedures) can do the task.
@@ -1030,6 +1030,17 @@ You can find description and examples of the accepted parameters in the next sec
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reconfigure.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+**Common considerations**
+
+Each section from the procedure inventory is merged with the corresponding section in the main `cluster.yaml`,
+and the related services are reconfigured based on the resulting inventory.
+
+Additionally, it is possible to supply empty section describing a particular service for most services.
+This does not introduce new changes in the `cluster.yaml`, but still triggers the reconfiguring,
+and thus allows to make the cluster and the inventory consistent to each other.
+
+Also, Kubemarine detects effectively changed settings of the services, if ones depend on the others, and reconfigures the dependent services accordingly.
 
 #### Reconfigure Kubeadm
 
@@ -1166,10 +1177,43 @@ Control plane nodes are reconfigured first.
 Working `kube-apiserver` is not required to reconfigure control plane components (more specifically, to change their static manifests),
 but required to reconfigure kubelet and kube-proxy.
 
+### Reconfigure sysctl
+
+The `reconfigure` procedure allows to supply new kernel parameters or change the existing ones
+in the same format, and with the same caveats, as for the installation procedure.
+For more information, refer to [sysctl](Installation.md#sysctl).
+
+It is also possible to trigger reconfiguring using empty `services.sysctl` section:
+
+```yaml
+services:
+  sysctl: {}
+```
+
+**Note**: kernel parameters can also be reconfigured using [patches](#append-patches).
+
+**Warning**: Be careful with these settings, they directly affect the hosts operating system.
+
+**Warning**: In comparison to the installation procedure, the new parameters are validated, but reboot is not scheduled.
+To make sure that the new settings are preserved after reboot, perform the reboot using [Reboot Procedure](#reboot-procedure),
+and run PaaS check, namely [232 Kernel Parameters Configuration](Kubecheck.md#232-kernel-parameters-configuration).
+
+### Append patches
+
+It is possible to **append** new [patches](Installation.md#patches) to the main `cluster.yaml`, and trigger reconfiguring of the corresponding services.
+
+The following sections are supported in the new patches:
+- `services.sysctl`
+
+Since the new patches are appended, the same settings have precedence in the last patch of the procedure inventory if overridden few times for the same node.
+
 ### Reconfigure Procedure Tasks Tree
 
 The `reconfigure` procedure executes the following sequence of tasks:
 
+- prepare
+  - system
+    - sysctl
 - deploy
   - kubernetes
     - reconfigure

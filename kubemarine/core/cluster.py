@@ -310,10 +310,24 @@ class KubernetesCluster(Environment):
         return self._products.inventory
 
     @property
+    def previous_nodes_inventory(self) -> Dict[str, dict]:
+        """
+        The previous resulting inventory describing specific nodes before procedure inventory is applied.
+        For `install` and some other procedures this equals to the resulting `KubernetesCluster.nodes_inventory`.
+
+        The inventory can be derived from the `KubernetesCluster.previous_inventory` only,
+        and should not depend on other sources of information.
+
+        The property should be read only, and should be examined primarily at PROCEDURE stage or inside the flow.
+        """
+        return self._previous_products.nodes_inventory
+
+    @property
     def nodes_inventory(self) -> Dict[str, dict]:
         """
         The resulting inventory describing specific nodes.
-        The inventory can be derived from the main `inventory` only,
+
+        The inventory can be derived from the main `KubernetesCluster.inventory` only,
         and should not depend on other sources of information.
 
         Should be changed only during the enrichment.

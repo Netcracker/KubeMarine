@@ -116,22 +116,20 @@ def configure_apparmor(group: NodeGroup, expected_profiles: dict) -> RunnersGrou
     return group.sudo(cmd)
 
 
-def setup_apparmor(group: NodeGroup) -> None:
-    from kubemarine import system  # pylint: disable=cyclic-import
-
+def setup_apparmor(group: NodeGroup) -> bool:
     log = group.cluster.log
 
     if group.get_nodes_os() != 'debian':
         log.debug("Skipped - Apparmor is supported only on Ubuntu/Debian")
-        return
+        return False
 
     expected_profiles = group.cluster.inventory['services']['kernel_security'].get('apparmor', {})
     valid = is_state_valid(group, expected_profiles)
 
     if valid:
         log.debug("Skipped - Apparmor already correctly configured")
-        return
+        return False
 
-    log.debug(configure_apparmor(group, expected_profiles))
-    group.cluster.schedule_cumulative_point(system.reboot_nodes)
-    group.cluster.schedule_cumulative_point(system.verify_system)
+    group.call(configure_apparmor, expected_profiles=expected_profiles)
+
+    return True
