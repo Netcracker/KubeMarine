@@ -1335,7 +1335,8 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     cluster = group.cluster
 
     # Copy binaries to the nodes
-    random_port = str(random.randint(50000, 65535))
+    random_sport = str(random.randint(50000, 65535))
+    random_dport = str(random.randint(50000, 65535))
     failed_nodes: Set[str] = set()
     recv_cmd: Dict[str, str] = {}
     trns_cmd: Dict[str, str] = {}
@@ -1370,12 +1371,12 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             # Transmitter starts first and sends IPIP packets every 1 second until the timeout comes or
             # the process is killed by terminating command
             trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
-                             f"-ext {trns_neighbor_host} -dport {random_port} " \
+                             f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
                              f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
             # Receiver start command
             # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from neighbor node
-            recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -dport {random_port} " \
-                             f"-msg {msg} -timeout 3 2> /dev/null"
+            recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport}" \
+                             f" -dport {random_dport} -msg {msg} -timeout 3 2> /dev/null"
             node_number += 1
     else:
         # Two nodes have only one transmitter and only one receiver
