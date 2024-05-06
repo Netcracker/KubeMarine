@@ -100,7 +100,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
                 {'<<': 'merge'}
             ],
             'kubelet': [
-                {'groups': ['worker'], 'patch': {'kubelet_kp1': 'kubelet_vp1_new'}}
+                {'groups': ['worker'], 'patch': {'maxPods': 111}}
             ]
         }
 
@@ -164,7 +164,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
             {'groups': ['control-plane'], 'patch': {'api_kp1': 'api_vp1'}}
         ], kubeadm_patches['apiServer'])
 
-        self.assertEqual([{'groups': ['worker'], 'patch': {'kubelet_kp1': 'kubelet_vp1_new'}}], kubeadm_patches['kubelet'])
+        self.assertEqual([{'groups': ['worker'], 'patch': {'maxPods': 111}}], kubeadm_patches['kubelet'])
 
     def test_change_apiserver_args_check_jinja_dependent_parameters(self):
         self.reconfigure['services']['kubeadm'] = {
@@ -211,7 +211,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.25.7'
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
-                {'nodes': ['balancer-1'], 'patch': {'key': 'value'}},
+                {'nodes': ['balancer-1'], 'patch': {'maxPods': 111}},
             ]
         }
         with self.assertRaisesRegex(
@@ -237,7 +237,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
-                {'nodes': ['master-1'], 'patch': {'key': 'value'}},
+                {'nodes': ['master-1'], 'patch': {'maxPods': 111}},
             ]
         }
         with self.assertRaisesRegex(

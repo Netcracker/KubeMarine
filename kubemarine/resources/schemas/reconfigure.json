@@ -9,11 +9,7 @@
         "kubeadm_kubelet": {
           "type": "object",
           "description": "Override the original settings for the kubelet",
-          "properties": {
-            "protectKernelDefaults": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ProtectKernelDefaults"},
-            "serializeImagePulls": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/SerializeImagePulls"}
-          },
-          "additionalProperties": false
+          "allOf": [{"$ref": "#/definitions/KubeletReconfigureSupported"}]
         },
         "kubeadm_kube-proxy": {
           "type": "object",
@@ -24,7 +20,32 @@
           }
         },
         "kubeadm_patches": {
-          "$ref": "definitions/services/kubeadm_patches.json"
+          "type": "object",
+          "allOf": [{"$ref": "definitions/services/kubeadm_patches.json"}],
+          "properties": {
+            "kubelet": {
+              "type": "array",
+              "allOf": [{"$ref": "definitions/services/kubeadm_patches.json#/definitions/KubeletPatches"}],
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "allOf": [{"$ref": "definitions/services/kubeadm_patches.json#/definitions/KubeletPatch"}],
+                    "properties": {
+                      "patch": {
+                        "type": "object",
+                        "allOf": [
+                          {"$ref": "#/definitions/KubeletReconfigureSupported"},
+                          {"$ref": "definitions/services/kubeadm_patches.json#/definitions/KubeletProperties"}
+                        ]
+                      }
+                    }
+                  },
+                  {"$ref": "definitions/common/utils.json#/definitions/ListMergingSymbol"}
+                ]
+              }
+            }
+          }
         },
         "kubeadm": {
           "type": "object",
@@ -61,5 +82,15 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "definitions": {
+    "KubeletReconfigureSupported": {
+      "type": "object",
+      "properties": {
+        "protectKernelDefaults": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ProtectKernelDefaults"},
+        "serializeImagePulls": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/SerializeImagePulls"}
+      },
+      "additionalProperties": false
+    }
+  }
 }
