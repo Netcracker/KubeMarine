@@ -24,12 +24,7 @@ class TheAction(Action):
         super().__init__("Reinstall etcdctl thirdparty")
 
     def run(self, res: DynamicResources) -> None:
-        logger = res.logger()
         cluster = res.cluster()
-        if cluster.inventory['services']['cri']['containerRuntime'] == 'docker':
-            logger.info("Docker cri is used, updating etcdctl thirdparty is not needed")
-            return
-
         cluster.log.info("Update /usr/bin/etcdctl thirdparty")
         install_thirdparty(cluster.nodes['all'], '/usr/bin/etcdctl')
 

@@ -177,7 +177,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     initial_cluster_list_without_names = []
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
         initial_cluster_list.append(control_plane['name'] + '=https://' + control_plane["internal_address"] + ":2380")
-        initial_cluster_list_without_names.append(control_plane["internal_address"] + ":2379")
+        initial_cluster_list_without_names.append('https://' + control_plane["internal_address"] + ":2379")
     initial_cluster = ','.join(initial_cluster_list)
 
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
@@ -201,8 +201,12 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         control_plane_conn.sudo(
             f'chmod 777 {snap_name} && '
             f'sudo ls -la {snap_name} && '
-            f'sudo ETCD_IMAGE="{etcd_image}" ETCD_CERT="{etcd_cert}" ETCD_KEY="{etcd_key}" ETCD_CA="{etcd_cacert}" '
-            f'ETCD_ENDPOINTS="{initial_cluster}" ETCD_MOUNTS="{mount_options}" etcdctl snapshot restore {snap_name} '
+            f'sudo ETCD_IMAGE="{etcd_image}" ETCD_MOUNTS="{mount_options}" etcdctl '
+            f'--cert={etcd_cert} '
+            f'--key={etcd_key} '
+            f'--cacert={etcd_cacert} '
+            f'--endpoints={",".join(initial_cluster_list_without_names)} '
+            f'snapshot restore {snap_name} '
             f'--name={control_plane["name"]} '
             f'--data-dir=/var/lib/etcd/snapshot '
             f'--initial-cluster={initial_cluster} '
