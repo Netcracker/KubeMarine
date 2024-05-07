@@ -14,27 +14,43 @@
 
 import re
 import unittest
+from contextlib import contextmanager
+from typing import Set, List
+
 from test.unit import utils as test_utils
 
-from kubemarine import demo, kubernetes
+from kubemarine import demo, kubernetes, sysctl
 from kubemarine.core import flow
 from kubemarine.procedures import reconfigure
 
 
-class ReconfigureKubeadmEnrichment(unittest.TestCase):
+class _AbstractReconfigureTest(unittest.TestCase):
     def setUp(self):
         self.setUpScheme(demo.ALLINONE)
 
     def setUpScheme(self, scheme: dict):
         self.inventory = demo.generate_inventory(**scheme)
-        self.context = demo.create_silent_context(['fake.yaml'], procedure='reconfigure')
+        self.context = demo.create_silent_context(['fake.yaml', '--without-act'], procedure='reconfigure')
 
         self.reconfigure = demo.generate_procedure_inventory('reconfigure')
         self.reconfigure['services'] = {}
 
-    def new_cluster(self) -> demo.FakeKubernetesCluster:
-        return demo.new_cluster(self.inventory, procedure_inventory=self.reconfigure, context=self.context)
+    def new_resources(self) -> demo.FakeResources:
+        nodes_context = demo.generate_nodes_context(self.inventory)
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.reconfigure, nodes_context=nodes_context)
 
+    def new_cluster(self) -> demo.FakeKubernetesCluster:
+        with test_utils.unwrap_fail():
+            return self.new_resources().cluster()
+
+    def run_action(self) -> demo.FakeResources:
+        resources = self.new_resources()
+        flow.run_actions(resources, [reconfigure.ReconfigureAction()])
+        return resources
+
+
+class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
     def test_enrich_and_finalize_inventory(self):
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': 'v1.25.7',
@@ -246,24 +262,153 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
             self.new_cluster()
 
 
-class RunTasks(unittest.TestCase):
+class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):
     def setUp(self):
-        self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.reconfigure = demo.generate_procedure_inventory('reconfigure')
-        self.reconfigure.setdefault('services', {})
+        self.setUpScheme({'balancer': 1, 'master': 1, 'worker': 1})
 
-    def _run_tasks(self, tasks_filter: str) -> demo.FakeResources:
-        context = demo.create_silent_context(
-            ['fake.yaml', '--tasks', tasks_filter], procedure='reconfigure')
+    def test_enrich_and_finalize_inventory(self):
+        self.inventory['services']['sysctl'] = {
+            'parameter1': 1,
+            'parameter3': {
+                'value': 1,
+            },
+            'parameter4': 1,
+            'parameter5': {
+                'value': 1,
+            },
+            'parameter6': 1,
+            'parameter7': {
+                'value': 1
+            },
+            'parameter8': 1,
+        }
+        self.reconfigure['services']['sysctl'] = {
+            'parameter1': 2,
+            'parameter2': 2,
+            'parameter3': '{{ "2" }}',
+            'parameter4': {
+                'value': 2,
+                'groups': ['control-plane'],
+            },
+            'parameter5': {
+                'value': '2',
+                'nodes': ['worker-1'],
+            },
+            'parameter6': '',
+            'parameter7': {
+                'value': 0,
+                'install': '{{ "False" }}',
+            },
+        }
 
-        nodes_context = demo.generate_nodes_context(self.inventory)
-        resources = demo.FakeResources(context, self.inventory,
-                                       procedure_inventory=self.reconfigure, nodes_context=nodes_context)
-        flow.run_actions(resources, [reconfigure.ReconfigureAction()])
-        return resources
+        self.inventory['patches'] = [
+            {
+                'groups': ['control-plane', 'worker'],
+                'services': {'sysctl': {
+                    'parameter8': 2,
+                }}
+            },
+        ]
+        self.reconfigure['patches'] = [
+            {
+                'groups': ['control-plane'],
+                'services': {'sysctl': {
+                    'parameter8': 3,
+                }}
+            },
+        ]
 
-    def test_kubernetes_reconfigure_empty_procedure_inventory(self):
-        self._run_tasks('deploy.kubernetes.reconfigure')
+        resources = self.run_action()
+        cluster = resources.cluster_if_initialized()
+        self._test_enrich_and_finalize_inventory_check(cluster)
+
+        cluster2 = demo.new_cluster(resources.finalized_inventory)
+        self._test_enrich_and_finalize_inventory_check(cluster2)
+
+        cluster3 = demo.new_cluster(resources.inventory())
+        self._test_enrich_and_finalize_inventory_check(cluster3)
+
+    def _test_enrich_and_finalize_inventory_check(self, cluster: demo.FakeKubernetesCluster):
+        all_nodes = {'balancer-1', 'master-1', 'worker-1'}
+        self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter1 = 2'))
+        self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter2 = 2'))
+        self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter3 = 2'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter4 = 1'))
+        self.assertEqual({'master-1'}, self._nodes_having_parameter(cluster, 'parameter4 = 2'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter5 = 1'))
+        self.assertEqual({'worker-1'}, self._nodes_having_parameter(cluster, 'parameter5 = 2'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter6 = 1'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter6 = 2'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter7 = 1'))
+        self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter7 = 2'))
+        self.assertEqual({'balancer-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 1'))
+        self.assertEqual({'worker-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 2'))
+        self.assertEqual({'master-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 3'))
+
+    def test_invalid(self):
+        for name, parameter, msg, in (
+                (
+                        'invalid_integer_value',
+                        {'parameter': 'test'},
+                        "invalid integer value 'test' "
+                        "in section ['services']['sysctl']['parameter']"
+                ),
+                (
+                        'invalid_integer_value_extended_format',
+                        {'parameter': {'value': 'test'}},
+                        "invalid integer value 'test' "
+                        "in section ['services']['sysctl']['parameter']['value']"
+                ),
+                (
+                        'kernel.pid_max_error_less_than_required',
+                        {'kernel.pid_max': 10000},
+                        sysctl.ERROR_PID_MAX_REQUIRED.format(node='master-1', value=10000, required=452608)
+                ),
+                (
+                        'ambiguous_conntrack_max',
+                        {'net.netfilter.nf_conntrack_max': {'value': 10000, 'groups':['control-plane']}},
+                        kubernetes.ERROR_AMBIGUOUS_CONNTRACK_MAX.format(values='{10000, None}')
+                ),
+        ):
+            for patch in (False, True):
+                if patch:
+                    msg = msg.replace("['services']", "['patches'][0]['services']")
+                with self.subTest(f'{name}, patch: {patch}'), test_utils.assert_raises_regex(self, Exception, re.escape(msg)):
+                    self.setUp()
+                    if patch:
+                        self.reconfigure['patches'] = [
+                            {
+                                'groups': ['control-plane', 'worker', 'balancer'],
+                                'services': {'sysctl': parameter}
+                            }
+                        ]
+                    else:
+                        self.reconfigure['services']['sysctl'] = parameter
+
+                    self.run_action()
+
+    @staticmethod
+    def _nodes_having_parameter(cluster: demo.FakeKubernetesCluster, parameter: str) -> Set[str]:
+        return {node.get_node_name() for node in cluster.nodes['all'].get_ordered_members_list()
+                if parameter in sysctl.make_config(cluster, node)}
+
+
+class RunTasks(_AbstractReconfigureTest):
+    def _run(self) -> demo.FakeResources:
+        # pylint: disable-next=attribute-defined-outside-init
+        self.context = demo.create_silent_context(
+            ['fake.yaml', '--tasks', 'prepare.system.sysctl,deploy.kubernetes.reconfigure'], procedure='reconfigure')
+
+        return self.run_action()
+
+    def test_empty_procedure_inventory(self):
+        with self._sysctl_reconfigured(False), self._kubernetes_components_reconfigured([]):
+            self._run()
+
+    def test_prepare_sysctl_empty_section(self):
+        self.reconfigure['services']['sysctl'] = {}
+        with self._sysctl_reconfigured(True), self._kubernetes_components_reconfigured([]):
+            self._run()
 
     def test_kubernetes_reconfigure_empty_sections(self):
         self.reconfigure['services'] = {
@@ -271,38 +416,82 @@ class RunTasks(unittest.TestCase):
             'kubeadm_kubelet': {},
             'kubeadm_kube-proxy': {},
         }
-        with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
-            self._run_tasks('deploy.kubernetes.reconfigure')
-
-            actual_called = run.call_args[1]['components'] if run.called else []
-            expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet', 'kube-proxy']
-            self.assertEqual(expected_called, actual_called,
-                             "Unexpected list of components to reconfigure")
+        expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet', 'kube-proxy']
+        with self._sysctl_reconfigured(False), self._kubernetes_components_reconfigured(expected_called):
+            self._run()
 
     def test_kubernetes_reconfigure_empty_patch_sections(self):
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.25.7'
         self.reconfigure.setdefault('services', {})['kubeadm_patches'] = {
             'apiServer': [], 'scheduler': [], 'controllerManager': [], 'etcd': [], 'kubelet': [],
         }
-        with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
-            self._run_tasks('deploy.kubernetes.reconfigure')
-
-            actual_called = run.call_args[1]['components'] if run.called else []
-            expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet']
-            self.assertEqual(expected_called, actual_called,
-                             "Unexpected list of components to reconfigure")
+        expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet']
+        with self._sysctl_reconfigured(False), self._kubernetes_components_reconfigured(expected_called):
+            self._run()
 
     def test_kubernetes_reconfigure_empty_apiserver_certsans(self):
         self.reconfigure['services'] = {
             'kubeadm': {'apiServer': {'certSANs': []}}
         }
+        expected_called = ['kube-apiserver/cert-sans', 'kube-apiserver']
+        with self._sysctl_reconfigured(False), self._kubernetes_components_reconfigured(expected_called):
+            self._run()
+
+    def test_kubernetes_reconfigure_detect_kube_proxy_conntrack_min_changes(self):
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        self.reconfigure['services']['sysctl'] = {
+            'net.netfilter.nf_conntrack_max': 1000001
+        }
+        expected_called = ['kube-proxy']
+        with self._sysctl_reconfigured(True), self._kubernetes_components_reconfigured(expected_called):
+            res = self._run()
+            self.assertEqual(1000001, res.working_inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
+
+    def test_prepare_sysctl_detect_changes_kubelet_maxPods_changed(self):
+        self.reconfigure['services']['kubeadm_patches'] = {
+            'kubelet': [
+                {'nodes': ['master-1'], 'patch': {'maxPods': 105}},
+            ]
+        }
+        expected_called = ['kubelet']
+        with self._sysctl_reconfigured(True), self._kubernetes_components_reconfigured(expected_called):
+            res = self._run()
+            cluster = res.cluster_if_initialized()
+            control_plane_1 = cluster.make_group_from_nodes(['master-1'])
+            control_plane_1_config = cluster.nodes_inventory[control_plane_1.get_host()]
+            self.assertEqual(432128, control_plane_1_config['services']['sysctl']['kernel.pid_max']['value'])
+
+    def test_prepare_sysctl_detect_changes_kubelet_protectKernelDefaults_changed(self):
+        self.reconfigure['services']['kubeadm_kubelet'] = {
+            'protectKernelDefaults': False
+        }
+        expected_called = ['kubelet']
+        with self._sysctl_reconfigured(True), self._kubernetes_components_reconfigured(expected_called):
+            res = self._run()
+            cluster = res.cluster_if_initialized()
+            for node in cluster.nodes['all'].get_ordered_members_list():
+                sysctl_config = sysctl.make_config(cluster, node)
+                for unexpected_parameter in ('kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops'):
+                    self.assertNotIn(unexpected_parameter, sysctl_config)
+
+    @contextmanager
+    def _kubernetes_components_reconfigured(self, expected_called: List[str]):
         with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
-            self._run_tasks('deploy.kubernetes.reconfigure')
+            yield
 
             actual_called = run.call_args[1]['components'] if run.called else []
-            expected_called = ['kube-apiserver/cert-sans', 'kube-apiserver']
             self.assertEqual(expected_called, actual_called,
                              "Unexpected list of components to reconfigure")
+
+    @contextmanager
+    def _sysctl_reconfigured(self, reconfigured: bool):
+        with test_utils.mock_call(sysctl.configure), \
+                test_utils.mock_call(sysctl.reload), \
+                test_utils.mock_call(sysctl.is_valid, side_effect=[False, True]) as is_valid_run:
+            yield
+
+            expected_call_count = 2 if reconfigured else 0
+            self.assertEqual(expected_call_count, is_valid_run.call_count, "Unexpected number of sysctl.is_valid calls")
 
 
 if __name__ == '__main__':
