@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 import re
 from textwrap import dedent
-from typing import List, Dict, Optional, Union, cast
+from typing import List, Dict, Optional, Union, cast, Iterable
 
 import yaml
 import ruamel.yaml
@@ -169,7 +169,13 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str) -> Non
         hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
         if not hosts_to_packages:
             raise TestWarn(f"No nodes to check {pckg_alias!r} version")
-        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False)
+
+        os_family = cluster.get_os_family()
+        require_same_version = []
+        if pckgs.cache_versions_enabled(cluster, os_family, pckg_alias):
+            require_same_version = pckgs.get_association_packages(cluster, os_family, pckg_alias)
+
+        check_packages_versions(cluster, tc, hosts_to_packages, require_same_version, raise_successful=False)
 
         if pckg_alias in ["haproxy", "keepalived", "containerd", "docker"]:
             recommended_system_package_versions(cluster, pckg_alias)
@@ -186,16 +192,21 @@ def mandatory_packages_versions(cluster: KubernetesCluster) -> None:
         _check_same_os(cluster)
         hosts_to_packages: Dict[str, List[str]] = {}
         group = cluster.nodes['all']
+        os_family = cluster.get_os_family()
+        require_same_version = OrderedSet[str]()
         for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
             packages = pckgs.get_association_hosts_to_packages(group, cluster.inventory, package)
 
             for host, packages_list in packages.items():
                 hosts_to_packages.setdefault(host, []).extend(packages_list)
 
+            if pckgs.cache_versions_enabled(cluster, os_family, package):
+                require_same_version.update(pckgs.get_association_packages(cluster, os_family, package))
+
         if not hosts_to_packages:
             raise TestWarn(f"No mandatory packages to check")
 
-        return check_packages_versions(cluster, tc, hosts_to_packages)
+        return check_packages_versions(cluster, tc, hosts_to_packages, require_same_version)
 
 
 def generic_packages_versions(cluster: KubernetesCluster) -> None:
@@ -207,47 +218,59 @@ def generic_packages_versions(cluster: KubernetesCluster) -> None:
         _check_same_os(cluster)
         packages = cluster.inventory['services']['packages'].get('install', {}).get('include', [])
         hosts_to_packages = {host: packages for host in cluster.nodes['all'].get_hosts()}
-        return check_packages_versions(cluster, tc, hosts_to_packages, warn_on_bad_result=True)
+        return check_packages_versions(cluster, tc, hosts_to_packages, packages, warn_on_bad_result=True)
 
 
 def check_packages_versions(cluster: KubernetesCluster, tc: TestCase, hosts_to_packages: Dict[str, List[str]],
+                            packages_require_same_version: Iterable[str],
                             warn_on_bad_result: bool = False, raise_successful: bool = True) -> None:
     """
     Verifies that all packages are installed on required nodes and have equal versions
     :param cluster: main cluster object
     :param tc: current test case object
     :param hosts_to_packages: hosts where to check packages
-    :param warn_on_bad_result: if true then uses Warning instead of Failure. Default False.
+    :param packages_require_same_version: Fail or Warn for the specified set of packages
+                                          if different versions are detected.
+    :param warn_on_bad_result: if true then bad results raises Warning instead of Failure. Default False.
+    :param raise_successful: if true, successful test result will be risen. Default True.
     """
-    bad_results = []
+    bad_results = OrderedSet[str]()
+    warn_results = OrderedSet[str]()
     good_results = []
 
     packages_map = pckgs.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
     for package, version_map in packages_map.items():
-        if len(version_map) != 1:
+        installed_versions = [version for version in version_map if "not installed" not in version]
+        if len(installed_versions) != 1:
             cluster.log.debug(f"Package {package} has different versions:")
-            cluster.log.debug(version_map)
-            bad_results.append(package)
-
-        version = list(version_map.keys())[0]
-        if "not installed" in version:
-            cluster.log.debug(f"Package {package} is not installed on some nodes:")
-            cluster.log.debug(version_map[version])
-            bad_results.append(package)
-        else:
-            package_name = package.replace("*", "")
-            if version.startswith(package_name):
-                good_results.append(version)
+            cluster.log.debug(installed_versions)
+            if package in packages_require_same_version:
+                bad_results.append(package)
             else:
-                bad_results.append(f"Actual version: {version} doesn't match expected package version: {package}")
+                warn_results.append(package)
 
+        for version in version_map.keys():
+            if "not installed" in version:
+                cluster.log.debug(f"Package {package} is not installed on some nodes:")
+                cluster.log.debug(version_map[version])
+                bad_results.append(package)
+            else:
+                package_name = package.replace("*", "")
+                if version.startswith(package_name):
+                    good_results.append(version)
+                else:
+                    cluster.log.debug(f"Actual version: {version} doesn't match expected package version: {package} on "
+                                      f"nodes: {version_map[version]}")
+                    bad_results.append(version)
 
-    if bad_results:
+    if bad_results and not warn_on_bad_result:
         hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
-                       f'system: {bad_results}\n'
-        if warn_on_bad_result:
-            raise TestWarn("detected incorrect packages versions", hint=hint_message)
+                       f'system: {list(bad_results)}\n'
         raise TestFailure("detected incorrect packages versions", hint=hint_message)
+    if warn_results or (warn_on_bad_result and bad_results):
+        hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
+                       f'system: {list(bad_results | warn_results)}\n'
+        raise TestWarn("detected incorrect packages versions", hint=hint_message)
     cluster.log.debug(f"installed packages: {good_results}")
     if raise_successful:
         tc.success("all packages have correct versions")

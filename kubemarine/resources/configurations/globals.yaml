@@ -259,18 +259,23 @@ packages:
         - control-plane
         - worker
     openssl:
+      cache_versions: false
       package_name: 'openssl'
       groups: [ control-plane, worker, balancer ]
     curl:
+      cache_versions: false
       package_name: 'curl'
       groups: [ control-plane, worker, balancer ]
     unzip:
+      cache_versions: false
       package_name: 'unzip'
       groups: []
     kmod:
+      cache_versions: false
       package_name: 'kmod'
       groups: [ control-plane, worker, balancer ]
     semanage:
+      cache_versions: false
       groups: [ control-plane, worker, balancer ]
 
 compatibility_map:
