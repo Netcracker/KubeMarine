@@ -28,6 +28,7 @@ from ordered_set import OrderedSet
 from kubemarine import kubernetes, system, plugins, thirdparties
 from kubemarine.core import errors, utils as kutils, static, log, flow, schema
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
+from kubemarine.kubernetes import components
 from kubemarine.procedures import upgrade, install
 from kubemarine import demo
 
@@ -1151,6 +1152,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
     def _run_kubernetes_task(self) -> demo.FakeResources:
         with utils.mock_call(kubernetes.upgrade_first_control_plane), \
                 utils.mock_call(install.deploy_coredns), \
+                utils.mock_call(components.patch_kubelet_configmap), \
                 utils.mock_call(kubernetes.upgrade_other_control_planes), \
                 utils.mock_call(kubernetes.upgrade_workers), \
                 utils.mock_call(upgrade.kubernetes_cleanup_nodes_versions):

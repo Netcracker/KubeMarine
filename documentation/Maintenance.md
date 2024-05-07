@@ -864,10 +864,11 @@ The `add_node` procedure executes the following sequence of tasks:
     * cluster_installation
   * dns
     * hostname
-    * resolv_conf
     * etc_hosts
+    * resolv_conf
   * package_manager
     * configure
+    * disable_unattended_upgrades
     * manage_packages
   * ntp
     * chrony

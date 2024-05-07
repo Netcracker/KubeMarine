@@ -13,7 +13,7 @@
 # limitations under the License.
 import re
 from typing import List, Dict, Tuple, Optional, Union, Mapping, Set
-
+from io import StringIO
 from typing_extensions import Protocol
 
 from kubemarine import yum, apt, jinja
@@ -377,22 +377,37 @@ def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory
 
     relevant_group = relevant_group.intersection_group(group)
 
-    global_cache_versions = packages_section['cache_versions']
     for node in relevant_group.get_ordered_members_list():
         os_family = node.get_nodes_os()
-        package_associations = packages_section['associations'].get(os_family, {}).get(association_name, {})
-        packages = package_associations.get('package_name', [])
+        packages = get_association_packages(cluster, os_family, association_name)
 
-        if isinstance(packages, str):
-            packages = [packages]
-
-        if ensured_association_only and not (global_cache_versions and package_associations.get('cache_versions', True)):
+        if ensured_association_only and not cache_versions_enabled(cluster, os_family, association_name):
             packages = []
 
         if packages:
             hosts_to_packages[node.get_host()] = packages
 
     return hosts_to_packages
+
+
+def get_association_packages(cluster: KubernetesCluster, os_family: str, association_name: str) -> List[str]:
+    packages_section = cluster.inventory['services']['packages']
+    package_associations = packages_section['associations'].get(os_family, {}).get(association_name, {})
+    packages: Union[str, List[str]] = package_associations.get('package_name', [])
+
+    if isinstance(packages, str):
+        packages = [packages]
+
+    return packages
+
+
+def cache_versions_enabled(cluster: KubernetesCluster, os_family: str, association_name: str) -> bool:
+    packages_section = cluster.inventory['services']['packages']
+    global_cache_versions = packages_section['cache_versions']
+    specific_cache_versions: bool = packages_section['associations'] \
+        .get(os_family, {}).get(association_name, {}).get('cache_versions', True)
+
+    return global_cache_versions and specific_cache_versions
 
 
 def _cache_package_associations(group: NodeGroup, inventory: dict,
@@ -457,6 +472,24 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
             return package
     else:
         return detected_package_versions[0]
+
+
+def disable_unattended_upgrade(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    if group.get_nodes_os() != 'debian':
+        cluster.log.debug("Skipped - unattended upgrades are supported only on Ubuntu/Debian os family")
+        return
+
+    packages_per_node = get_all_managed_packages_for_group(group=group, inventory=cluster.inventory,
+                                                           ensured_association_only=True)
+
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            packages = [get_package_name(node.get_nodes_os(), package) for package in packages_per_node[node.get_host()]]
+            unattended_upgrade_config = 'Unattended-Upgrade::Package-Blacklist { %s };\n' % " ".join(
+                ['"%s";' % package for package in packages])
+            node.put(StringIO(unattended_upgrade_config), '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine',
+                     sudo=True, backup=True)
 
 
 def get_associations_os_family_keys() -> Set[str]:

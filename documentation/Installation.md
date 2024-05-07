@@ -260,6 +260,8 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 
 **Warning**: Do not use unattended-upgrade to automatically update packages besides security updates.
 
+**Note**: Kubemarine disables unattended-upgrades for some packages. See [associations](#associations) for more information;
+
 **Note**: Since this mechanism is launched once a day at a random time, it may coincide with the work of other package managers (apt, aptitude, dpkg, and so on), resulting in an error in these package managers. In this case, the simplest solution is to wait for the completion of the unattended-upgrades process and restart apt, aptitude, or dpkg.
 
 **Preconfigured**
@@ -2211,6 +2213,13 @@ The following associations are used by default:
   This behavior can be changed by setting the `cache_versions` option to "false".
   The package versions are then used only with the template from the `associations` section.
   The option can be used both in global `services.packages` and in specific associations sections.
+* 'cache_versions' is installed to 'false' for following packages:
+  * openssl;
+  * curl;
+  * unzip;
+  * kmod;
+  * semanage;
+* Kubemarine disables `unattended_upgrades` for packages on Ubuntu/Debian nodes with "true" `cache_versions` option.
 
 The following is an example of overriding docker associations:
 
@@ -6006,10 +6015,11 @@ The following is the installation tasks tree:
     * **cluster_installation** - Looks for an already installed cluster.
   * **dns**
     * **hostname** - Configures nodes hostnames. 
-    * **resolv_conf** - Configures the records in `/etc/resolv.conf` (backup is presented). For more information about parameters for this task, see [resolv.conf](#resolvconf). If no parameters are presented, the task is skipped.
     * **etc_hosts** - Configures the records in `/etc/hosts` (backup is presented). This task writes the node names and their addresses to this file.
+    * **resolv_conf** - Configures the records in `/etc/resolv.conf` (backup is presented). For more information about parameters for this task, see [resolv.conf](#resolvconf). If no parameters are presented, the task is skipped.
   * **package_manager**
     * **configure** - Configures repositories for the package manager (backup is presented) and updates the repodata. For more information about parameters for this task, see [package_manager](#package_manager). If no parameters are presented, the task is skipped. OS-specific.
+    * **disable_unattended_upgrades** - Disables Ubuntu/Debian  unattended-upgrades for some packages. See [associations](#associations) for more information;
     * **manage_packages** - Manages packages on hosts. For more information about parameters for this task, see [packages](#packages). If no parameters are presented, the task is skipped. OS-specific.
   * **ntp**
     * **chrony** - Configures the file `/etc/chrony.conf` (backup is presented) and synchronizes the time using the `chronyd` service. For more information about parameters for this task, see [chrony](#chrony). If no parameters are presented or non-RHEL OS is used, the task is skipped.
@@ -6024,7 +6034,6 @@ The following is the installation tasks tree:
     * **audit**
       * **install** - Installs auditd daemon on nodes.
       * **configure** - Configures Linux audit rules. For more information about parameters for this task, see [audit-daemon](#audit-daemon).
-
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).
