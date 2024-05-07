@@ -23,10 +23,12 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.preserve_compatibility_kernel import PreserveCompatibilityKernel
+from kubemarine.patches.reinstall_etcdctl_thirdparty import ReinstallEtcdctl
 
 from kubemarine.patches.disable_unattended_upgrade import DisableUnattendedUpgrades
 patches: List[Patch] = [
     PreserveCompatibilityKernel(),
+    ReinstallEtcdctl(),
     DisableUnattendedUpgrades()  # Add the new patch to the list
 ]
 """
