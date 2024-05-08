@@ -233,7 +233,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml = self.get_obj(manifest, "Deployment_calico-typha")
-                self.assertEqual(2, target_yaml['spec']['replicas'], "Unexpected number of typha replicas")
+                self.assertEqual(1, target_yaml['spec']['replicas'], "Unexpected number of typha replicas")
 
                 template_spec = target_yaml['spec']['template']['spec']
                 container = self._get_calico_typha_container(manifest)
@@ -431,19 +431,39 @@ def get_default_expect_config(typha_enabled: bool) -> dict:
 
 
 class EnrichmentTest(unittest.TestCase):
+    def test_default_typha_enrichment(self):
+        for nodes in (1, 3, 4, 49, 50):
+            with self.subTest(f"Kubernetes nodes: {nodes}"):
+                inventory = self._inventory(nodes)
+                cluster = demo.new_cluster(inventory)
+
+                typha = cluster.inventory['plugins']['calico']['typha']
+
+                expected_enabled = nodes > 3
+                self.assertEqual(expected_enabled, typha['enabled'])
+
+                expected_replicas = 0 if nodes <= 3 else 2 if 3 < nodes < 50 else 3
+                self.assertEqual(expected_replicas, typha['replicas'])
+
+    def test_replicas_default_typha_enabled(self):
+        for nodes in (1, 2, 49, 50):
+            with self.subTest(f"Kubernetes nodes: {nodes}"):
+                inventory = self._inventory(nodes)
+                inventory['plugins']['calico']['typha'] = {
+                    'enabled': True
+                }
+                cluster = demo.new_cluster(inventory)
+
+                typha = cluster.inventory['plugins']['calico']['typha']
+                self.assertEqual(True, typha['enabled'])
+
+                expected_replicas = 1 if nodes == 1 else 2 if 1 < nodes < 50 else 3
+                self.assertEqual(expected_replicas, typha['replicas'])
+
     def test_expect_typha_default(self):
         for nodes in (3, 4):
             with self.subTest(f"Kubernetes nodes: {nodes}"):
-                scheme = {'master': [], 'worker': []}
-                for i in range(nodes):
-                    scheme['master'].append(f'master-{i+1}')
-                    scheme['worker'].append(f'master-{i+1}')
-
-                inventory = demo.generate_inventory(**scheme)
-                inventory.setdefault('plugins', {})['calico'] = {
-                    'install': True,
-                }
-
+                inventory = self._inventory(nodes)
                 cluster = demo.new_cluster(inventory)
 
                 expected_expect_step = get_default_expect_config(nodes > 3)
@@ -452,6 +472,20 @@ class EnrichmentTest(unittest.TestCase):
                 actual_expect_steps = [step['expect'] for step in steps if 'expect' in step]
                 self.assertEqual([expected_expect_step, expected_expect_step], actual_expect_steps,
                                  "Unexpected expect procedures")
+
+    @staticmethod
+    def _inventory(nodes: int) -> dict:
+        scheme = {'master': [], 'worker': []}
+        for i in range(nodes):
+            scheme['master'].append(f'master-{i + 1}')
+            scheme['worker'].append(f'master-{i + 1}')
+
+        inventory = demo.generate_inventory(**scheme)
+        inventory.setdefault('plugins', {})['calico'] = {
+            'install': True,
+        }
+
+        return inventory
 
 
 class RedeployIfNeeded(unittest.TestCase):
@@ -580,6 +614,54 @@ class RedeployIfNeeded(unittest.TestCase):
         self.prepare_context('remove_node')
 
         self._run_and_check(False)
+
+    def test_add_remove_second_kubernetes_node_redeploy_not_needed(self):
+        # pylint: disable=attribute-defined-outside-init
+
+        for role in ('master', 'worker'):
+            with self.subTest(f'Role: {role}'):
+                scheme = {'balancer': 1, 'master': ['master-1'], 'worker': ['master-1']}
+                add_node_name = 'node-1'
+                if role == 'master':
+                    scheme['master'].append(add_node_name)
+                else:
+                    scheme['worker'].append(add_node_name)
+
+                self.prepare_context('add_node')
+                self.prepare_inventory(scheme, 'add_node', add_node_name)
+
+                res = self._run_and_check(False)
+
+                self.inventory = res.inventory()
+                self.prepare_context('remove_node')
+
+                self._run_and_check(False)
+
+    def test_add_remove_second_kubernetes_node_typha_enabled_redeploy_needed(self):
+        # pylint: disable=attribute-defined-outside-init
+
+        for role in ('master', 'worker'):
+            for typha_replicas_redefined in (False, True):
+                with self.subTest(f'Role: {role}, Typha replicas redefined: {typha_replicas_redefined}'):
+                    scheme = {'balancer': 1, 'master': ['master-1'], 'worker': ['master-1']}
+                    add_node_name = 'node-1'
+                    if role == 'master':
+                        scheme['master'].append(add_node_name)
+                    else:
+                        scheme['worker'].append(add_node_name)
+
+                    self.prepare_context('add_node')
+                    self.prepare_inventory(scheme, 'add_node', add_node_name)
+                    self.inventory['plugins']['calico']['typha']['enabled'] = True
+                    if typha_replicas_redefined:
+                        self.inventory['plugins']['calico']['typha']['replicas'] = 2
+
+                    res = self._run_and_check(not typha_replicas_redefined)
+
+                    self.inventory = res.inventory()
+                    self.prepare_context('remove_node')
+
+                    self._run_and_check(not typha_replicas_redefined)
 
     def test_add_remove_50th_kubernetes_node_redeploy_needed(self):
         # pylint: disable=attribute-defined-outside-init

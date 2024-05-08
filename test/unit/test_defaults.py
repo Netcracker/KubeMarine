@@ -256,10 +256,6 @@ class PrimitiveValuesAsString(unittest.TestCase):
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
         self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
 
-        typha = inventory['plugins']['calico']['typha']
-        self.assertEqual(False, typha['enabled'])
-        self.assertEqual(2, typha['replicas'])
-
         nginx_ingress_ports = inventory['plugins']['nginx-ingress-controller']['ports']
         self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
         self.assertEqual(20443, [port for port in nginx_ingress_ports if port['name'] == 'https'][0]['hostPort'])
