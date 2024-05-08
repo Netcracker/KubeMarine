@@ -626,7 +626,7 @@ def kubernetes_nodes_condition(cluster: KubernetesCluster, condition_type: str) 
 
 def get_not_running_pods(cluster: KubernetesCluster) -> str:
     # Completed pods should be excluded from the list as well
-    get_pods_cmd = ('kubectl get pods -A --field-selector status.phase!=Running '
+    get_pods_cmd = ('kubectl get pods -A | grep -v Running '
                     '| awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed || true')
     result = cluster.nodes['control-plane'].get_any_member().sudo(get_pods_cmd)
     cluster.log.verbose(result)
