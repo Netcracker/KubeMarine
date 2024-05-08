@@ -4058,7 +4058,7 @@ rbac:
 * The custom policies should not have 'oob-' prefix.
 * To manage custom policies on an existing cluster use the `manage_psp` maintenance procedure. 
 
-### Admission PSS
+### Admission pss
 
 Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
 (or profiles) of policies. The profiles are the following:
