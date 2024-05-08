@@ -53,6 +53,13 @@ if target_arch:
     install_package.append(target_arch)
 call(install_package)
 
+if target_arch == 'arm64':
+    # universal2 build for macOS is not really universal, and this won't be fixed
+    # https://sourceforge.net/p/ruamel-yaml-clib/tickets/20/
+    # At the same time, the dependency is optional and is going to be removed.
+    # https://sourceforge.net/p/ruamel-yaml-clib/tickets/33/#0443
+    call(['pip', 'uninstall', '-y', 'ruamel.yaml.clib'])
+
 # To avoid ambiguity, remove Kubemarine package to surely run PyInstaller on sources.
 call(['pip', 'uninstall', '-y', 'kubemarine'])
 call(['pip', 'install', '-r', 'requirements-pyinstaller.txt'])
