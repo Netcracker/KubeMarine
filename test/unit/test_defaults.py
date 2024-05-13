@@ -242,6 +242,22 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][1]['ip'])
         self.assertEqual(inventory['control_plain']['external'], inventory['vrrp_ips'][1]['floating_ip'])
 
+    def test_single_control_plane(self):
+        inventory = demo.generate_inventory(master=['node-1'], worker=['node-1'], balancer=0)
+        inventory['nodes'][0]['roles'].remove('worker')
+        cluster = demo.new_cluster(inventory)
+        self.assertTrue(cluster.make_group_from_roles(['worker']).is_empty())
+
+    def test_error_no_control_planes_balancers(self):
+        inventory = demo.generate_inventory(master=0, worker=1, balancer=0)
+        with test_utils.assert_raises_kme(self, 'KME0004'):
+            demo.new_cluster(inventory)
+
+    def test_error_no_control_planes(self):
+        inventory = demo.generate_inventory(master=0, worker=1, balancer=1)
+        with test_utils.assert_raises_kme(self, 'KME0004'):
+            demo.new_cluster(inventory)
+
 
 class PrimitiveValuesAsString(unittest.TestCase):
     def test_default_enrichment(self):

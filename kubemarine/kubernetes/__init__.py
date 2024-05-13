@@ -106,6 +106,12 @@ def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
         default_merger.merge(cluster.inventory.setdefault('services', {}), utils.deepcopy_yaml(kubeadm_sections))
 
 
+@enrichment(EnrichmentStage.ALL)
+def verify_roles(cluster: KubernetesCluster) -> None:
+    if cluster.make_group_from_roles(['control-plane']).is_empty():
+        raise KME("KME0004")
+
+
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     inventory = cluster.inventory
@@ -136,8 +142,6 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         if name not in certsans:
             certsans.append(name)
 
-    any_worker_found = False
-
     # validating node labels and configuring additional labels
     for node in inventory["nodes"]:
         if "control-plane" not in node["roles"] and "worker" not in node["roles"]:
@@ -150,8 +154,6 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
             continue
 
         if "worker" in node["roles"]:
-            any_worker_found = True
-
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
@@ -171,9 +173,6 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                     raise Exception(ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE % control_plane_item)
                 if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
                     raise Exception(ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE % control_plane_item)
-
-    if not any_worker_found:
-        raise KME("KME0004")
 
     # check ignorePreflightErrors value and add mandatory errors from defaults.yaml if they're absent
     default_preflight_errors = static.DEFAULTS["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
@@ -843,7 +842,7 @@ def verify_upgrade_versions(cluster: KubernetesCluster) -> None:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     upgrade_version = get_kubernetes_version(cluster.inventory)
 
-    k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['control-plane'])
+    k8s_nodes_group = cluster.make_group_from_roles(['control-plane', 'worker'])
     for node in k8s_nodes_group.get_ordered_members_list():
         cluster.log.debug(f"Verifying current k8s version for node {node.get_node_name()}")
         result = first_control_plane.sudo("kubectl get nodes "

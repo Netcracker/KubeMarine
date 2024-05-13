@@ -25,16 +25,20 @@ from kubemarine.core import errors
 class TestInventoryValidation(unittest.TestCase):
 
     def test_labels_check(self):
-        inventory = demo.generate_inventory(control_plane=0, balancer=1, worker=0)
-        inventory["nodes"][0]["labels"] = {"should": "fail"}
+        inventory = demo.generate_inventory(control_plane=1, balancer=1, worker=0)
+        for node in inventory['nodes']:
+            if 'balancer' in node['roles']:
+                node["labels"] = {"should": "fail"}
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory)
 
         self.assertIn("Only 'worker' or 'control-plane' nodes can have labels", str(context.exception))
 
     def test_taints_check(self):
-        inventory = demo.generate_inventory(control_plane=0, balancer=1, worker=0)
-        inventory["nodes"][0]["taints"] = ["should fail"]
+        inventory = demo.generate_inventory(control_plane=1, balancer=1, worker=0)
+        for node in inventory['nodes']:
+            if 'balancer' in node['roles']:
+                node["taints"] = ["should fail"]
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory)
 
