@@ -196,14 +196,14 @@ class LogHandler:
                  colorize: bool = False,
                  correct_newlines: bool = False,
                  filemode: str = 'a',
-                 format_: str = DEFAULT_FORMAT,
+                 format: str = DEFAULT_FORMAT,  # pylint: disable=redefined-builtin
                  datefmt: str = None,
                  header: str = None,
                  **kwargs: Union[str, bool, int]):
 
         self._colorize = colorize
         self._correct_newlines = correct_newlines
-        self._format = format_
+        self._format = format
         self._datefmt = datefmt
         self._header = header
 
