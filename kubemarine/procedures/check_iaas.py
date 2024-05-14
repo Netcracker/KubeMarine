@@ -1325,9 +1325,14 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
             raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
 
         if failed_nodes:
-            raise TestFailure(f"Check firewall settings, IP in IP traffic is not allowed between nodes.",
-                              hint='\n'.join(failed_nodes))
+            raise TestFailure(f"Check firewall settings for all nodes in the cluster, "
+                              "IP in IP traffic is not allowed between nodes.", hint='\n'.join(failed_nodes))
 
+        if group.nodes_amount() == 2:
+            skipped_msgs.append("Change nodes order in 'cluster.yaml' and run the check "
+                                "10 minutes later")
+            raise TestWarn("Check has been succeded for the second node but cannot be completed for "
+                           "the first node", hint='\n'.join(skipped_msgs))
 
 def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
@@ -1335,7 +1340,8 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     cluster = group.cluster
 
     # Copy binaries to the nodes
-    random_port = str(random.randint(50000, 65535))
+    random_sport = str(random.randint(50000, 65535))
+    random_dport = str(random.randint(50000, 65535))
     failed_nodes: Set[str] = set()
     recv_cmd: Dict[str, str] = {}
     trns_cmd: Dict[str, str] = {}
@@ -1350,22 +1356,44 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     fake_addr = str(ipaddress.IPv4Address(int_ip))
     # That is used as number of packets for transmitter
     timeout = int(cluster.inventory['globals']['timeout_download'])
-    for node in group.get_ordered_members_configs_list():
-        host = node['internal_address']
-        # Transmitter start command
-        # Transmitter starts first and sends IPIP packets every 1 second until the timeout comes or
-        # the process is killed by terminating command
-        trns_item_cmd: List[str] = []
-        for node_item in group.get_ordered_members_configs_list():
-            if node_item['internal_address'] != host:
-                trns_item_cmd.append(f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} "
-                                     f"-ext {node_item['internal_address']} -dport {random_port} "
-                                     f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid")
-        trns_cmd[host] = '& sudo '.join(trns_item_cmd)
-        # Receiver start command
-        # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from eache node
-        recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -dport {random_port} " \
-                         f"-msg {msg} -timeout 3 2> /dev/null"
+    nodes_list = group.get_ordered_members_configs_list()
+    # The ring circuit is used for the procedure. Each node in the ring transmit IPIP packets to the next node in the ring
+    # and receive IPIP packets from the previous node of the ring.
+    # That makes check more robast to some IP filters implementation.
+    recv_neighbor_node: Dict[str, str] = {}
+    trns_neighbor_host = ""
+    if len(nodes_list) > 2:
+        node_number = 0
+        for node in nodes_list:
+            host = node['internal_address']
+            if node_number < len(nodes_list) - 1:
+                recv_neighbor_node[nodes_list[node_number + 1]['name']] = node['name']
+                trns_neighbor_host = nodes_list[node_number + 1]['internal_address']
+            else:
+                recv_neighbor_node[nodes_list[0]['name']] = node['name']
+                trns_neighbor_host = nodes_list[0]['internal_address']
+            # Transmitter start command
+            # Transmitter starts first and sends IPIP packets every 1 second until the timeout comes or
+            # the process is killed by terminating command
+            trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
+                             f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
+                             f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
+            # Receiver start command
+            # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from neighbor node
+            recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport}" \
+                             f" -dport {random_dport} -msg {msg} -timeout 3 2> /dev/null"
+            node_number += 1
+    else:
+        # Two nodes have only one transmitter and only one receiver
+        host = nodes_list[0]['internal_address']
+        recv_neighbor_node[nodes_list[1]['name']] = nodes_list[0]['name']
+        trns_neighbor_host = nodes_list[1]['internal_address']
+        trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
+                         f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
+                         f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
+        host = nodes_list[1]['internal_address']
+        recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport} " \
+                         f"-dport {random_dport} -msg {msg} -timeout 3 2> /dev/null"
 
     try:
         collector = CollectorCallback(group.cluster)
@@ -1373,18 +1401,20 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         group.put(binary_check_path, f"{ipip_check}.gz")
         group.sudo(f"gzip -d {ipip_check}.gz")
         group.sudo(f"sudo chmod +x {ipip_check}")
-        # Run transmitters
+        # Run transmitters if it's applicable for node
         cluster.log.debug("Run transmitters")
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{trns_cmd[host_int]}")
-        # Run receivers and get results
+                if trns_cmd.get(host_int, ""):
+                    node_exe.sudo(f"{trns_cmd[host_int]}")
+        # Run receivers and get results if it's applicable for node
         cluster.log.debug("Run receivers")
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
+                if recv_cmd.get(host_int, ""):
+                    node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
 
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)
@@ -1392,9 +1422,10 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             if len(item.stdout) > 0:
                 for log_item in item.stdout.split("\n")[:-1]:
                     item_list.add(log_item)
-            for node in group.get_ordered_members_configs_list():
-                if node['internal_address'] not in item_list and node['connect_to'] != host:
-                    failed_nodes.add(f"{node['name']} -> {node_name}")
+            # Check if the neighbor IP is in logs
+            trns_node = group.get_member_by_name(recv_neighbor_node[node_name]).get_config()
+            if trns_node['internal_address'] not in item_list:
+                failed_nodes.add(f"{trns_node['name']} -> {node_name}")
 
         return failed_nodes
     finally:
