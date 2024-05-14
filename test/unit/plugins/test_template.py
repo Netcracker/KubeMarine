@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 import unittest
+from test.unit import utils as test_utils
 
-from kubemarine import demo
-from kubemarine.core import errors
+from kubemarine import demo, plugins
+from kubemarine.core import errors, utils
 from kubemarine.plugins import verify_template, apply_template
 
 
-class TestTemplate(unittest.TestCase):
+class TestTemplate(test_utils.CommonTest):
 
     def test_verify_missed_source(self):
         for procedure_type in ('template', 'config'):
@@ -120,6 +121,32 @@ class TestTemplate(unittest.TestCase):
                         if len(history) == 1 and history[0]["used_times"] == 1:
                             cnt += 1
                     self.assertEqual(1, cnt)
+
+    @test_utils.temporary_directory
+    def test_compile_template(self):
+        template_file = os.path.join(self.tmpdir, 'template.yaml.j2')
+        with utils.open_external(template_file, 'w') as t:
+            t.write('Compiled: {{ plugins.my_plugin.compiled }}')
+
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+
+        inventory['plugins'] = {'my_plugin': {
+            'compiled': '{{ "{{ Yes }}" }}',
+            'install': True,
+            'installation': {'procedures': [{'template': template_file}]}
+        }}
+
+        cluster = demo.new_cluster(inventory)
+
+        result = demo.create_nodegroup_result(cluster.nodes["master"], hide=False)
+        cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/template.yaml"], usage_limit=1)
+
+        plugins.install(cluster, {'my_plugin': cluster.inventory['plugins']['my_plugin']})
+
+        host = cluster.nodes['all'].get_host()
+        destination_data = cluster.fake_fs.read(host, '/etc/kubernetes/template.yaml')
+
+        self.assertEqual('Compiled: {{ Yes }}', destination_data, "Inventory variable should be expanded.")
 
 
 if __name__ == '__main__':

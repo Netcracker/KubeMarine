@@ -438,6 +438,18 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
         self.assertEqual(True, inventory['plugins']['kubernetes-dashboard']['install'])
 
+    def test_recursive_reference_primitive_template(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['plugins'] = {'my_plugin': {
+            'var1': '{% if plugins.my_plugin.install %}unexpected{% else %}ok{% endif %}',
+            'install': '{{ "false" }}',
+        }}
+
+        cluster = demo.new_cluster(inventory)
+        inventory = cluster.inventory
+        self.assertEqual(False, inventory['plugins']['my_plugin']['install'])
+        self.assertEqual('ok', inventory['plugins']['my_plugin']['var1'])
+
     def _actual_sysctl_params(self, cluster: demo.FakeKubernetesCluster, node: NodeGroup) -> Set[str]:
         return {
             record.split(' = ')[0]

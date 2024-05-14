@@ -1012,11 +1012,8 @@ class RunPatchesSequenceTest(unittest.TestCase):
 
     @contextmanager
     def _assert_raises_kme(self):
-        with self.assertRaisesRegex(errors._BaseKME, "KME"):
-            try:
-                yield
-            except errors.FailException as e:
-                raise e.reason
+        with self.assertRaisesRegex(errors.BaseKME, "KME"), test_utils.unwrap_fail():
+            yield
 
     def test_reinstall_dashboard_change_inventory_run_other_patch_collect_summary(self):
         for change_hostname in (False, True):

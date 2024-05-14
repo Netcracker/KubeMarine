@@ -433,10 +433,6 @@ class DynamicResources:
             kubemarine.core.defaults.remove_service_roles,
             # Enrichment of inventory for LIGHT stage should be finished at this step.
 
-            # Should be just after compilation, but currently not necessary for LIGHT stage.
-            # Sections with primitive values may be potentially split in the future if necessary for LIGHT.
-            kubemarine.core.defaults.manage_primitive_values,
-
             # Validation of procedure inventory enrichment after compilation
             kubemarine.kubernetes.verify_version,
             kubemarine.admission.verify_manage_enrichment,

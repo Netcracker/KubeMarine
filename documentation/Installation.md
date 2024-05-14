@@ -5811,7 +5811,7 @@ Application of the list merge strategy is allowed in the following sections:
 
 There are settings in the configuration file that borrow their contents from the settings of the other sections. To avoid any duplication of the settings, the mechanism of dynamic variables is used.
 
-This mechanism allows you to specify a link to one variable to another.
+This mechanism allows you to specify a link from one variable to another.
 
 For example, the following parameters:
 
@@ -5917,7 +5917,7 @@ Dynamic variables have some limitations that should be considered when working w
     kubemarine_variable: '{{ values.custom_variable }}'
   ```
 * The start pointer of the Jinja2 template must be inside a pair of single or double quotes. The `{{` or `{%` out of quotes leads to a parsing error of the yaml file.
-* The variable cannot refer to itself. It does not lead to any result, but it slows down the compilation process.
+* The variable cannot refer to itself.
 * The variables cannot mutually refer to each other. For example, the following configuration:
 
   ```yaml
@@ -5926,23 +5926,26 @@ Dynamic variables have some limitations that should be considered when working w
    variable_two: '{{ section.variable_one }}'
   ```
   
-  This leads to the following result:
-   
-  ```yaml
-  section:
-   variable_one: '{{ section.variable_one }}'
-   variable_two: '{{ section.variable_one }}'
-  ```
-  The variables copy each other, but since none of them lead to any result, there is a cyclic link to one of them.
+  This leads to the "cyclic reference" error.
 
 #### Jinja2 Expressions Escaping
 
-Inventory strings can have strings containing characters that Jinja2 considers as their expressions. For example, if you specify a golang template. To avoid rendering errors for such expressions, it is possible to wrap them in exceptions `{% raw %}``{% endraw %}`. 
+Inventory strings can have strings containing characters that Jinja2 considers as their expressions.
+For example, if you specify a golang template.
+To avoid rendering errors for such expressions, it is possible to escape the special characters. 
 For example:
+
+```yaml
+authority: '{{ "{{ .Name }}" }} 3600 IN SOA'
+```
+
+or
 
 ```yaml
 authority: '{% raw %}{{ .Name }}{% endraw %} 3600 IN SOA'
 ```
+
+For more information, refer to https://jinja.palletsprojects.com/en/3.1.x/templates/#escaping
 
 ### Environment Variables
 

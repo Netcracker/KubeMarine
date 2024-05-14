@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import re
-from typing import Optional, Dict, Any, Tuple, List, Callable, Union
+from typing import Optional, Dict, Any, Tuple, List, Callable, Union, Sequence, cast, Type
 
 import yaml
 
@@ -20,6 +21,7 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 from kubemarine.core.errors import KME
 from kubemarine import jinja, keepalived, haproxy, controlplane, kubernetes, thirdparties
 from kubemarine.core import utils, static, log, os
+from kubemarine.core.proxytypes import Primitive, Index, Node
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.cri.containerd import contains_old_format_properties
 
@@ -53,8 +55,6 @@ ssh_access_node_properties = ssh_access_default_properties + [
 
 
 invalid_node_name_regex = re.compile("[^a-z-.\\d]", re.M)
-escaped_expression_regex = re.compile('({%[\\s*|]raw[\\s*|]%}.*?{%[\\s*|]endraw[\\s*|]%})', re.M)
-jinja_query_regex = re.compile("{{ .* }}", re.M)
 
 
 @enrichment(EnrichmentStage.LIGHT, procedures=['add_node'])
@@ -469,41 +469,33 @@ def _merge_inventory(cluster: KubernetesCluster, base: dict) -> dict:
 
 @enrichment(EnrichmentStage.LIGHT)
 def compile_connections(cluster: KubernetesCluster) -> None:
-    return _compile_inventory(cluster, inject_globals=False)
+    return _compile_inventory(cluster, light=True)
 
 
 @enrichment(EnrichmentStage.FULL)
 def compile_inventory(cluster: KubernetesCluster) -> None:
-    return _compile_inventory(cluster, inject_globals=True)
+    return _compile_inventory(cluster, light=False)
 
 
-def _compile_inventory(cluster: KubernetesCluster, *, inject_globals: bool) -> None:
+def _compile_inventory(cluster: KubernetesCluster, *, light: bool) -> None:
     inventory = cluster.inventory
-    # convert references in yaml to normal values
-    iterations = 100
-    root = utils.deepcopy_yaml(inventory)
-    if inject_globals:
-        root['globals'] = static.GLOBALS
-    root['env'] = os.Environ()
 
-    while iterations > 0:
+    extra: Dict[str, Any] = {'env': os.Environ()}
+    if not light:
+        extra['globals'] = static.GLOBALS
 
-        cluster.log.verbose('Inventory is not rendered yet...')
-        inventory = compile_object(cluster.log, inventory, root)
+    if light:
+        # Management of primitive values is currently not necessary for LIGHT stage.
+        env = Environment(cluster.log, inventory, recursive_compile=True, recursive_extra=extra)
+        jinja.compile_node(inventory, [], env)
+    else:
+        primitives_config = _get_primitive_values_registry()
+        env = Environment(cluster.log, inventory, recursive_compile=True, recursive_extra=extra,
+                          primitives_config=primitives_config)
+        compile_node_with_primitives(inventory, [], env, primitives_config)
 
-        temp_dump = yaml.dump(inventory)
+    remove_empty_items(inventory)
 
-        # remove golang specific
-        temp_dump = re.sub(escaped_expression_regex, '', temp_dump.replace('\n', ''))
-
-        # it is necessary to carry out several iterations,
-        # in case we have dynamic variables that reference each other
-        if '{{' in temp_dump or '{%' in temp_dump:
-            iterations -= 1
-        else:
-            iterations = 0
-
-    compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
     dump_inventory(cluster, cluster.context, "cluster_precompiled.yaml")
 
 
@@ -518,46 +510,59 @@ def dump_inventory(cluster: KubernetesCluster, context: dict, filename: str) -> 
     utils.dump_file(context, data, filename)
 
 
-def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_jinja_escapes: bool = True) -> Any:
+PrimitivesConfig = List[Tuple[List[str], Callable[[Any], Any]]]
+
+
+def compile_node_with_primitives(struct: Union[list, dict],
+                                 path: List[Union[str, int]],
+                                 env: jinja.Environment,
+                                 primitives_config: PrimitivesConfig) -> Union[list, dict]:
     if isinstance(struct, list):
-        new_struct = []
         for i, v in enumerate(struct):
-            struct[i] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
-            # delete empty list entries, which can appear after jinja compilation
-            if struct[i] != '':
-                new_struct.append(struct[i])
-        struct = new_struct
-    elif isinstance(struct, dict):
+            struct[i] = compile_object_with_primitives(v, path, i, env, primitives_config)
+    else:
         for k, v in struct.items():
-            struct[k] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
-    elif isinstance(struct, str) and jinja.is_template(struct):
-        struct = compile_string(logger, struct, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            struct[k] = compile_object_with_primitives(v, path, k, env, primitives_config)
 
     return struct
 
 
-def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
-                   ignore_jinja_escapes: bool = True) -> str:
-    logger.verbose("Rendering \"%s\"" % struct)
+def compile_object_with_primitives(struct: Union[Primitive, list, dict],
+                                   path: List[Index], index: Index,
+                                   env: jinja.Environment,
+                                   primitives_config: PrimitivesConfig) -> Union[Primitive, list, dict]:
+    depth = len(path)
+    primitives_config = choose_nested_primitives_config(primitives_config, depth, index)
 
-    def precompile(struct: str) -> str:
-        return compile_string(logger, struct, root)
-
-    if ignore_jinja_escapes:
-        iterator = escaped_expression_regex.finditer(struct)
-        struct = re.sub(escaped_expression_regex, '', struct)
-        struct = jinja.new(logger, recursive_compiler=precompile, precompile_filters={
-            'kubernetes_version': kubernetes.verify_allowed_version
-        }).from_string(struct).render(**root)
-
-        # TODO this does not work for {raw}{jinja}{raw}{jinja}
-        for match in iterator:
-            span = match.span()
-            struct = struct[:span[0]] + match.group() + struct[span[0]:]
+    path.append(index)
+    if isinstance(struct, (list, dict)):
+        if primitives_config:
+            struct = compile_node_with_primitives(struct, path, env, primitives_config)
+        else:
+            struct = jinja.compile_node(struct, path, env)
     else:
-        struct = jinja.new(logger, recursive_compiler=precompile).from_string(struct).render(**root)
+        if isinstance(struct, str) and jinja.is_template(struct):
+            struct = env.compile_string(struct, jinja.Path(path))
 
-    logger.verbose("\tRendered as \"%s\"" % struct)
+        struct = convert_primitive(struct, path, primitives_config)
+
+    path.pop()
+    return struct
+
+
+def remove_empty_items(struct: Any) -> Any:
+    if isinstance(struct, list):
+        new_struct = []
+        for v in struct:
+            v = remove_empty_items(v)
+            # delete empty list entries, which can appear after jinja compilation
+            if v != '':
+                new_struct.append(v)
+        struct = new_struct
+    elif isinstance(struct, dict):
+        for k, v in struct.items():
+            struct[k] = remove_empty_items(v)
+
     return struct
 
 
@@ -574,15 +579,13 @@ def escape_jinja_characters_for_inventory(cluster: KubernetesCluster, obj: Any) 
 
 
 def _escape_jinja_character(value: str) -> str:
-    if '{{' in value and '}}' in value and re.search(jinja_query_regex, value):
-        matches = re.findall(jinja_query_regex, value)
-        for match in matches:
-            # TODO: rewrite to correct way of match replacement: now it can cause "{raw}{raw}xxx.." circular bug
-            value = value.replace(match, '{% raw %}'+match+'{% endraw %}')
+    if jinja.is_template(value):
+        value = '{{ %s }}' % (json.JSONEncoder().encode(value),)
+
     return value
 
 
-def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], Any]]]:
+def _get_primitive_values_registry() -> PrimitivesConfig:
     return [
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
@@ -601,42 +604,145 @@ def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], An
     ]
 
 
-@enrichment(EnrichmentStage.FULL)
-def manage_primitive_values(cluster: KubernetesCluster) -> None:
-    paths_func_strip = _get_primitive_values_registry()
-    for search_path, func in paths_func_strip:
-        _convert_primitive_values(cluster.inventory, [], search_path, func)
+def choose_nested_primitives_config(primitives_config: PrimitivesConfig, depth: int, index: Index) -> PrimitivesConfig:
+    nested_config = []
+    for search in primitives_config:
+        search_path = search[0]
+        if depth == len(search_path):
+            continue
+
+        section = search_path[depth]
+        if section in ('*', index):
+            nested_config.append(search)
+
+    return nested_config
 
 
-def _convert_primitive_values(struct: Union[Any], path: List[Union[str, int]],
-                              search_path: List[str], func: Callable[[Any], Any]) -> None:
-    depth = len(path)
-    section = search_path[depth]
-    if section == '*':
-        if isinstance(struct, list):
-            for i in reversed(range(len(struct))):
-                _convert_primitive_value_section(struct, i, path, search_path, func)
+def convert_primitive(struct: Primitive, path: Sequence[Index], primitives_config: PrimitivesConfig) -> Primitive:
+    for search_path, func in primitives_config:
+        if len(search_path) == len(path):
+            try:
+                struct = func(struct)
+            except ValueError as e:
+                raise ValueError(f"{str(e)} in section {utils.pretty_path(path)}") from None
 
-        elif isinstance(struct, dict):
-            for k in list(struct):
-                _convert_primitive_value_section(struct, k, path, search_path, func)
-
-    elif isinstance(struct, dict) and section in struct:
-        _convert_primitive_value_section(struct, section, path, search_path, func)
+    return struct
 
 
-def _convert_primitive_value_section(struct: Union[dict, list], section: Union[str, int],
-                                     path: List[Union[str, int]],
-                                     search_path: List[str], func: Callable[[Any], Any]) -> None:
-    value = struct[section]  # type: ignore[index]
-    path.append(section)
-    depth = len(path)
-    if depth < len(search_path):
-        _convert_primitive_values(value, path, search_path, func)
-    else:
-        try:
-            struct[section] = func(value)  # type: ignore[index]
-        except ValueError as e:
-            raise ValueError(f"{str(e)} in section {utils.pretty_path(path)}") from None
+class NodePrimitives(jinja.JinjaNode):
+    """
+    A Node that both compiles template strings and converts primitive values in the underlying `dict` or `list`.
+    """
 
-    path.pop()
+    def __init__(self, delegate: Union[dict, list], *,
+                 path: jinja.Path, env: jinja.Environment,
+                 primitives_config: PrimitivesConfig):
+        super().__init__(delegate, path=path, env=env)
+        self.primitives_config = primitives_config
+
+    def _child(self, index: Index, val: Union[list, dict]) -> jinja.Node:
+        primitives_config = self._nested_primitives_config(index)
+        return self._child_type(index)(val, path=self.path + (index,), env=self.env,
+                                       primitives_config=primitives_config)
+
+    def _child_type(self, _: Index) -> Type['NodePrimitives']:
+        return NodePrimitives
+
+    def _convert(self, index: Index, val: Primitive) -> Primitive:
+        val = super()._convert(index, val)
+
+        primitives_config = self._nested_primitives_config(index)
+        val = convert_primitive(val, self.path + (index,), primitives_config)
+
+        return val
+
+    def _nested_primitives_config(self, index: Index) -> PrimitivesConfig:
+        depth = len(self.path)
+        return choose_nested_primitives_config(self.primitives_config, depth, index)
+
+
+class NodesCustomization:
+    """
+    Customize access to the particular sections of the inventory.
+    """
+
+    # pylint: disable=no-self-argument
+
+    def __init__(nodes) -> None:
+        # The classes below should customize access to the sections of the inventory,
+        # while preserving the global behaviour of Node implementations: NodePrimitives, JinjaNode, Node.
+
+        class Kubeadm(Node):
+            def descend(self, index: Index) -> Union[Primitive, Node]:
+                child: Union[Primitive, Node] = super().descend(index)
+
+                if index == 'kubernetesVersion':
+                    kubernetes.verify_allowed_version(cast(str, child))
+
+                return child
+
+        class Services(Node):
+            def _child_type(self, index: Index) -> Type[Node]:
+                if index == 'kubeadm':
+                    return nodes.Kubeadm
+
+                return super()._child_type(index)
+
+        class Root(Node):
+            def _child_type(self, index: Index) -> Type[Node]:
+                if index == 'services':
+                    return nodes.Services
+
+                return super()._child_type(index)
+
+        nodes.Kubeadm: Type[Node] = Kubeadm
+        nodes.Services: Type[Node] = Services
+        nodes.Root: Type[Node] = Root
+
+    def derive(nodes, Base: Type[Node], delegate: dict, **kwargs: Any) -> Node:
+        nodes.Kubeadm = cast(Type[Node], type("Kubeadm", (nodes.Kubeadm, Base), {}))
+        nodes.Services = cast(Type[Node], type("Services", (nodes.Services, Base), {}))
+        nodes.Root = cast(Type[Node], type("Root", (nodes.Root, Base), {}))
+
+        return nodes.Root(delegate, **kwargs)
+
+
+class Environment(jinja.Environment):
+    """
+    Environment that supports recursive compilation and on-the-fly conversion of primitive values.
+
+    It also customizes access to the particular sections of the inventory.
+    """
+
+    def __init__(self, logger: log.EnhancedLogger, recursive_values: dict,
+                 *,
+                 recursive_compile: bool = False,
+                 recursive_extra: Dict[str, Any] = None,
+                 primitives_config: PrimitivesConfig = None):
+        """
+        Instantiate new environment and set default filters.
+
+        :param logger: EnhancedLogger
+        :param recursive_values: The render values access to which should be customized.
+                                 They may also be automatically converted and compiled if necessary.
+        :param recursive_compile: Flag that enables recursive compilation.
+        :param recursive_extra: If recursive compilation occurs, these render values are supplied to the template.
+        :param primitives_config: List of sections and convertors of primitive values.
+        """
+        self.recursive_compile = recursive_compile
+        self.primitives_config = primitives_config
+        super().__init__(logger, recursive_values, recursive_extra=recursive_extra)
+
+    def create_root(self, delegate: dict) -> Node:
+        kwargs = {}
+        Base: Type[Node]
+        if not self.recursive_compile:
+            Base = Node
+        else:
+            Base = jinja.JinjaNode
+            kwargs = {"path": jinja.Path(), "env": self}
+            if self.primitives_config is not None:
+                Base = NodePrimitives
+                kwargs = {**kwargs, "primitives_config": self.primitives_config}
+
+        return NodesCustomization().derive(Base, delegate, **kwargs)
