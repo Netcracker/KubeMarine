@@ -27,8 +27,7 @@ import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
-from typing import List, Tuple, Union, Dict, Optional, Iterator
-from typing_extensions import Literal
+from typing import List, Tuple, Union, Dict, Optional, Iterator, Literal
 
 import yaml
 

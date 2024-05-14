@@ -16,10 +16,9 @@ import functools
 from copy import deepcopy
 from enum import Flag, auto, IntFlag
 from types import FunctionType
-from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, cast, Sequence
+from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, cast, Sequence, Protocol
 
 from ordered_set import OrderedSet
-from typing_extensions import Protocol
 
 from kubemarine.core import log  # pylint: disable=unused-import
 from kubemarine.core import utils, static
