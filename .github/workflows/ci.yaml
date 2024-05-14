@@ -98,10 +98,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-latest resolves to macos-14-arm64 which does not have python 3.7
-        os: [ macos-13, ubuntu-latest, windows-latest ]
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version:
-          - "3.7"
           - "3.8"
           - "3.9"
           - "3.10"

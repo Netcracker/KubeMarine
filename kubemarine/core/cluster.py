@@ -136,7 +136,12 @@ def enrichment(stages: EnrichmentStage, procedures: List[str] = None) -> Callabl
     :param stages: `EnrichmentStage` stages to run this function at.
     :param procedures: list of procedures for which the function is applicable.
     """
-    return lambda fn: functools.wraps(fn)(EnrichmentFunction(fn, stages, procedures))
+    def helper(fn: _Enrichment) -> EnrichmentFunction:
+        wrapper = EnrichmentFunction(fn, stages, procedures)
+        functools.update_wrapper(wrapper, fn)
+        return wrapper
+
+    return helper
 
 
 @dataclasses.dataclass(repr=False)
