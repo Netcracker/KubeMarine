@@ -11,7 +11,7 @@ RUN go mod download && \
     GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false && \
     gzip ipip_check
 
-FROM python:3.12-slim-bookworm AS python-build
+FROM python:3.12-slim-bullseye AS python-build
 
 ARG BUILD_TYPE
 
