@@ -20,7 +20,7 @@ import tarfile
 
 # pylint: disable=bad-builtin
 
-PIP_VERSION = "23.3.1"
+PIP_VERSION = "24.0"
 
 
 def call(args: List[str]) -> None:
@@ -41,7 +41,7 @@ with tarfile.open(f"dist/kubemarine-{version}.tar.gz") as arch:
 
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.
-# https://github.com/pypa/pip/blob/23.3.1/docs/html/user_guide.rst#using-pip-from-your-program
+# https://github.com/pypa/pip/blob/24.0/docs/html/user_guide.rst#using-pip-from-your-program
 call([sys.executable, '-m', 'pip', 'install', f'pip=={PIP_VERSION}'])
 
 target_arch = None
