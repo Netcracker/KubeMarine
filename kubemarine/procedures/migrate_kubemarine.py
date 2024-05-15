@@ -403,7 +403,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
             upgrade_patches.append(ThirdpartyUpgradePatch(thirdparty_name, k8s_versions))
 
     k8s_versions = [version
-                    for pkg in ('docker', 'containerd', 'containerdio')
+                    for pkg in ('containerd', 'containerdio')
                     for v_key in ('version_rhel', 'version_rhel8', 'version_rhel9', 'version_debian')
                     for version in upgrade_config['packages'][pkg].get(v_key, [])]
     if k8s_versions:
