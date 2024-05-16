@@ -203,6 +203,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                     ['spec']['template']['spec']['containers'][0]['image']
                 if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version:
                     expected_num_resources = 9  # Adjust expected number for v1.9.5 and v1.9.6
+                else
+                    expected_num_resources = 10
 
                 for key in self.all_obj_keys(manifest):
                     if 'admission' in key:
