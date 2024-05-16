@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build ipip_check binary
-FROM golang:1.21 AS go-build
+FROM golang:1.22 AS go-build
 
 WORKDIR /opt
 
