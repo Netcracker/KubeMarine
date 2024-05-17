@@ -241,12 +241,17 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 self.assertEqual(expected_image, container['image'], "Unexpected calico-typha image")
                 self.assertEqual({"kubernetes.io/os": "something"}, template_spec['nodeSelector'],
                                  "Unexpected calico-typha nodeSelector")
-                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
-                              template_spec['tolerations'],
-                              "Default calico-typha toleration is not present")
-                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'},
-                              template_spec['tolerations'],
-                              "Default calico-typha toleration is not present")
+
+                default_tolerations = [
+                    {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
+                    {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'},
+                    {'effect': 'NoExecute', 'operator': 'Exists'},
+                    {'effect': 'NoSchedule', 'operator': 'Exists'},
+                ]
+                for toleration in default_tolerations:
+                    self.assertEqual(1, sum(1 for t in template_spec['tolerations'] if t == toleration),
+                                  "Default calico-typha toleration is not present")
+
                 self.assertIn({"key": 'something', "effect": "NoSchedule"}, template_spec['tolerations'],
                               "Custom calico-typha toleration is not present")
 

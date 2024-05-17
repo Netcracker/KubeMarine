@@ -620,10 +620,6 @@ plugins:
       # If Typha is disabled, set 0 replicas to avoid sudden configuration changes during add/remove nodes.
       # If enabled, Let's start from 2 replicas and increment it every 50 nodes.
       # In special case of 1 node, scale to 1 replica.
-      # In some calico versions Typha could not be deployed on control-planes
-      # https://github.com/projectcalico/calico/pull/7979
-      # This is considered a bug, so instead of introducing a dependency on calico version,
-      # it is potentially better to patch tolerations ourselves in the manifests during enrichment.
       replicas: "\
         {% if plugins.calico.typha.enabled | is_true %}\
         {% set kubernetes_nodes = nodes | select('has_roles', ['control-plane', 'worker']) | list | length %}\
