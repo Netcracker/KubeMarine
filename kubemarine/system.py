@@ -17,7 +17,7 @@ import io
 import re
 import socket
 import time
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Callable
 
 import paramiko
 from dateutil.parser import parse
@@ -258,6 +258,16 @@ def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source:
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
               sudo=True)
     group.sudo("systemctl daemon-reload")
+
+
+def configure_sensitive_service(group: NodeGroup, action: Callable[[NodeGroup], bool]) -> bool:
+    cluster: KubernetesCluster = group.cluster
+    is_updated = group.call(action)
+    if is_updated:
+        cluster.schedule_cumulative_point(reboot_nodes)
+        cluster.schedule_cumulative_point(verify_system)
+
+    return is_updated
 
 
 def fetch_firewalld_status(group: NodeGroup) -> RunnersGroupResult:

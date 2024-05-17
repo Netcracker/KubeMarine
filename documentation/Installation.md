@@ -150,6 +150,7 @@ System clock should be synchronized the same way as for Cluster nodes system clo
 ### Windows Deployer Restrictions
 
 There are the following restrictions when deploying from Windows:
+
 * [ansible](#ansible) plugin procedures are not supported.
 * All Kubemarine input text files must be in utf-8 encoding.
 
@@ -229,7 +230,7 @@ If you have other solution, remove or switch off the IP firewall before the inst
 unmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:vxlan-v6.calico
 ```
 
-**Preinstalled software**
+**Preinstalled Software**
 
 * Installation of the following packages is highly recommended; however, Kubernetes can work without them, but may show warnings:
   * ethtool
@@ -272,7 +273,7 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 **Recommended**
 * Logrotate policy for `/var/log/messages` is configured according to the planned load (it is recommended to use limited size and daily rotation)
 
-For more information, refer to _Official Kubernetes Requirements Documentation_
+For more information, refer to the _Official Kubernetes Requirements Documentation_
 at [https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#before-you-begin](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#before-you-begin).
 
 ### Minimal Hardware Requirements
@@ -346,7 +347,7 @@ Mount point:
 ```
 [General H/W recommendations](https://etcd.io/docs/latest/op-guide/hardware/)
 
-### SSH key Recommendation 
+### SSH Key Recommendation 
 
 Before working with the cluster, you need to generate an ssh key. Kubemarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
@@ -469,7 +470,7 @@ tolerations:
   effect: <EFFECT>
 ```
 
-A toleration "matches" a taint if the keys are the same and the effects are the same, and:
+A toleration "matches" a taint, if the keys are the same and the effects are the same, and:
 
  * the operator is Exists (in which case no value should be specified), or
  * the operator is Equal and the values are equal.
@@ -601,7 +602,8 @@ For more information about the listed parameters, refer to the following section
 
 Note: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
 
-Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See more details about [environment variables](#environment-variables) 
+Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See more details about [environment variables](#environment-variables).
+
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
@@ -611,7 +613,7 @@ The following options are supported:
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
 |keyfile|string|no| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
-|password|string|no| |`password@123`|Password to access the cluster machines, Either a keyfile or a password should be provided|
+|password|string|no| |`password@123`|Password to access the cluster machines, either a keyfile or a password should be provided|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
 |name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
 |address|ip address|no| |`10.101.0.1`|External node's IP-address|
@@ -680,7 +682,6 @@ cluster_name: "k8s-stack.sdntest.example.com"
 For more information, refer to _FQDN_ at https://en.wikipedia.org/wiki/Fully_qualified_domain_name
 
 <!-- #GFCFilterMarkerEnd# -->
-
 
 ### control_plain
 
@@ -857,7 +858,6 @@ registry:
   mirror_registry: "registry.cluster.local"
 ```
 
-
 #### registry (old address-port format)
 
 The following parameters are supported:
@@ -986,6 +986,7 @@ nodes:
 **Note**: If the gateway is not specified on the node, then the connection is direct.
 
 **Note**: To establish an ssh connection, you can use either a keyfile or a password.
+
 ### vrrp_ips
 
 *Installation task*: `deploy.loadbalancer.keepalived`
@@ -998,7 +999,7 @@ nodes:
 For interfaces with the autodetection mode selected, it is automatically detected by the `internal_address` property of the node on which the particular VRRP IP should be set.
 By default, autodetection is enabled.
 
-In order to assign VRRP IP you need to create a `vrrp_ips` section in the inventory and specify the appropriate configuration.
+In order to assign VRRP IP, you need to create a `vrrp_ips` section in the inventory and specify the appropriate configuration.
 You can specify several VRRP IP addresses.
 This configuration will be applied in keepalived configuration on balancer nodes.
 If it's needed, it's possible to specify global parameters or override whole keepalived configuration. More about it is
@@ -1556,7 +1557,7 @@ For more information about these settings, refer to the official Kubernetes docu
 
 *OS specific*: No
 
-In `services.kubeadm_patches` section you can override control-plane pod settings as well as kubelet settings on per node basis.
+In `services.kubeadm_patches` section, you can override control-plane pod settings as well as kubelet settings on per node basis.
 This feature is implemented by using of [kubeadm patches](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/control-plane-flags/#patches).
 
 **Note**: `patches` feature is available for control-plane pods (etcd, kube-apiserver, kube-controller-manager, kube-scheduler) since Kubernetes **v1.22.0** and for kubelet since Kubernetes **v1.25.0**.
@@ -1599,7 +1600,7 @@ services:
           maxPods: 200
 ```
 
-By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
+By default, Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
 
 **Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
@@ -1671,7 +1672,7 @@ The following parameters are available:
   </tr>
 </table>
 
-**Warning**: It is recommended to use default values. Using values different from default may cause unexpected consequences and no support is provided for consequences.
+**Warning**: It is recommended to use the default values. Using values different from the default may cause an unexpected consequences and no support is provided for consequences.
 
 **Note**: Turning off and then turning on SELinux can lead to the loss of security rules, which were configured earlier.
 
@@ -2361,7 +2362,7 @@ For that kubemarine provide following jinja functions to convert strings:
 * `b64decode` to decode from base64;
 * `url_quote` to use percent-encoding;
 
-**Note**: such functions can be used not only for thirdparties, but in any places and order;
+**Note**: Such functions can be used not only for thirdparties, but in any places and order;
 
 For example, if you use `REG_USERNAME` and `REG_PASSWORD` [environments](#environment-variables) for credentials, you can use following configuration:
 ```yaml
@@ -2779,6 +2780,8 @@ The following settings are supported in the extended format:
 
 **Note**: Per-node [patches](#patches) are also supported for this section.
 
+**Note**: Kernel parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
@@ -3029,7 +3032,7 @@ The following parameters are supported:
 |makestep|no|string|`5 -1`|Step the system clock if large correction is needed.|
 |rtcsync|no|boolean|`True`|Specify that RTC should be automatically synchronized by kernel.|
 
-For more information about Chrony configuration, refer to the official documentation at [https://chrony.tuxfamily.org/documentation.html](https://chrony.tuxfamily.org/documentation.html).
+For more information about Chrony configuration, refer to the _Official Chrony Documentation_ at [https://chrony.tuxfamily.org/documentation.html](https://chrony.tuxfamily.org/documentation.html).
 
 The following is a configuration example:
 
@@ -3237,7 +3240,7 @@ Default is `true`.
 
 ##### configmap
 
-This section contains the Configmap parameters that are applied to the Coredns service. By default the following configs are used:
+This section contains the Configmap parameters that are applied to the Coredns service. By default, the following configs are used:
 
 * Corefile - The main Coredns config, which is converted into a template in accordance with the specified parameters.
 * Hosts - IP addresses and names in the format of `/etc/hosts` file. Can be customized with any desired IP addresses and names. 
@@ -3845,6 +3848,8 @@ The following settings are supported:
 |**nodes**|yes*|`None`|The list of node names to apply the patch to. At least one of `groups` and `nodes` parameters should be provided.|
 |**services.sysctl**|no| |Manage the Linux Kernel parameters for the specified nodes in a patch. For more information, see [sysctl](#sysctl).|
 
+**Note**: New patches can be appended after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+
 ### RBAC Admission
 
 *Installation task*: `deploy.admission`
@@ -3862,7 +3867,7 @@ rbac:
 Pod security policies enable fine-grained authorization of pod creation and updates.
 Pod security policies are enforced by enabling the admission controller. By default, admission controller is enabled during installation.
 
-To configure pod security policies it is required to provide cluster-level `policy/v1beta1/podsecuritypolicy` resource 
+To configure pod security policies, it is required to provide cluster-level `policy/v1beta1/podsecuritypolicy` resource 
 that controls security sensitive aspects of the pod specification. 
 If controller is enabled and no policies are provided, then the system does not allow deployment of new pods.
 Several OOB policies are provided and by default they are enabled during installation. 
@@ -4057,11 +4062,11 @@ rbac:
 
 Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
 (or profiles) of policies. The profiles are the following:
-* `Privileged`	- Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
+* `Privileged` - Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
 escalations.
-* `Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
+* `Baseline` - Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
 Pod configuration.
-* `Restricted`	- Heavily restricted policy, following current Pod hardening best practices.
+* `Restricted` - Heavily restricted policy, following current Pod hardening best practices.
 
 There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to 
 [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
@@ -4146,13 +4151,13 @@ The default configuration does not enforce the default policy to any of the pods
       namespaces: ["kube-system"]
 ```
 
-Do not change the namespaces exemption list without strong necessary. In any case check our maintenance guide before any implementation.
+Do not change the namespaces exemption list without strong necessary. In any case, check our Maintenance Guide before any implementation.
 
 #### Application Prerequisites
 
-In case of using PSS the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
+In case of using PSS, the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
 `baseline`, `restricted`). Those profiles may be set by labeling the namespace so as it described above for predefined plugins. 
-Moreover the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
+Moreover, the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
 
 ```yaml
 ...
@@ -4364,7 +4369,7 @@ The plugin configuration supports the following parameters:
 ```
 **Note**: The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by Kubemarine itself.
 
-###### Calico metrics configuration
+###### Calico Metrics Configuration
 
 By default, no additional settings are required for Calico metrics. They are enabled by default.
 
@@ -4455,13 +4460,13 @@ plugins:
       FELIX_DEFAULTENDPOINTTOHOSTACTION: DENY
 ```
 
-**Note**: In case of you use IPv6 you have to define `CALICO_ROUTER_ID` with value `hash` in `env` section. This uses a hash of the configured nodename for the router ID.
+**Note**: In case of you use IPv6, you have to define `CALICO_ROUTER_ID` with value `hash` in `env` section. This uses a hash of the configured nodename for the router ID.
 
-For more information about the supported Calico environment variables, refer to the official Calico documentation at [https://docs.projectcalico.org/reference/node/configuration](https://docs.projectcalico.org/reference/node/configuration).
+For more information about the supported Calico environment variables, refer to the _Official Calico Documentation_ at [https://docs.projectcalico.org/reference/node/configuration](https://docs.projectcalico.org/reference/node/configuration).
 
 ###### Calico API server
 
-For details about the Calico API server, refer to the official documentation at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
+For details about the Calico API server, refer to the _Official Documentation_ at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
 
 By default, the Calico API server is not installed. To install it during the Calico installation, specify the following:
 
@@ -4629,7 +4634,8 @@ For example:
 **Warning**: Arguments for ingress-nginx-controller are also added from [nginx-ingress-controller-v*-original.yaml](https://github.com/Netcracker/KubeMarine/blob/main/kubemarine/plugins/yaml/), from other parameters in cluster.yaml (`controller.ssl.enableSslPassthrough` and `controller.ssl.default-certificate`) and `--watch-ingress-without-class=true` is added by default. Make sure there are no conflicts, otherwise the task will be interrupted.
 
 ###### monitoring
-By default 10254 port is opened and provides Prometheus metrics.
+
+By default, 10254 port is opened and provides Prometheus metrics.
 
 ##### kubernetes-dashboard
 
@@ -5121,7 +5127,7 @@ This procedures allows you to automatically compile the Jinja2 template file, up
 
 Inside the templates you can use all the variables defined in the inventory in `cluster.yaml`.
 Moreover, it is possible to dynamically create your own variables in runtime using `python` or `shell` plugin procedures.
-These runtime variables can also be used in templates by accessing `runtime_vars`, for example if you have variable
+These runtime variables can also be used in templates by accessing `runtime_vars`, for example, if you have variable
 `example_var` created in runtime you can access this variable in templates like `runtime_vars['example_var']`
 
 **Note**: You can specify nodes and groups at the same time.
@@ -5613,8 +5619,7 @@ plugins:
  
 ## Advanced Features
 
-Before use, the configuration file **cluster.yaml** is preprocessed. The user settings are merged with default settings, thereby creating the final configuration file, which
-is further used throughout the entire installation.
+Before use, the configuration file **cluster.yaml** is preprocessed. The user settings are merged with default settings, thereby creating the final configuration file, which is further used throughout the entire installation.
 
 **Note**: If [Dump Files](#dump-files) is enabled, then you can see merged **cluster.yaml** file version in the dump directory.
 
@@ -6198,10 +6203,10 @@ $ install --disable-dump-cleanup
 ### Finalized Dump
 
 After any procedure is completed, a final inventory with all the missing variable values is needed, which is pulled from the finished cluster environment.
-This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
+This inventory can be found in the **cluster_finalized.yaml** file in the working directory,
 and can be passed as a source inventory in future runs of Kubemarine procedures.
 
-**Note**: The `cluster_finalized.yaml` inventory file is aimed to reflect the current cluster state together with the Kubemarine version using which it is created.
+**Note**: The **cluster_finalized.yaml** inventory file is aimed to reflect the current cluster state together with the Kubemarine version using which it is created.
 This in particular means that the file cannot be directly used with a different Kubemarine version.
 Though, it still can be migrated together with the managed cluster using the [Kubemarine Migration Procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
 
@@ -6444,7 +6449,6 @@ For example, if the configurations are not updated, then a reboot for applying t
 For more detailed information, see the description of the tasks and their parameters.
 If the task is skipped, then it is not able to schedule the cumulative point. For example, by skipping certain tasks, you can avoid a reboot.
 
-
 # Supported Versions
 
 **Note**: You can specify Kubernetes version via `kubernetesVersion` parameter. See [Kubernetes version](#kubernetes-version) section for more details.
@@ -6454,6 +6458,7 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 The tables below shows the correspondence of versions that are supported and is used during the installation:
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.23.17
+
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
 |          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                            |

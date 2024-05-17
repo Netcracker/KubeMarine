@@ -35,7 +35,7 @@ NodeConfig = Dict[str, Any]
 GroupFilter = Union[Callable[[NodeConfig], bool], NodeConfig]
 
 _RESULT = TypeVar('_RESULT', bound=GenericResult, covariant=True)
-_T = TypeVar('_T')
+_T = TypeVar('_T', bound=Union['RunnersGroupResult', bool, None])
 
 
 class GenericGroupResult(Mapping[str, _RESULT]):
@@ -452,7 +452,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         callable_path = "%s.%s" % (func.__module__, func.__name__)
         self.cluster.log.debug("Running %s: " % callable_path)
         result = action(self, **kwargs)
-        if result is not None:
+        if isinstance(result, RunnersGroupResult):
             self.cluster.log.debug(result)
 
         return result

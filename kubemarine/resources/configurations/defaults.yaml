@@ -85,6 +85,9 @@ services:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
       extraVolumes: []
+    etcd:
+      local:
+        extraArgs: {}
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []

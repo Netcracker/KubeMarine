@@ -19,6 +19,16 @@ from kubemarine.core.cluster import EnrichmentStage, enrichment, KubernetesClust
 from kubemarine.core.yaml_merger import default_merger
 
 
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['reconfigure'])
+def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
+    # Do not apply usual merging strategy, always merge and never override.
+    # This is because `reconfigure` might support to change only subset of sections allowed during installation.
+    # Append reconfiguring patches to the end for them to have priority.
+    procedure_patches = cluster.procedure_inventory.get('patches', [])
+    if procedure_patches:
+        cluster.inventory.setdefault('patches', []).extend(procedure_patches)
+
+
 @enrichment(EnrichmentStage.FULL)
 def verify_inventory_patches(cluster: KubernetesCluster) -> None:
     for i, patch in enumerate(cluster.inventory['patches']):

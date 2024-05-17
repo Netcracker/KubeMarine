@@ -5,96 +5,104 @@
   "additionalProperties": false,
   "properties": {
     "apiServer": {
-      "$ref": "#/definitions/control-plane-pod-patch"
+      "$ref": "#/definitions/ControlPlanePodPatches"
     },
     "etcd": {
-      "$ref": "#/definitions/control-plane-pod-patch"
+      "$ref": "#/definitions/ControlPlanePodPatches"
     },
     "controllerManager": {
-      "$ref": "#/definitions/control-plane-pod-patch"
+      "$ref": "#/definitions/ControlPlanePodPatches"
     },
     "scheduler": {
-      "$ref": "#/definitions/control-plane-pod-patch"
+      "$ref": "#/definitions/ControlPlanePodPatches"
     },
     "kubelet": {
-      "$ref": "#/definitions/kubelet-patch"
+      "$ref": "#/definitions/KubeletPatches"
     }
   },
   "definitions": {
-    "control-plane-pod-patch": {
+    "ControlPlanePodPatches": {
       "type": "array",
       "description": "Patches for control-plane pods",
       "minItems": 0,
       "items": {
         "oneOf": [
-          {
-            "allOf": [
-              {
-                "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "patch": {
-                    "$ref": "#/definitions/patch"
-                  },
-                  "groups": {
-                    "$ref": "../common/node_ref.json#/definitions/ControlPlanes"
-                  },
-                  "nodes": {
-                    "$ref": "../common/node_ref.json#/definitions/Names"
-                  }
-                },
-                "required": ["patch"],
-                "additionalProperties": false
-              }
-            ]
-          },
+          {"$ref": "#/definitions/ControlPlanePodPatch"},
           {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
         ]
       }
     },
-    "kubelet-patch": {
+    "KubeletPatches": {
       "type": "array",
       "description": "Patches for kubelet",
       "minItems": 0,
       "items": {
         "oneOf": [
-          {
-            "allOf": [
-              {
-                "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "patch": {
-                    "allOf": [{"$ref": "#/definitions/patch"}],
-                    "properties": {
-                      "podPidsLimit": {"$ref": "kubeadm_kubelet.json#/definitions/PodPidsLimit"},
-                      "maxPods": {"$ref": "kubeadm_kubelet.json#/definitions/MaxPods"}
-                    }
-                  },
-                  "groups": {
-                    "$ref": "../common/node_ref.json#/definitions/KubernetesRoles"
-                  },
-                  "nodes": {
-                    "$ref": "../common/node_ref.json#/definitions/Names"
-                  }
-                },
-                "required": ["patch"],
-                "additionalProperties": false
-              }
-            ]
-          },
+          {"$ref": "#/definitions/KubeletPatch"},
           {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
         ]
       }
     },
-    "patch": {
+    "ControlPlanePodPatch": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "patch": {
+              "$ref": "#/definitions/Flags"
+            },
+            "groups": {
+              "$ref": "../common/node_ref.json#/definitions/ControlPlanes"
+            },
+            "nodes": {
+              "$ref": "../common/node_ref.json#/definitions/Names"
+            }
+          },
+          "required": ["patch"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KubeletPatch": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "patch": {
+              "$ref": "#/definitions/KubeletProperties"
+            },
+            "groups": {
+              "$ref": "../common/node_ref.json#/definitions/KubernetesRoles"
+            },
+            "nodes": {
+              "$ref": "../common/node_ref.json#/definitions/Names"
+            }
+          },
+          "required": ["patch"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Flags": {
       "type": "object",
       "additionalProperties": {
         "type": ["string", "boolean", "integer"]
+      }
+    },
+    "KubeletProperties": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/Flags"}],
+      "properties": {
+        "podPidsLimit": {"$ref": "kubeadm_kubelet.json#/definitions/PodPidsLimit"},
+        "maxPods": {"$ref": "kubeadm_kubelet.json#/definitions/MaxPods"}
       }
     }
   }
