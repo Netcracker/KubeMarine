@@ -108,11 +108,11 @@ compatibility_map:
     local-path-provisioner: v0.0.25
     crictl: v1.28.0
   v1.27.13:
-    calico: v3.27.0
-    nginx-ingress-controller: v1.9.6
+    calico: v3.28.0
+    nginx-ingress-controller: v1.10.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.26
-    crictl: v1.29.0
+    crictl: v1.30.0
   v1.28.0:
     calico: v3.26.4
     nginx-ingress-controller: v1.8.4
@@ -144,11 +144,11 @@ compatibility_map:
     local-path-provisioner: v0.0.26
     crictl: v1.29.0
   v1.28.9:
-    calico: v3.27.0
-    nginx-ingress-controller: v1.9.6
+    calico: v3.28.0
+    nginx-ingress-controller: v1.10.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.26
-    crictl: v1.29.0
+    crictl: v1.30.0
   v1.29.1:
     calico: v3.27.0
     nginx-ingress-controller: v1.9.6
@@ -156,11 +156,11 @@ compatibility_map:
     local-path-provisioner: v0.0.26
     crictl: v1.29.0
   v1.29.4:
-    calico: v3.27.0
-    nginx-ingress-controller: v1.9.6
+    calico: v3.28.0
+    nginx-ingress-controller: v1.10.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.26
-    crictl: v1.29.0
+    crictl: v1.30.0
 
 # After any change, please run scripts/thirdparties/sync.py
 
