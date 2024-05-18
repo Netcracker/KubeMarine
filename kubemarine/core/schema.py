@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import pathlib
 import urllib.request
 import urllib.error
@@ -23,6 +22,7 @@ from typing import List, Dict, Union, cast
 import jsonschema
 import referencing
 import referencing.exceptions
+import referencing.retrieval
 from ordered_set import OrderedSet
 
 from kubemarine.core import utils, log, errors
@@ -69,15 +69,9 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
         raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
 
     root_schema_uri = root_schema.as_uri()
-    schema = retrieve_uri_filesystem(root_schema_uri).contents
-    # This is necessary for proper resolving of relative URIs
-    schema['$id'] = root_schema_uri
-
-    validator_cls = jsonschema.validators.validator_for(schema)
-    validator_cls.check_schema(schema)
 
     registry = referencing.Registry(retrieve=retrieve_uri_filesystem)  # type: ignore[call-arg, var-annotated]
-    validator = validator_cls(schema, registry=registry)
+    validator = jsonschema.Draft7Validator({"$ref": root_schema_uri}, registry=registry)
 
     errs = list(validator.iter_errors(inventory))
     if not errs:
@@ -108,11 +102,12 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     raise errors.FailException(msg, hint=hint)
 
 
-def retrieve_uri_filesystem(uri: str) -> referencing.Resource:
+@referencing.retrieval.to_cached_resource()  # type: ignore[arg-type]
+def retrieve_uri_filesystem(uri: str) -> str:
     try:
         with urllib.request.urlopen(uri) as url:
-            contents = json.loads(url.read().decode("utf-8"))
-            return referencing.Resource.from_contents(contents)
+            content: str = url.read().decode("utf-8")
+            return content
     except urllib.error.URLError:
         raise referencing.exceptions.NoSuchResource(ref=uri) from None  # type: ignore[call-arg]
 
