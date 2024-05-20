@@ -10,7 +10,6 @@
 thirdparties:
   calicoctl: []
   crictl: []
-
 packages:
   docker:
     version_rhel: []
@@ -35,13 +34,7 @@ packages:
     version_rhel9: false
     version_debian: false
 plugins:
-  calico:
-  - v1.27.13
-  - v1.28.9
-  - v1.29.4
-  nginx-ingress-controller:
-  - v1.27.13
-  - v1.28.9
-  - v1.29.4
+  calico: []
+  nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
