@@ -8,14 +8,9 @@
 # The order of upgrade of defined by the implementation.
 
 thirdparties:
-  calicoctl:
-  - v1.27.13
-  - v1.28.9
-  - v1.29.4
-  crictl:
-  - v1.27.13
-  - v1.28.9
-  - v1.29.4
+  calicoctl: []
+  crictl: []
+
 packages:
   docker:
     version_rhel: []
