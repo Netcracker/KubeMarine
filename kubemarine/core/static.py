@@ -60,10 +60,8 @@ def _load_defaults() -> dict:
         utils.get_internal_resource_path('resources/configurations/defaults.yaml'))
 
 
-# Cannot annotate in Python 3.7
-# https://github.com/python/cpython/issues/79120
-GLOBALS = {}  # type: ignore[var-annotated]
-DEFAULTS = {}  # type: ignore[var-annotated]
-KUBERNETES_VERSIONS = {}  # type: ignore[var-annotated]
+GLOBALS: dict = {}
+DEFAULTS: dict = {}
+KUBERNETES_VERSIONS: dict = {}
 
 reload()

@@ -97,7 +97,7 @@ class EnrichmentValidation(unittest.TestCase):
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
             {'shell': ''}
         ]}}}
-        with self.assertRaisesRegex(errors.FailException, r"'' is too short"):
+        with self.assertRaisesRegex(errors.FailException, r"'' should be non-empty"):
             demo.new_cluster(inventory)
 
     def test_verify_shell_in_var_name_not_defined(self):
@@ -128,7 +128,7 @@ class EnrichmentValidation(unittest.TestCase):
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
             {'ansible': ''}
         ]}}}
-        with self.assertRaisesRegex(errors.FailException, r"'' is too short"):
+        with self.assertRaisesRegex(errors.FailException, r"'' should be non-empty"):
             demo.new_cluster(inventory)
 
     def test_verify_helm_empty_chart_path(self):
@@ -136,7 +136,7 @@ class EnrichmentValidation(unittest.TestCase):
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
             {'helm': {'chart_path': ''}}
         ]}}}
-        with self.assertRaisesRegex(errors.FailException, r"'' is too short"):
+        with self.assertRaisesRegex(errors.FailException, r"'' should be non-empty"):
             demo.new_cluster(inventory)
 
     def test_verify_manifest_not_found(self):

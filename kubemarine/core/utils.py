@@ -27,7 +27,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional, NoReturn
+from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -35,23 +35,10 @@ import ruamel.yaml
 
 from pathvalidate import sanitize_filepath
 from ruamel.yaml import CommentedMap
-from typing_extensions import Protocol
+from useful_types import SupportsAllComparisons
 
 from kubemarine.core import log
 from kubemarine.core.errors import pretty_print_error
-
-
-_T_contra = TypeVar("_T_contra", contravariant=True)
-
-
-class SupportsAllComparisons(Protocol[_T_contra]):
-    def __lt__(self, __other: _T_contra) -> bool: ...
-
-    def __gt__(self, __other: _T_contra) -> bool: ...
-
-    def __le__(self, __other: _T_contra) -> bool: ...
-
-    def __ge__(self, __other: _T_contra) -> bool: ...
 
 
 def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> NoReturn:
