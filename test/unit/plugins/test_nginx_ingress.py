@@ -202,7 +202,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 # Check if nginx-ingress-controller version is v1.9.5 or v1.9.6 before counting webhook resources
                 nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
                     ['spec']['template']['spec']['containers'][0]['image']
-                if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version or "v1.10.0" in nginx_version:
+                if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version or "v1.10.1" in nginx_version:
                     expected_num_resources = 9  # Adjust expected number for v1.9.5 and v1.9.6
 
                 for key in self.all_obj_keys(manifest):
