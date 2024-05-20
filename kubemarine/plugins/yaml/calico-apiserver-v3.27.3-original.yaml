@@ -77,15 +77,22 @@ spec:
         env:
         - name: DATASTORE_TYPE
           value: kubernetes
-        image: calico/apiserver:v3.28.0
-        name: calico-apiserver
-        readinessProbe:
+        image: calico/apiserver:v3.27.3
+        livenessProbe:
           httpGet:
-            path: /readyz
+            path: /version
             port: 5443
             scheme: HTTPS
-          timeoutSeconds: 5
-          periodSeconds: 60
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        name: calico-apiserver
+        readinessProbe:
+          exec:
+            command:
+            - /code/filecheck
+          failureThreshold: 5
+          initialDelaySeconds: 5
+          periodSeconds: 10
         securityContext:
           privileged: false
           runAsUser: 0
