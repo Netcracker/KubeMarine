@@ -53,7 +53,7 @@ dependencies = [
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
-ansible = ["ansible==7.0.*"]
+ansible = ["ansible==7.7.*"]
 mypy = [
     "mypy==1.10.*",
     "types-PyYAML==6.*",
