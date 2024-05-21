@@ -151,6 +151,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
         args = container['args']
         self.assertFalse(any(arg.startswith('--publish-service=') for arg in args), "--publish-service should be absent")
+        self.assertFalse(any(arg.startswith('--enable-metrics=') for arg in args), "--enable-metrics should be absent")
         self.assertIn('--watch-ingress-without-class=true', args, "Required arg not found")
         self.assertIn('--enable-ssl-passthrough', args, "Required arg not found")
         self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found ")
