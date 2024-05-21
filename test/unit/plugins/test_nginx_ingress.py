@@ -22,6 +22,7 @@ from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
 
 
+
 class EnrichmentValidation(unittest.TestCase):
     def install(self):
         # pylint: disable=attribute-defined-outside-init
@@ -150,6 +151,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
         args = container['args']
         self.assertFalse(any(arg.startswith('--publish-service=') for arg in args), "--publish-service should be absent")
+        self.assertFalse(any(arg.startswith('--enable-metrics=') for arg in args), "--enable-metrics should be absent")
         self.assertIn('--watch-ingress-without-class=true', args, "Required arg not found")
         self.assertIn('--enable-ssl-passthrough', args, "Required arg not found")
         self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found ")
@@ -201,7 +203,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 # Check if nginx-ingress-controller version is v1.9.5 or v1.9.6 before counting webhook resources
                 nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
                     ['spec']['template']['spec']['containers'][0]['image']
-                if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version:
+                if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version or "v1.10.1" in nginx_version:
                     expected_num_resources = 9  # Adjust expected number for v1.9.5 and v1.9.6
 
                 for key in self.all_obj_keys(manifest):
