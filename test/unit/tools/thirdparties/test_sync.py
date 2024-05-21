@@ -158,9 +158,11 @@ class SynchronizationTest(unittest.TestCase):
     def _check_added_k8s_images(self, ver: str, _: str):
         for k8s_image in ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler', 'kube-proxy',
                           'pause', 'etcd', 'coredns/coredns'):
+            expected_version = self.images_resolver.stub_image(ver, k8s_image).split(':')[1]
+
             software_mapping = self.compatibility.stored['kubernetes_images.yaml'][k8s_image]
             actual_mapping = software_mapping.get(ver, {})
-            self.assertEqual(f"fake-{k8s_image}-version",
+            self.assertEqual(expected_version,
                              actual_mapping.get('version'),
                              f"Version for {k8s_image!r} and Kubernetes {ver} was not synced")
             self.assertTrue(utils.is_sorted(list(software_mapping), key=utils.version_key),
