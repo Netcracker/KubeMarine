@@ -23,7 +23,7 @@ import invoke
 
 from kubemarine import demo
 from kubemarine.core.executor import RunnersResult, UnexpectedExit, GenericResult, CommandTimedOut
-from kubemarine.core.group import GroupException, RemoteGroupException, CollectorCallback
+from kubemarine.core.group import GroupException, CollectorCallback
 
 
 class RemoteExecutorTest(unittest.TestCase):
@@ -49,7 +49,7 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except RemoteGroupException as exc:
+            except GroupException as exc:
                 exception = exc
             for results_list in exception.results.values():
                 self.assertIsInstance(results_list[0], UnexpectedExit)
@@ -74,7 +74,7 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except RemoteGroupException as exc:
+            except GroupException as exc:
                 exception = exc
             for results_list in exception.results.values():
                 self.assertIsInstance(results_list[0], TimeoutError)
@@ -122,7 +122,7 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except RemoteGroupException as exc:
+            except GroupException as exc:
                 exception = exc
 
             self.assertIsNotNone(exception, "Exception was not raised")
@@ -144,7 +144,7 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except RemoteGroupException as exc:
+            except GroupException as exc:
                 exception = exc
 
             self.assertIsNotNone(exception, "Exception was not raised")
@@ -261,7 +261,7 @@ class RemoteExecutorTest(unittest.TestCase):
         exception = None
         try:
             group.flush()
-        except RemoteGroupException as exc:
+        except GroupException as exc:
             exception = exc
 
         self.assertIsNotNone(exception, "Exception was not raised")
@@ -310,7 +310,7 @@ class RemoteExecutorTest(unittest.TestCase):
         exception = None
         try:
             group.flush()
-        except RemoteGroupException as exc:
+        except GroupException as exc:
             exception = exc
 
         self.assertIsNotNone(exception, "Exception was not raised")

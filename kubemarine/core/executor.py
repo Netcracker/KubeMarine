@@ -21,14 +21,17 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from types import TracebackType
-from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable
+from typing import (
+    Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable,
+    Sequence, Generic
+)
 
 import fabric  # type: ignore[import-untyped]
 import fabric.transfer  # type: ignore[import-untyped]
 
 import invoke
 
-from kubemarine.core import log, static
+from kubemarine.core import log, static, errors
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 
@@ -167,6 +170,31 @@ Token = int
 GenericResult = Union[Exception, RunnersResult, fabric.transfer.Result]
 HostToResult = Dict[str, GenericResult]
 TokenizedResult = OrderedDict[Token, GenericResult]
+
+RESULT = TypeVar('RESULT', bound=GenericResult, covariant=True)
+
+
+class GroupResult(Generic[RESULT]):
+    def __init__(self, results: Mapping[str, Sequence[RESULT]]) -> None:
+        self._results = results
+
+    def __str__(self) -> str:
+        return represent_results(self._results)
+
+
+class BaseExecutorException(BaseException):
+    def __init__(self, results: Mapping[str, Sequence[GenericResult]]):
+        self.results = results
+
+    def __str__(self) -> str:
+        # We always print output of all commands in the batch even if they are not failed,
+        # for the reason that the user code might want to print output of some commands in the batch,
+        # but failed to do that because of the exception.
+        return represent_results(self.results, hide_already_printed=True)
+
+
+class GroupException(BaseExecutorException, errors.GroupException):
+    pass
 
 
 class Callback(ABC):
@@ -425,6 +453,9 @@ class RawExecutor:
     def get_last_results(self) -> Dict[str, TokenizedResult]:
         return self._last_results
 
+    def get_flat_result(self) -> Mapping[str, Sequence[GenericResult]]:
+        return {host: list(res.values()) for host, res in self._last_results.items()}
+
     def flush(self) -> None:
         """
         Flushes the connections' queue and returns grouped result
@@ -472,6 +503,10 @@ class RawExecutor:
                     self._last_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
 
         self._connections_queue = {}
+
+        for results in self._last_results.values():
+            if any(isinstance(result, Exception) for _, result in results.items()):
+                raise GroupException(self.get_flat_result())
 
     def _prepare_merged_action(self, host: str, payloads: List[_PayloadItem]) -> _Action:
         # unpack last action in list of payloads
@@ -744,3 +779,27 @@ class RawExecutor:
             self.logger.verbose('Disconnected session with %s' % host)
             cxn = self.connection_pool.get_connection(host)
             cxn.close()
+
+
+def represent_results(flat_results: Mapping[str, Sequence[RESULT]], hide_already_printed: bool = True) -> str:
+    host_outputs = []
+    for host, results in flat_results.items():
+        output = f"{host}:"
+
+        # filter out transfer results and the last exception if present
+        runners_results = [res for res in results if isinstance(res, RunnersResult)]
+        if runners_results:
+            merged_result = RunnersResult.merge(runners_results)
+            output += f" code={merged_result.repr_code()}"
+            repr_out = merged_result.repr_out(hide_already_printed=hide_already_printed)
+            if repr_out:
+                output += '\n\t' + repr_out.replace('\n', '\n\t')
+
+        # The exception may be only the last in the list. We are also sure to have at least one result per node.
+        if isinstance(results[-1], Exception):
+            exception = errors.wrap_kme_exception(results[-1])
+            output += '\n\t' + str(exception).replace('\n', '\n\t')
+
+        host_outputs.append(output)
+
+    return "\n".join(host_outputs)

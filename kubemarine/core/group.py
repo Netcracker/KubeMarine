@@ -25,33 +25,33 @@ from typing import (
     Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast, Sequence
 )
 
-from kubemarine.core import utils, log, errors
+from kubemarine.core import utils, log, executor as exe
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult, UnexpectedExit,
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, UnexpectedExit,
+    RESULT, GroupResult,
 )
 
 NodeConfig = Dict[str, Any]
 GroupFilter = Union[Callable[[NodeConfig], bool], NodeConfig]
 
-_RESULT = TypeVar('_RESULT', bound=GenericResult, covariant=True)
 _T = TypeVar('_T', bound=Union['RunnersGroupResult', bool, None])
 
 
-class GenericGroupResult(Mapping[str, _RESULT]):
+class GenericGroupResult(GroupResult[RESULT], Mapping[str, RESULT]):
 
-    def __init__(self, cluster: object, results: Mapping[str, _RESULT]) -> None:
+    def __init__(self, cluster: object, results: Mapping[str, RESULT]) -> None:
+        super().__init__({host: [result] for host, result in results.items()})
         self.cluster = cluster
-        self._result: Dict[str, _RESULT] = dict(results)
 
-    def __getitem__(self, host: str) -> _RESULT:
-        return self._result[host]
+    def __getitem__(self, host: str) -> RESULT:
+        return self._results[host][0]
 
     def __len__(self) -> int:
-        return len(self._result)
+        return len(self._results)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._result)
+        return iter(self._results)
 
     def get_simple_out(self) -> str:
         return self.get_simple_result().stdout
@@ -67,26 +67,6 @@ class GenericGroupResult(Mapping[str, _RESULT]):
                                       % type(res))
 
         return res
-
-    def __str__(self) -> str:
-        host_outputs = []
-        for host, result in self.items():
-            output = f"{host}:"
-
-            if isinstance(result, RunnersResult):
-                output += f" code={result.repr_code()}"
-                repr_out = result.repr_out()
-                if repr_out:
-                    output += '\n\t' + repr_out.replace('\n', '\n\t')
-
-            # The exception may be only the last in the list. We are also sure to have at least one result per node.
-            if isinstance(result, Exception):
-                exception = errors.wrap_kme_exception(result)
-                output += '\n\t' + str(exception).replace('\n', '\n\t')
-
-            host_outputs.append(output)
-
-        return "\n".join(host_outputs)
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -193,32 +173,6 @@ class GenericGroupResult(Mapping[str, _RESULT]):
         :return: true if string presented
         """
         return len(self.get_hosts_list_where_value_in_stderr(value)) > 0
-
-    def __eq__(self, other: object) -> bool:
-        if self is other:
-            return True
-
-        if not isinstance(other, GenericGroupResult):
-            return False
-
-        if len(self) != len(other):
-            return False
-
-        for host, result in self.items():
-            compared_result = other.get(host)
-            if compared_result is None:
-                return False
-
-            if not isinstance(result, RunnersResult) or not isinstance(compared_result, RunnersResult):
-                raise NotImplementedError('Currently only instances of RunnersResult can be compared')
-
-            if result != compared_result:
-                return False
-
-        return True
-
-    def __ne__(self, other: object) -> bool:
-        return not self == other
 
 
 class NodeGroupResult(GenericGroupResult[GenericResult]):
@@ -707,12 +661,16 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
         executor = RawExecutor(self.cluster)
         executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
-        executor.flush()
 
-        results = {host: next(iter(results.values()))
-                   for host, results in executor.get_last_results().items()}
+        excepted = False
+        try:
+            executor.flush()
+        except exe.GroupException:
+            excepted = True
 
-        if any(isinstance(result, Exception) for result in results.values()):
+        results = {host: results[0]
+                   for host, results in executor.get_flat_result().items()}
+        if excepted:
             raise GroupResultException(NodeGroupResult(self.cluster, results))
 
         return results
@@ -773,7 +731,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
             try:
                 defer.flush()
-            except RemoteGroupException as e:
+            except GroupException as e:
                 results = e.results[self.get_host()]
                 for result in results:
                     if isinstance(result, UnexpectedExit):
@@ -866,17 +824,16 @@ class RemoteExecutor(RawExecutor):
 
         :return: grouped tokenized results per connection.
         """
-        super().flush()
+        try:
+            super().flush()
+        except exe.GroupException as e:
+            raise GroupException(self.cluster, e.results) from None
 
-        for results in self._last_results.values():
-            if any(isinstance(result, Exception) for _, result in results.items()):
-                raise RemoteGroupException(self.cluster, self._last_results)
 
-
-class GroupException(Exception):
-    def __init__(self, cluster: object, results: Dict[str, List[GenericResult]]):
+class GroupException(exe.GroupException):
+    def __init__(self, cluster: object, results: Mapping[str, Sequence[GenericResult]]):
+        super().__init__(results)
         self.cluster = cluster
-        self.results = results
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -931,39 +888,8 @@ class GroupException(Exception):
         nodes_list = self.get_exited_hosts_list()
         return self._make_group(nodes_list)
 
-    def __str__(self) -> str:
-        # We always print output of all commands in the batch even if they are not failed,
-        # for the reason that the user code might want to print output of some commands in the batch,
-        # but failed to do that because of the exception.
-        host_outputs = []
-        for host, results in self.results.items():
-            output = f"{host}:"
-
-            # filter out transfer results and the last exception if present
-            runners_results = [res for res in results if isinstance(res, RunnersResult)]
-            if runners_results:
-                merged_result = RunnersResult.merge(runners_results)
-                output += f" code={merged_result.repr_code()}"
-                repr_out = merged_result.repr_out(hide_already_printed=True)
-                if repr_out:
-                    output += '\n\t' + repr_out.replace('\n', '\n\t')
-
-            # The exception may be only the last in the list. We are also sure to have at least one result per node.
-            if isinstance(results[-1], Exception):
-                exception = errors.wrap_kme_exception(results[-1])
-                output += '\n\t' + str(exception).replace('\n', '\n\t')
-
-            host_outputs.append(output)
-
-        return "\n".join(host_outputs)
-
 
 class GroupResultException(GroupException):
     def __init__(self, result: GenericGroupResult[GenericResult]):
         super().__init__(result.cluster, {host: [res] for host, res in result.items()})
         self.result = result
-
-
-class RemoteGroupException(GroupException):
-    def __init__(self, cluster: object, results: Dict[str, TokenizedResult]):
-        super().__init__(cluster, {host: list(res.values()) for host, res in results.items()})
