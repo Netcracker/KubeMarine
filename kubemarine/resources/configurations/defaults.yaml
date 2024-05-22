@@ -617,8 +617,14 @@ plugins:
     typha:
       # enabled by default for envs with nodes > 3
       enabled: '{% if (nodes | select("has_roles", ["control-plane", "worker"]) | list | length) < 4 %}false{% else %}true{% endif %}'
-      # let's start from 2 replicas and increment it every 50 nodes
-      replicas: '{{ (((nodes | select("has_roles", ["control-plane", "worker"]) | list | length) / 50) + 2) | round(0, "floor") | int }}'
+      # If Typha is disabled, set 0 replicas to avoid sudden configuration changes during add/remove nodes.
+      # If enabled, Let's start from 2 replicas and increment it every 50 nodes.
+      # In special case of 1 node, scale to 1 replica.
+      replicas: "\
+        {% if plugins.calico.typha.enabled | is_true %}\
+        {% set kubernetes_nodes = nodes | select('has_roles', ['control-plane', 'worker']) | list | length %}\
+        {{ (1 + ([kubernetes_nodes - 1, 1] | min) + kubernetes_nodes / 50) | round(0, 'floor') | int }}\
+        {% else %}0{% endif %}"
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux

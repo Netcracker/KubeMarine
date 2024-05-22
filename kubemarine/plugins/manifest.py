@@ -238,19 +238,23 @@ class Processor(ABC):
                 self.log.verbose(f"The current version of original yaml does not include "
                                  f"the following object: {key}")
 
+    def original_manifest(self) -> Manifest:
+        """
+        get original YAML and parse it into list of objects
+        """
+        try:
+            with utils.open_utf8(self.manifest_path, 'r') as stream:
+                return Manifest(self.manifest_identity, stream)
+        except Exception as exc:
+            raise Exception(f"Failed to load {self.manifest_identity.repr_id()} from {self.manifest_path} "
+                            f"for {self.plugin_name!r} plugin") from exc
+
     def enrich(self) -> Manifest:
         """
         The method implements full processing for the plugin main manifest.
         """
 
-        # get original YAML and parse it into list of objects
-        try:
-            with utils.open_utf8(self.manifest_path, 'r') as stream:
-                manifest = Manifest(self.manifest_identity, stream)
-        except Exception as exc:
-            raise Exception(f"Failed to load {self.manifest_identity.repr_id()} from {self.manifest_path} "
-                            f"for {self.plugin_name!r} plugin") from exc
-
+        manifest = self.original_manifest()
         self.validate_original(manifest)
 
         # call enrichment functions one by one
