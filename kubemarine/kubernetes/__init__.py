@@ -1036,7 +1036,7 @@ def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: st
         # comes from nodes-k8s-versions.txt content as a comment symbol
         if line[0] == '#':
             continue
-        version, node_name, status = list(filter(lambda val: val, line.split(' ')))
+        version, node_name, status = list(filter(len, line.split(' ')))
         if version != future_version:
             cluster.log.verbose("Node \"%s\" has version \"%s\" and scheduled for upgrade." % (node_name, version))
             upgrade_list.append(node_name)
