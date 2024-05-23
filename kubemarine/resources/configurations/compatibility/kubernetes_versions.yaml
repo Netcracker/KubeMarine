@@ -1,8 +1,6 @@
 # This section can be changed manually, but it is also synchronized automatically with the 'compatibility_map' section below.
 kubernetes_versions:
 # To remove docker shim support once 1.23 is removed. https://kubernetes.io/blog/2020/12/02/dockershim-faq/#when-will-dockershim-be-removed
-  v1.23:
-    supported: true
   v1.24:
     supported: true
   v1.25:
@@ -17,6 +15,18 @@ kubernetes_versions:
     supported: true
 compatibility_map:
 # This section should be changed manually.
+  v1.24.2:
+    calico: v3.24.2
+    nginx-ingress-controller: v1.2.0
+    kubernetes-dashboard: v2.5.1
+    local-path-provisioner: v0.0.22
+    crictl: v1.25.0
+  v1.24.11:
+    calico: v3.24.2
+    nginx-ingress-controller: v1.2.0
+    kubernetes-dashboard: v2.5.1
+    local-path-provisioner: v0.0.22
+    crictl: v1.25.0
   v1.25.2:
     calico: v3.24.2
     nginx-ingress-controller: v1.4.0

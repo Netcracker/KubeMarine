@@ -124,11 +124,16 @@ def stub_detect_packages(cluster: demo.FakeKubernetesCluster, packages_hosts_stu
 def stub_associations_packages(cluster: demo.FakeKubernetesCluster, packages_hosts_stub: Dict[str, Dict[str, str]]):
     packages_list = []
     for association_params in cluster.get_associations().values():
-        pkgs = association_params['package_name']
-        if isinstance(pkgs, str):
-            pkgs = [pkgs]
-
-        packages_list.extend(pkgs)
+        pkgs = association_params.get('package_name')
+        if pkgs is not None:
+            if isinstance(pkgs, str):
+                pkgs = [pkgs]
+            else:
+                try:
+                    iter(pkgs)
+                except TypeError:
+                    pkgs = [pkgs]
+            packages_list.extend(pkgs)
 
     packages_list = list(set(packages_list))
     for package in packages_list:

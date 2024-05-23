@@ -379,22 +379,6 @@ class FlowTest(unittest.TestCase):
                                           offline=[node['address'] for node in inventory['nodes']], inaccessible=[]):
             flow.run_tasks(res, tasks)
 
-    def test_migrate_cri_all_nodes_inaccessible(self):
-        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        inventory['services']['cri'] = {
-            'containerRuntime': 'docker'
-        }
-        procedure_inventory = demo.generate_procedure_inventory('migrate_cri')
-
-        self._stub_detect_nodes_context(inventory, [], [])
-        context = demo.create_silent_context(['fake_path.yaml'], procedure='migrate_cri')
-        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
-                                 fake_shell=self.light_fake_shell)
-
-        with test_utils.assert_raises_kme(self, 'KME0006', escape=True,
-                                          offline=[node['address'] for node in inventory['nodes']], inaccessible=[]):
-            flow.run_tasks(res, tasks)
-
     def test_all_nodes_offline_check_iaas(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self._stub_detect_nodes_context(inventory, [], [])

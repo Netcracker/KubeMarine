@@ -164,33 +164,29 @@ class AssociationsEnrichment(unittest.TestCase):
 
     def test_redefine_os_specific_section(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = 'docker-ce'
-        package_associations(inventory, 'debian', 'docker')['package_name'] = expected_pkgs
+        expected_pkgs = 'containerd'
+        package_associations(inventory, 'debian', 'containerd')['package_name'] = expected_pkgs
         cluster = new_debian_cluster(inventory)
         associations = global_associations(cluster.inventory)
 
         defs = get_compiled_defaults(cluster)
-        self.assertNotEqual(expected_pkgs, defs['debian']['docker']['package_name'])
-        defs['debian']['docker']['package_name'] = expected_pkgs
+        self.assertNotEqual(expected_pkgs, defs['debian']['containerd']['package_name'])
+        defs['debian']['containerd']['package_name'] = expected_pkgs
         self.assertEqual(defs, associations,
                          "Debian associations section was not enriched")
 
     def test_propagate_global_section_to_os_specific(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs_1 = 'docker-ce'
-        expected_pkgs_2 = ['containerd=1.5.*']
-        package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs_1
-        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs_2
+        expected_pkgs = ['containerd=1.5.*']
+        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs
         cluster = new_debian_cluster(inventory)
         associations = global_associations(cluster.inventory)
         self.assertEqual({'debian'}, associations.keys(),
                          "Associations should have only OS family specific sections")
 
         defs = get_compiled_defaults(cluster)
-        self.assertNotEqual(expected_pkgs_1, defs['debian']['docker']['package_name'])
-        self.assertNotEqual(expected_pkgs_2, defs['debian']['containerd']['package_name'])
-        defs['debian']['docker']['package_name'] = expected_pkgs_1
-        defs['debian']['containerd']['package_name'] = expected_pkgs_2
+        self.assertNotEqual(expected_pkgs, defs['debian']['containerd']['package_name'])
+        defs['debian']['containerd']['package_name'] = expected_pkgs
         self.assertEqual(defs, associations,
                          "Debian associations section was not enriched")
 
@@ -468,14 +464,12 @@ class CacheVersions(unittest.TestCase):
 
     def test_skip_cache_versions_not_managed(self):
         default_conntrack = ASSOCIATIONS_DEFAULTS['debian']['conntrack']['package_name']
-        default_docker = ASSOCIATIONS_DEFAULTS['debian']['docker']['package_name'][0]
 
         set_mandatory_off(self.inventory, 'conntrack')
         cluster = self._new_cluster()
         utils.stub_associations_packages(cluster, {
             'conntrack': {host: 'conntrack=1:1.4.6-2build2' for host in self.initial_hosts},
             'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.initial_hosts},
-            'docker-ce': {host: 'docker-ce=1' for host in self.initial_hosts},
         })
 
         cache_installed_packages(cluster)
@@ -486,9 +480,6 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('curl',
                          package_associations(cluster.inventory, 'debian', 'curl')['package_name'],
                          "curl should be default because cache_version is disabled for it")
-        self.assertEqual(default_docker,
-                         package_associations(cluster.inventory, 'debian', 'docker')['package_name'][0],
-                         "docker should be default because cluster is based on containerd")
 
         finalized_inventory = utils.make_finalized_inventory(cluster, stub_cache_packages=False)
         self.assertEqual(default_conntrack,
@@ -497,9 +488,6 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('curl=7.68.0-1ubuntu2.14',
                          package_associations(finalized_inventory, 'debian', 'curl')['package_name'],
                          "curl was not detected")
-        self.assertEqual(default_docker,
-                         package_associations(finalized_inventory, 'debian', 'docker')['package_name'][0],
-                         "docker should be default because cluster is based on containerd")
 
     def test_add_node_fails_different_package_versions(self):
         cluster = self._new_cluster()

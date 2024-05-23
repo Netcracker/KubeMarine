@@ -156,7 +156,7 @@ class UpgradeCRI(unittest.TestCase):
         self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
 
         associations = {}
-        for sample_package in ('docker', 'containerd', 'haproxy', 'keepalived'):
+        for sample_package in ('containerd', 'haproxy', 'keepalived'):
             associations[sample_package] = {}
 
         self.migrate_kubemarine['upgrade'] = {'packages': {
@@ -176,7 +176,7 @@ class UpgradeCRI(unittest.TestCase):
         set_cri(self.inventory, cri)
         self.changed_config = {
             'packages': {
-                'docker': {}, 'containerdio': {}, 'containerd': {}
+                'containerdio': {}, 'containerd': {}
             }
         }
 
@@ -231,15 +231,15 @@ class UpgradeCRI(unittest.TestCase):
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
         ):
-            for cri in ('docker', 'containerd'):
-                for package_vary in ('docker', 'containerd', 'containerdio'):
-                    expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
+            cri = 'containerd'
+            for package_vary in ('containerd', 'containerdio'):
+                expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
 
-                    with self.subTest(f"{os_family}, {cri}, {package_vary}"):
-                        self.prepare_environment(cri, os_name, os_version)
-                        self.changed_config['packages'][package_vary][f"version_{os_family}"] = [self.kubernetes_version]
-                        self._run_and_check(expected_upgrade_required,
-                                            EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
+                with self.subTest(f"{os_family}, {cri}, {package_vary}"):
+                    self.prepare_environment(cri, os_name, os_version)
+                    self.changed_config['packages'][package_vary][f"version_{os_family}"] = [self.kubernetes_version]
+                    self._run_and_check(expected_upgrade_required,
+                                        EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
         if cri == 'containerd':
@@ -247,8 +247,6 @@ class UpgradeCRI(unittest.TestCase):
                 package_names = ['containerdio']
             else:
                 package_names = ['containerd']
-        else:
-            package_names = ['docker', 'containerdio']
 
         return package_names
 
@@ -317,11 +315,6 @@ class UpgradeCRI(unittest.TestCase):
     def test_changed_other_os_family_upgrade_not_required(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_rhel'] = [self.kubernetes_version]
-        self._run_and_check(False, EnrichmentStage.DEFAULT)
-
-    def test_changed_not_associated_package_upgrade_not_required(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
-        self.changed_config['packages']['docker']['version_debian'] = [self.kubernetes_version]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
@@ -590,11 +583,6 @@ class UpgradeThirdparties(unittest.TestCase):
         self.changed_config['thirdparties']['crictl'] = [get_kubernetes_versions()[-2]]
         self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
 
-    def test_docker_cri_upgrade_crictl_not_required(self):
-        set_cri(self.inventory, 'docker')
-        self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
-        self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
-
     def test_require_source_redefinition(self):
         set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
@@ -853,7 +841,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
         self.changed_config = {
             'thirdparties': {},
             'packages': {
-                'docker': {}, 'containerdio': {}, 'containerd': {}, 'haproxy': {}, 'keepalived': {},
+                'containerdio': {}, 'containerd': {}, 'haproxy': {}, 'keepalived': {},
             },
             'plugins': {},
         }
@@ -870,16 +858,13 @@ class RunPatchesSequenceTest(unittest.TestCase):
                         ('crictl', 'keepalived'),
                         ('crictl', 'nginx-ingress-controller'),
                         ('containerd', 'haproxy'),
-                        ('docker', 'calico'),
+                        ('containerd', 'calico'),
                         ('keepalived', 'calico'),
                         ('calico', 'nginx-ingress-controller'),
                 ):
                     if (first, second) == ('crictl', 'cri'):
                         if first_result == 'skipped':
-                            second = 'docker'
-                        else:
                             second = 'containerd'
-
                     with self.subTest(f"{first}: {first_result}, {second}: {second_result}"):
                         self._test_run_upgrade_two_patches((first, first_result), (second, second_result))
 
@@ -895,7 +880,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
             if result == 'failed':
                 self.inventory['services'].setdefault('thirdparties', {})['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
 
-        elif service in ('docker', 'containerd', 'keepalived', 'haproxy'):
+        elif service in ('containerd', 'keepalived', 'haproxy'):
             if result in ('run', 'failed', 'skipped'):
                 # For Debian, one of keys in compatibility map for CRI matches the CRI name.
                 # Keys in compatibility map for haproxy and keepalived always match the service name
@@ -928,7 +913,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
     def _test_run_upgrade_two_patches(self, first: Tuple[str, str], second: Tuple[str, str]):
         cri = 'containerd'
         for service, _ in (first, second):
-            if service in ('docker', 'containerd'):
+            if service == 'containerd':
                 cri = service
 
         self.prepare_environment(cri, 'ubuntu', '22.04')
@@ -955,7 +940,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
                 if result == 'failed':
                     stack.enter_context(self._assert_raises_kme())
 
-                if service in ('docker', 'containerd'):
+                if service == 'containerd':
                     service = 'cri'
 
                 patch_ids.append(f"upgrade_{re.sub(r'-', '_', service)}")

@@ -657,7 +657,6 @@ class ClusterEnrichOptimization(unittest.TestCase):
             ('install', 2),
             ('manage_psp', 3),
             ('manage_pss', 3),
-            ('migrate_cri', 3),
             ('migrate_kubemarine', 3),
             ('reboot', 2),
             ('remove_node', 3),
