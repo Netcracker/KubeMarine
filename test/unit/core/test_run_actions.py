@@ -667,7 +667,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
                 inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
                 kubernetes_version = 'v1.24.11' if procedure in 'manage_psp' else 'v1.27.8'
                 inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
-                cri = 'docker' if procedure == 'migrate_cri' else 'containerd'
+                cri = 'containerd'
                 inventory['services'].setdefault('cri', {})['containerRuntime'] = cri
 
                 args = [] if procedure in ('check_iaas', 'install') else ['fake.yaml']

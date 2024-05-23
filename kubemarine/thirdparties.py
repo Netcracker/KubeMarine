@@ -144,15 +144,13 @@ def _get_procedure_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
         procedure_thirdparties = procedure_inventory.get('upgrade', {}).get("thirdparties", {})
         procedure_thirdparties = utils.subdict_yaml(procedure_thirdparties, [context['upgrading_thirdparty']])
         upgrade_plan = [("", procedure_thirdparties)]
-    elif procedure == "migrate_cri":
-        upgrade_plan = [("", procedure_inventory.get("thirdparties", {}))]
     elif procedure == "restore":
         upgrade_plan = [("", procedure_inventory.get('restore_plan', {}).get('thirdparties', {}))]
 
     return upgrade_plan
 
 
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri', 'restore'])
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'restore'])
 def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
     procedure_plan = _get_procedure_plan(cluster)
     procedure_thirdparties = {} if not procedure_plan else procedure_plan[0][1]

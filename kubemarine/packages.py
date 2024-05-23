@@ -119,9 +119,6 @@ def _get_associations_procedure_plan(cluster: KubernetesCluster) -> List[Tuple[s
         procedure_associations = utils.subdict_yaml(procedure_associations,
                                                     _get_system_packages_support_upgrade(cluster))
         upgrade_plan = [("", procedure_associations)]
-    elif procedure == "migrate_cri":
-        procedure_associations = procedure_inventory.get("packages", {}).get("associations", {})
-        upgrade_plan = [("", procedure_associations)]
 
     return upgrade_plan
 
@@ -136,7 +133,7 @@ def _get_redefined_package_name(cluster: KubernetesCluster, associations: dict, 
     return [package_name] if isinstance(package_name, str) else package_name
 
 
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
 def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
     procedure_plan = _get_associations_procedure_plan(cluster)
     procedure_associations = {} if not procedure_plan else procedure_plan[0][1]
@@ -151,7 +148,7 @@ def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
         upgrade_inventory_packages(cluster)
 
 
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine',])
 def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
     context = cluster.context
     procedure = context["initial_procedure"]
@@ -159,9 +156,6 @@ def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
     os_family = cluster.get_os_family()
     if os_family not in get_associations_os_family_keys():
         raise errors.KME("KME0012", procedure=procedure)
-
-    if procedure == 'migrate_cri':
-        return
 
     upgrade_plan = _get_associations_procedure_plan(cluster)
     if not upgrade_plan:
