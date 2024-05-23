@@ -1002,19 +1002,22 @@ def exclude_node_from_upgrade_list(first_control_plane: NodeGroup, node_name: st
 def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: str) -> List[str]:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     try:
-        nodes_list_result = first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] && '
-                                              'sudo kubectl get nodes -o custom-columns=\''
+        nodes_list_result = (first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] || '
+                                                     'sudo cat /etc/kubernetes/nodes-k8s-versions.txt')
+                                .get_simple_out())
+        if not nodes_list_result:
+            cluster.log.debug('Cluster status file /etc/kubernetes/nodes-k8s-versions.txt unexist or empty, '
+                              'the new file will be created.')
+            nodes_list_result = first_control_plane.sudo('sudo kubectl get nodes --no-headers -o custom-columns=\''
                                               'VERSION:.status.nodeInfo.kubeletVersion,'
                                               'NAME:.metadata.name,'
-                                              'STATUS:.status.conditions[-1].type\' '
-                                              '| sed -n \'1!p\' | tr -s \' \' '
-                                              '| sed \'1 i\\# This file contains a cached list of nodes and versions '
-                                              'required to continue the Kubernetes upgrade procedure if it fails. '
-                                              'If all the nodes are completely updated or you manually fixed the '
-                                              'problem that occurred during the upgrade, you can delete it.\' '
-                                              '| sudo tee /etc/kubernetes/nodes-k8s-versions.txt; '
-                                              'sudo cat /etc/kubernetes/nodes-k8s-versions.txt') \
-            .get_simple_out()
+                                              'STATUS:.status.conditions[-1].type\'').get_simple_result().stdout
+            nodes_list_result = (f'# This file contains a cached list of nodes and versions '
+                                   'required to continue the Kubernetes upgrade procedure if it fails. '
+                                   'If all the nodes are completely updated or you manually fixed the '
+                                   f'problem that occurred during the upgrade, you can delete it.\n{nodes_list_result}')
+            first_control_plane.put(io.StringIO(nodes_list_result), '/etc/kubernetes/nodes-k8s-versions.txt',
+                                    backup=False, sudo=True)
         cluster.log.verbose("Remote response with nodes description:\n%s" % nodes_list_result)
     except Exception as e:
         cluster.log.warning("Failed to detect cluster status before upgrade. All nodes will be scheduled for upgrade.")
@@ -1033,7 +1036,7 @@ def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: st
         # comes from nodes-k8s-versions.txt content as a comment symbol
         if line[0] == '#':
             continue
-        version, node_name, status = line.split(' ')
+        version, node_name, status = list(filter(len, line.split(' ')))
         if version != future_version:
             cluster.log.verbose("Node \"%s\" has version \"%s\" and scheduled for upgrade." % (node_name, version))
             upgrade_list.append(node_name)
