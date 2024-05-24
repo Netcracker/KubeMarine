@@ -854,7 +854,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
         for first_result in ('skipped', 'run'):
             for second_result in ('skipped', 'run', 'failed'):
                 for first, second in (
-                        ('crictl', 'cri'),
+                        ('crictl', 'containerd'),
                         ('crictl', 'keepalived'),
                         ('crictl', 'nginx-ingress-controller'),
                         ('containerd', 'haproxy'),
@@ -862,9 +862,6 @@ class RunPatchesSequenceTest(unittest.TestCase):
                         ('keepalived', 'calico'),
                         ('calico', 'nginx-ingress-controller'),
                 ):
-                    if (first, second) == ('crictl', 'cri'):
-                        if first_result == 'skipped':
-                            second = 'containerd'
                     with self.subTest(f"{first}: {first_result}, {second}: {second_result}"):
                         self._test_run_upgrade_two_patches((first, first_result), (second, second_result))
 
@@ -912,18 +909,9 @@ class RunPatchesSequenceTest(unittest.TestCase):
 
     def _test_run_upgrade_two_patches(self, first: Tuple[str, str], second: Tuple[str, str]):
         cri = 'containerd'
-        for service, _ in (first, second):
-            if service == 'containerd':
-                cri = service
-
         self.prepare_environment(cri, 'ubuntu', '22.04')
 
         service, result = first
-
-        if service == 'crictl' and result == 'skipped' and cri == 'docker':
-            # Let's prepare inventory as the patch should run. It should not be run actually for docker CRI.
-            result = 'run'
-
         self._prepare_environment_for_service_upgrade(service, result)
         service, result = second
         self._prepare_environment_for_service_upgrade(service, result)
@@ -957,7 +945,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
             if service == 'crictl':
                 type_ = 'thirdparty'
                 mock_context = mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__)
-            elif service in ('docker', 'containerd'):
+            elif service == 'containerd':
                 type_ = 'cri'
                 mock_context = mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__)
             elif service in ('keepalived', 'haproxy'):

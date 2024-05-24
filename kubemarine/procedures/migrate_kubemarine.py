@@ -82,16 +82,6 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
         super().__init__(software_name, k8s_versions)
         self._destination = thirdparties.get_thirdparty_destination(self.software_name)
 
-    def is_patch_relevant(self, cluster: KubernetesCluster) -> bool:
-        relevant = super().is_patch_relevant(cluster)
-        if relevant and self._destination not in cluster.inventory['services']['thirdparties']:
-            version = kubernetes.get_kubernetes_version(cluster.inventory)
-            cri_impl = cri.get_cri_impl(cluster.inventory)
-            cluster.log.info(f"Patch is not relevant for Kubernetes {version}, based on {cri_impl}")
-            relevant = False
-
-        return relevant
-
     def _upgrade(self, cluster: KubernetesCluster) -> None:
         cluster.log.info(f"Reinstalling third-party {self._destination!r}")
         self._run(cluster)
