@@ -5,26 +5,6 @@
 #
 # After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 docker:
-  v1.23.1:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_rhel9: 20.10*
-    version_debian: 5:20.10.*
-  v1.23.6:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_rhel9: 20.10*
-    version_debian: 5:20.10.*
-  v1.23.11:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_rhel9: 20.10*
-    version_debian: 5:20.10.*
-  v1.23.17:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_rhel9: 20.10*
-    version_debian: 5:20.10.*
   v1.24.2:
     version_rhel: 19.03*
     version_rhel8: 19.03*
@@ -111,14 +91,6 @@ docker:
     version_rhel9: 20.10*
     version_debian: 5:20.10.*
 containerd:
-  v1.23.1:
-    version_debian: 1.5.*
-  v1.23.6:
-    version_debian: 1.5.*
-  v1.23.11:
-    version_debian: 1.5.*
-  v1.23.17:
-    version_debian: 1.5.*
   v1.24.2:
     version_debian: 1.6.*
   v1.24.11:
@@ -154,26 +126,6 @@ containerd:
   v1.29.1:
     version_debian: 1.6.*
 containerdio:
-  v1.23.1:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-    version_debian: 1.5.*
-  v1.23.6:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-    version_debian: 1.5.*
-  v1.23.11:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-    version_debian: 1.5.*
-  v1.23.17:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-    version_debian: 1.5.*
   v1.24.2:
     version_rhel: 1.6*
     version_rhel8: 1.6*
