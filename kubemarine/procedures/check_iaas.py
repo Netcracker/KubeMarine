@@ -634,17 +634,11 @@ def suspend_firewalld(cluster: KubernetesCluster) -> Iterator[None]:
     firewalld_statuses = system.fetch_firewalld_status(group)
     stop_firewalld_group = firewalld_statuses.get_nodes_group_where_value_in_stdout("active (running)")
 
-    nodes_to_rollback = cluster.make_group([])
     try:
-        try:
-            nodes_to_rollback = system.stop_service(stop_firewalld_group, "firewalld").get_group()
-        except GroupException as e:
-            nodes_to_rollback = e.get_exited_nodes_group()
-            raise
-
+        system.stop_service(stop_firewalld_group, "firewalld")
         yield
     finally:
-        system.start_service(nodes_to_rollback, "firewalld")
+        system.start_service(stop_firewalld_group, "firewalld", warn=True)
 
 
 def get_host_network_ports(_: KubernetesCluster) -> Dict[str, Set[str]]:
@@ -793,22 +787,17 @@ def get_input_ports(cluster: KubernetesCluster, group: NodeGroup, subnet_type: s
 def assign_ips(group: NodeGroup,
                host_to_ip: Dict[str, str], host_to_inf: Dict[str, str],
                prefix: int) -> Iterator[None]:
-    group_to_rollback = group
     try:
         # Create alias from the node network interface for the subnet on every node
-        try:
-            with group.new_executor() as exe:
-                for node in exe.group.get_ordered_members_list():
-                    host = node.get_host()
-                    node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
-        except GroupException as e:
-            group_to_rollback = e.get_exited_nodes_group()
-            raise
+        with group.new_executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
+                node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
 
         yield
     finally:
         # Remove the created aliases from network interfaces
-        with group_to_rollback.new_executor() as exe:
+        with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 node.sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",

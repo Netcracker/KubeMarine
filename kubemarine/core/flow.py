@@ -55,9 +55,10 @@ class Flow(ABC):
             utils.prepare_dump_directory(context)
             resources.logger()
             self._run(resources)
-        except Exception as exc:
+        except (Exception, KeyboardInterrupt) as exc:
             logger = resources.logger_if_initialized()
             if isinstance(exc, errors.FailException):
+                # pylint: disable-next=no-member
                 utils.do_fail(exc.message, exc.reason, exc.hint, logger=logger)
             else:
                 utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
@@ -121,7 +122,7 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
             act.run(resources)
             resources.collect_action_result()
             successfully_performed.append(act.identifier)
-        except Exception:
+        except (Exception, KeyboardInterrupt):  # even on KeyboardInterrupt we have to preserve what we have done
             if successfully_performed:
                 _post_process_actions_group(resources, cluster, successfully_performed, failed=True)
 
@@ -380,7 +381,7 @@ def run_tasks_recursive(tasks: dict, final_task_names: List[str], cluster: c.Kub
             try:
                 task(cluster)
                 add_task_to_proceeded_list(cluster, __task_name)
-            except Exception as exc:
+            except (Exception, KeyboardInterrupt) as exc:
                 raise errors.FailException(
                     "TASK FAILED %s" % __task_name, exc,
                     hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_name)

@@ -16,6 +16,7 @@ import concurrent
 import io
 import random
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +32,7 @@ import fabric.transfer  # type: ignore[import-untyped]
 
 import invoke
 
-from kubemarine.core import log, static, errors
+from kubemarine.core import log, static, errors, connections
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 
@@ -132,42 +133,54 @@ class RunnersResult:
         return not self.stdout and not self.stderr and self.exited == 1
 
 
-class UnexpectedExit(Exception):
+class Failure(Exception):
     def __init__(self, result: RunnersResult):
         self.result = result
 
     def __str__(self) -> str:
-        ret = [
+        ret = self._header()
+        repr_out = self.result.repr_out(hide_already_printed=True)
+        if repr_out:
+            ret.append(repr_out)
+
+        return "\n".join(ret)
+
+    def _header(self) -> List[str]:
+        return []
+
+
+class CommandInterrupted(Failure, KeyboardInterrupt):
+    def _header(self) -> List[str]:
+        return [
+            "\n",
+            f"Command: {self.result.command!r}\n",
+            f"Exit code: {self.result.exited}\n",
+        ]
+
+
+class UnexpectedExit(Failure):
+    def _header(self) -> List[str]:
+        return [
             "Encountered a bad command exit code!\n",
             f"Command: {self.result.command!r}\n",
             f"Exit code: {self.result.exited}\n",
         ]
-        repr_out = self.result.repr_out(hide_already_printed=True)
-        if repr_out:
-            ret.append(repr_out)
-
-        return "\n".join(ret)
 
 
-class CommandTimedOut(Exception):
+class CommandTimedOut(Failure):
     def __init__(self, result: RunnersResult, timeout: int):
-        self.result = result
+        super().__init__(result)
         self.timeout = timeout
 
-    def __str__(self) -> str:
-        ret = [
+    def _header(self) -> List[str]:
+        return [
             f"Command did not complete within {self.timeout} seconds!\n",
             f"Command: {self.result.command!r}\n",
         ]
-        repr_out = self.result.repr_out(hide_already_printed=True)
-        if repr_out:
-            ret.append(repr_out)
-
-        return "\n".join(ret)
 
 
 Token = int
-GenericResult = Union[Exception, RunnersResult, fabric.transfer.Result]
+GenericResult = Union[BaseException, RunnersResult, fabric.transfer.Result]
 HostToResult = Dict[str, GenericResult]
 TokenizedResult = OrderedDict[Token, GenericResult]
 
@@ -191,6 +204,11 @@ class BaseExecutorException(BaseException):
         # for the reason that the user code might want to print output of some commands in the batch,
         # but failed to do that because of the exception.
         return represent_results(self.results, hide_already_printed=True)
+
+
+class GroupInterrupt(BaseExecutorException, KeyboardInterrupt):
+    def __str__(self) -> str:
+        return '\n' + super().__str__()
 
 
 class GroupException(BaseExecutorException, errors.GroupException):
@@ -218,7 +236,7 @@ class Callback(ABC):
         pass
 
 
-_RawHostToResult = Dict[str, Union[Exception, fabric.runners.Result, fabric.transfer.Result]]
+_RawHostToResult = Dict[str, Union[BaseException, fabric.runners.Result, fabric.transfer.Result]]
 
 _Action = Tuple[str, tuple, dict]
 _PayloadItem = Tuple[_Action, Optional[Callback], Token]
@@ -238,16 +256,17 @@ class RawExecutor:
         self._last_token = -1
         self._last_results: Dict[str, TokenizedResult] = {}
         self._command_separator = ''.join(random.choice('=-_') for _ in range(32))
-        self._supported_args = {'hide', 'warn', 'timeout', 'env', 'out_stream', 'err_stream'}
+        self._supported_args = {'hide', 'warn', 'pty', 'timeout', 'env', 'out_stream', 'err_stream'}
+        self._interrupt_queue = threading.Semaphore(0)
         self._closed = False
 
     def __enter__(self: _T) -> _T:
         self._check_closed()
         return self
 
-    def __exit__(self, exc_type: Optional[Type[Exception]], exc_value: Optional[Exception],
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_value: Optional[BaseException],
                  tb: Optional[TracebackType]) -> None:
-        if self._connections_queue:
+        if not isinstance(exc_value, KeyboardInterrupt) and self._connections_queue:
             self.flush()
 
         self._closed = True
@@ -266,7 +285,7 @@ class RawExecutor:
             if arg in ('out_stream', 'err_stream') and kwargs1.get(arg) is kwargs2.get(arg):
                 continue
 
-            if arg in ('hide', 'warn') and kwargs1.get(arg) == kwargs2.get(arg):
+            if arg in ('hide', 'warn', 'pty') and kwargs1.get(arg) == kwargs2.get(arg):
                 continue
 
             # If any action has 'env' param, they are not mergeable.
@@ -286,7 +305,7 @@ class RawExecutor:
             reparsed_results[host] = conn_results
 
             runner_exception = None
-            if isinstance(raw_result, (invoke.UnexpectedExit, invoke.CommandTimedOut)):
+            if isinstance(raw_result, (invoke.UnexpectedExit, invoke.CommandTimedOut, connections.CommandInterrupted)):
                 runner_exception = raw_result
                 raw_result = raw_result.result
 
@@ -301,7 +320,10 @@ class RawExecutor:
                 reparsed_result: GenericResult = result
                 _, callback, token = payloads[i]
                 if i == len(results) - 1 and runner_exception is not None:
-                    if isinstance(runner_exception, invoke.UnexpectedExit):
+                    if isinstance(runner_exception, connections.CommandInterrupted):
+                        # Part of commands were successful until the last reparsed command interrupted.
+                        reparsed_result = CommandInterrupted(result)
+                    elif isinstance(runner_exception, invoke.UnexpectedExit):
                         # Commands were successful until the last command in the batch.
                         reparsed_result = UnexpectedExit(result)
                     if isinstance(runner_exception, invoke.CommandTimedOut):
@@ -325,13 +347,16 @@ class RawExecutor:
         # unpack last action in list of payloads
         _, _, kwargs = payloads[-1][0]
         hide = kwargs.get('hide', False)
+        pty = kwargs.get('pty', False)
 
         # Raw stdout may not fully contain the separator,
-        # if the channel was closed due to a timeout while reading the separator from the remote output.
+        # if the channel was interrupted or closed due to a timeout, while reading the separator from the remote output.
         # In this case the part of the separator becomes a part of the reparsed command output.
         # This is acceptable as the situation is considered extremely rare,
         # and because the only we can do with not finished command is to print its partial output.
-        raw_stderrs = result.stderr.split(self._command_separator)
+
+        # stdout and stderr are combined if pty.
+        raw_stderrs = [] if pty else result.stderr.split(self._command_separator)
         raw_stdouts = result.stdout.split(self._command_separator)
 
         results = []
@@ -343,14 +368,16 @@ class RawExecutor:
         err_i = 0
         has_next = True
         while has_next:
-            has_next = out_i < len(raw_stdouts) and err_i < len(raw_stderrs)
+            has_next = out_i < len(raw_stdouts) and (pty or err_i < len(raw_stderrs))
             if has_next:
                 stdout = raw_stdouts[out_i]
-                stderr = raw_stderrs[err_i]
+                if not pty:
+                    stderr = raw_stderrs[err_i]
                 if result_i > 0:
                     # cut LF from the previous "echo <separator>" command
                     stdout = stdout[1:]
-                    stderr = stderr[1:]
+                    if not pty:
+                        stderr = stderr[1:]
 
                 has_next = out_i + 1 < len(raw_stdouts)
                 if has_next:
@@ -360,7 +387,7 @@ class RawExecutor:
                     else:
                         has_next = False
 
-                has_next = has_next and err_i + 1 < len(raw_stderrs)
+                has_next = has_next and (pty or err_i + 1 < len(raw_stderrs))
 
             action, _, _ = payloads[result_i]
             command: str = action[1][0]
@@ -375,15 +402,21 @@ class RawExecutor:
 
         return results
 
-    def _get_separator(self, warn: bool) -> str:
+    def _get_separator(self, kwargs: dict) -> str:
+        warn: bool = kwargs.get('warn', False)
+        pty: bool = kwargs.get('pty', False)
         if warn:
             separator_symbol = ";"
         else:
             separator_symbol = "&&"
 
-        return f" {separator_symbol} " \
-               f"printf \"%s\\n$?\\n%s\\n\" \"{self._command_separator}\" \"{self._command_separator}\" {separator_symbol} " \
-               f"echo \"{self._command_separator}\" 1>&2 {separator_symbol} "
+        separator = (
+            f" {separator_symbol} "
+            f"printf \"%s\\n$?\\n%s\\n\" \"{self._command_separator}\" \"{self._command_separator}\" {separator_symbol} ")
+        if not pty:
+            separator += f"echo \"{self._command_separator}\" 1>&2 {separator_symbol} "
+
+        return separator
 
     def _merge_actions(self, payload_items: List[_PayloadItem]) -> List[List[_PayloadItem]]:
         merged_payloads: List[List[_PayloadItem]] = []
@@ -454,7 +487,7 @@ class RawExecutor:
         return self._last_results
 
     def get_flat_result(self) -> Mapping[str, Sequence[GenericResult]]:
-        return {host: list(res.values()) for host, res in self._last_results.items()}
+        return get_flat_result(self._last_results)
 
     def flush(self) -> None:
         """
@@ -463,7 +496,7 @@ class RawExecutor:
         :return: grouped tokenized results per connection.
         """
         self._check_closed()
-        self._last_results = {}
+        self._last_results.clear()
 
         if not self._connections_queue:
             self.logger.verbose('Queue is empty, nothing to perform')
@@ -479,34 +512,30 @@ class RawExecutor:
                 batch = {host: payloads for host, payloads in batch.items()
                          # failed command is always last if present
                          if host not in self._last_results
-                         or not isinstance(list(self._last_results[host].values())[-1], Exception)}
+                         or not isinstance(list(self._last_results[host].values())[-1], BaseException)}
 
                 retry = 0
-                batch_results: Dict[str, TokenizedResult] = {}
                 while True:
                     retry += 1
 
-                    parsed_results = self._do_batch(batch, TPE)
-                    for host, tokenized_results in parsed_results.items():
-                        batch_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
-
-                    batch = self._get_remained_batch(batch, batch_results)
+                    self._do_batch(batch, TPE, self._last_results)
+                    batch = self._get_remained_batch(batch)
 
                     if (not batch or retry >= static.GLOBALS['workaround']['retries']
-                            or not self._try_workaround(batch, batch_results, TPE)):
+                            or not self._try_workaround(batch, TPE)):
                         break
 
                     self.logger.verbose('Retrying #%s...' % retry)
                     time.sleep(static.GLOBALS['workaround']['delay_period'])
 
-                for host, tokenized_results in batch_results.items():
-                    self._last_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
-
         self._connections_queue = {}
 
         for results in self._last_results.values():
-            if any(isinstance(result, Exception) for _, result in results.items()):
+            if any(isinstance(result, BaseException) for result in results.values()):
                 raise GroupException(self.get_flat_result())
+
+    def interrupt(self) -> None:
+        self._interrupt_queue.release()
 
     def _prepare_merged_action(self, host: str, payloads: List[_PayloadItem]) -> _Action:
         # unpack last action in list of payloads
@@ -532,8 +561,7 @@ class RawExecutor:
             if do_type == 'sudo':
                 precommand = 'sudo '
 
-            warn: bool = kwargs.get('warn', False)
-            separator = self._get_separator(warn)
+            separator = self._get_separator(kwargs)
 
             merged_command = (separator + precommand).join(commands)
             args = (merged_command,)
@@ -559,45 +587,90 @@ class RawExecutor:
                     writer: log.LoggerWriter = kwargs[stream_key]
                     writer.flush(remainder=True)
 
-    def _do_batch(self, batch: Dict[str, List[_PayloadItem]], tpe: ThreadPoolExecutor) -> Dict[str, TokenizedResult]:
+    def _do_batch(self, batch: Dict[str, List[_PayloadItem]], tpe: ThreadPoolExecutor,
+                  capture_results: Dict[str, TokenizedResult]) -> None:
         results: _RawHostToResult = {}
         futures: Dict[str, concurrent.futures.Future] = {}
 
         def safe_exec(result_map: Dict[str, Any], host: str, call: Callable[[], Any]) -> None:
             try:
                 result_map[host] = call()
-            except Exception as e:
+            except BaseException as e:  # including KeyboardInterrupt
                 results[host] = e
 
-        for host, payloads in batch.items():
-            cxn = self.connection_pool.get_connection(host)
-            do_type, args, kwargs = self._prepare_merged_action(host, payloads)
-            # pylint: disable-next=cell-var-from-loop
-            safe_exec(futures, host, lambda: tpe.submit(getattr(cxn, do_type), *args, **kwargs))
+        interrupted = False
+        try:
+            while True:
+                try:
+                    if not interrupted:
+                        for host, payloads in batch.items():
+                            cxn = self.connection_pool.get_connection(host)
+                            cxn.KM_start()
 
-        for host, future in futures.items():
-            # We try to shut down ThreadPoolExecutor gracefully with joining of all the threads.
-            # This makes usage of future timeout useless, as the operation is not stopped.
-            # Instead, we always pass timeout for run/sudo and so have CommandTimedOut.
-            # For put/get fabric & paramiko do not offer timeout, so transfer cannot be stopped currently.
+                            do_type, args, kwargs = self._prepare_merged_action(host, payloads)
+                            # pylint: disable-next=cell-var-from-loop
+                            safe_exec(futures, host, lambda: tpe.submit(getattr(cxn, do_type), *args, **kwargs))
 
-            # pylint: disable-next=cell-var-from-loop
-            safe_exec(results, host, lambda: future.result(timeout=None))
+                    # Timeout is implemented through timeout for run/sudo that finishes the future eventually.
+                    # For put/get fabric & paramiko do not offer timeout, so transfer can be stopped only using SIGINT.
+                    # The following short-time sleeps allow to implement interruption.
+                    not_done = set(futures.values())
+                    while not_done := concurrent.futures.wait(not_done, timeout=connections.input_sleep).not_done:
+                        if self._interrupt_queue.acquire(blocking=False):  # pylint: disable=consider-using-with
+                            raise KeyboardInterrupt()
+
+                except KeyboardInterrupt:
+                    interrupted = True
+                    for host, payloads in batch.items():
+                        cxn = self.connection_pool.get_connection(host)
+                        cxn.KM_interrupt()
+
+                    continue
+
+                break
+        finally:
+            for host, future in futures.items():
+                # Only obtain the result of finished futures, thus no timeout
+                # pylint: disable-next=cell-var-from-loop
+                safe_exec(results, host, lambda: future.result(timeout=None))
 
         self._flush_logger_writers(batch)
 
-        return self._reparse_results(results, batch)
+        parsed_results = self._reparse_results(results, batch)
+        for host, tokenized_results in parsed_results.items():
+            capture_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
 
-    def _get_remained_batch(self, batch: Dict[str, List[_PayloadItem]],
-                            batch_results: Dict[str, TokenizedResult]) -> Dict[str, List[_PayloadItem]]:
+        if interrupted:
+            flat_results = get_flat_result(capture_results)
+            timed_out = False
+            # Check if at least one command was really interrupted.
+            # See also `connections.RemoteRunner.wait()`.
+            for flat_result in flat_results.values():
+                for result in flat_result:
+                    if isinstance(result, KeyboardInterrupt):
+                        raise GroupInterrupt(flat_results)
+
+                    timed_out = timed_out or isinstance(result, CommandTimedOut)
+
+            # No command was interrupted using real SIGINT character sent, but some command was timed out.
+            # This case will be processed later.
+            if timed_out:
+                return
+
+            # The commands were really finished, but we still need to stop execution of main thread.
+            # It seems that no need to print the output.
+            raise KeyboardInterrupt()
+
+    def _get_remained_batch(self, batch: Dict[str, List[_PayloadItem]]) -> Dict[str, List[_PayloadItem]]:
         remained_batch = {}
         for host, payloads in batch.items():
             remained_payloads = []
             for payload in payloads:
                 _, _, token = payload
+                tokenized_results = self._last_results[host]
                 # Command is not yet executed or failed.
                 # Not yet executed commands can be only after the failed command.
-                if token not in batch_results[host] or isinstance(batch_results[host][token], Exception):
+                if token not in tokenized_results or isinstance(tokenized_results[token], BaseException):
                     remained_payloads.append(payload)
 
             if remained_payloads:
@@ -605,13 +678,12 @@ class RawExecutor:
 
         return remained_batch
 
-    def _try_workaround(self, batch: Dict[str, List[_PayloadItem]],
-                        batch_results: Dict[str, TokenizedResult], tpe: ThreadPoolExecutor) -> bool:
+    def _try_workaround(self, batch: Dict[str, List[_PayloadItem]], tpe: ThreadPoolExecutor) -> bool:
         not_booted = []
 
         for host in batch:
             # failed command is always last
-            exception = list(batch_results[host].values())[-1]
+            exception = list(self._last_results[host].values())[-1]
             if isinstance(exception, CommandTimedOut):
                 self.logger.verbose("Command timed out at %s: %s" % (host, str(exception.result)))
                 return False
@@ -638,7 +710,7 @@ class RawExecutor:
             results = self._wait_for_boot_with_executor(not_booted, tpe)
             # if there are not booted nodes, but we succeeded to wait for at least one is booted,
             # we can continue execution
-            if all(isinstance(result, Exception) for result in results.values()):
+            if all(isinstance(result, BaseException) for result in results.values()):
                 return False
 
         return True
@@ -673,7 +745,7 @@ class RawExecutor:
             # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
             results.update(self._do_nopasswd(left_nodes, tpe, "last reboot"))
             left_nodes = [host for host, result in results.items()
-                          if (isinstance(result, Exception)
+                          if (isinstance(result, BaseException)
                               # Something is wrong with sudo access. Node is active.
                               and not self.is_require_nopasswd_exception(result)
                               # If not a connection-related exception, do not try to connect further
@@ -687,11 +759,6 @@ class RawExecutor:
 
             if not left_nodes or waited >= timeout:
                 break
-
-            for host, exc in results.items():
-                if isinstance(exc, Exception) and not self._is_allowed_connection_exception(str(exc)):
-                    self.logger.verbose("Unexpected exception at %s, node is considered as not booted: %s"
-                                        % (host, str(exc)))
 
             self.logger.verbose("Nodes %s are not ready yet, remaining time to wait %i"
                                 % (left_nodes, timeout - waited))
@@ -738,14 +805,15 @@ class RawExecutor:
         # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
         token = self._next_token()
         action: _Action = ("run", (f"sudo -S -p '{prompt}' {command}",),
-                           {"hide": True, "watchers": [NoPasswdResponder()]})
+                           {"hide": True, "pty": True, "watchers": [NoPasswdResponder()]})
         payload: _PayloadItem = (action, None, token)
         batch = {host: [payload] for host in left_nodes}
-        parsed_results = self._do_batch(batch, tpe)
+        parsed_results: Dict[str, TokenizedResult] = {}
+        self._do_batch(batch, tpe, parsed_results)
         return {host: next(iter(results.values())) for host, results in parsed_results.items()}
 
     @staticmethod
-    def is_require_nopasswd_exception(exc: Exception) -> bool:
+    def is_require_nopasswd_exception(exc: BaseException) -> bool:
         return isinstance(exc, invoke.exceptions.Failure) \
                and isinstance(exc.reason, invoke.exceptions.ResponseNotAccepted)
 
@@ -781,7 +849,11 @@ class RawExecutor:
             cxn.close()
 
 
-def represent_results(flat_results: Mapping[str, Sequence[RESULT]], hide_already_printed: bool = True) -> str:
+def get_flat_result(results: Dict[str, TokenizedResult]) -> Mapping[str, Sequence[GenericResult]]:
+    return {host: list(res.values()) for host, res in results.items()}
+
+
+def represent_results(flat_results: Mapping[str, Sequence[GenericResult]], hide_already_printed: bool = True) -> str:
     host_outputs = []
     for host, results in flat_results.items():
         output = f"{host}:"
@@ -796,7 +868,7 @@ def represent_results(flat_results: Mapping[str, Sequence[RESULT]], hide_already
                 output += '\n\t' + repr_out.replace('\n', '\n\t')
 
         # The exception may be only the last in the list. We are also sure to have at least one result per node.
-        if isinstance(results[-1], Exception):
+        if isinstance(results[-1], BaseException):
             exception = errors.wrap_kme_exception(results[-1])
             output += '\n\t' + str(exception).replace('\n', '\n\t')
 

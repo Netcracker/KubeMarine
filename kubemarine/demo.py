@@ -298,7 +298,7 @@ class FakeResources(FakeClusterResources):
         utils.dump_file(self, yaml.dump(finalized_inventory), finalized_filename)
 
 
-class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
+class FakeConnection(connections.Connection):
 
     def __init__(self, ip: str, fake_shell: FakeShell, fake_fs: FakeFS, **kw: Any):
         super().__init__(ip, **kw)
@@ -349,7 +349,7 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                 raise Exception('Fake result not found for requested action type \'%s\' and command %s' % (do_type, [command]))
 
             timeout_exception = None
-            if isinstance(found_result, Exception):
+            if isinstance(found_result, BaseException):
                 if i > 0:
                     raise ValueError("Exception can be thrown only for the whole command")
                 elif isinstance(found_result, CommandTimedOut):
@@ -456,7 +456,7 @@ class FakeConnectionPool(connections.ConnectionPool):
 
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,
-                                        inline_ssh_env: bool = True) -> fabric.connection.Connection:
+                                        inline_ssh_env: bool = True) -> FakeConnection:
         return FakeConnection(
             ip, self.fake_shell, self.fake_fs, gateway=gateway,
             user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),

@@ -31,6 +31,10 @@ def get_kme_dictionary() -> dict:
         "KME0000": {
             "name": "Test exception"
         },
+        "KME0001": {
+            "instance": KeyboardInterrupt,
+            "name": "Interrupted{reason}"
+        },
         "KME0002": {
             "instance": GroupException,
             "name": "Remote group exception\n{reason}"
@@ -138,23 +142,23 @@ class KME0006(BaseKME):
 
 
 class FailException(Exception):
-    def __init__(self, message: str = '', reason: Exception = None, hint: str = '') -> None:
+    def __init__(self, message: str = '', reason: BaseException = None, hint: str = '') -> None:
         super().__init__(message)
         self.message = message
         self.reason = reason
         self.hint = hint
 
 
-def wrap_kme_exception(reason: Exception) -> Exception:
+def wrap_kme_exception(reason: BaseException) -> BaseException:
     for dictionary_code, dictionary_kme in get_kme_dictionary().items():
-        exception_class: Type[Exception] = dictionary_kme.get('instance')
+        exception_class: Type[BaseException] = dictionary_kme.get('instance')
         if exception_class is not None and isinstance(reason, exception_class):
             return KME(dictionary_code, reason=reason)
 
     return reason
 
 
-def pretty_print_error(message: str = '', reason: Exception = None, log: klog.EnhancedLogger = None) -> None:
+def pretty_print_error(message: str = '', reason: BaseException = None, log: klog.EnhancedLogger = None) -> None:
     """
     Parses the passed error and nicely displays its name and structure depending on what was passed.
     The method outputs to stdout by default, but will use the logger if one is specified.

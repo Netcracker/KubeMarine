@@ -258,27 +258,72 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
 
     def run(self, command: str,
             *,
-            warn: bool = False, hide: bool = True,
+            warn: bool = False, hide: bool = True, pty: bool = False,
             env: Dict[str, str] = None, timeout: int = None,
             callback: Callback = None) -> GROUP_RUN_TYPE:
+        """
+        Execute `fabric.Connection.run()` for each node in the group.
+        Most of kwargs have the same semantics as in `invoke.Runner.run()`
+        with probably changed default values, except the `callback`.
+
+        :param command: the shell command to execute
+        :param warn: whether to continue on non-zero code, instead of raising a `.GroupException`
+        :param hide:
+            Do not copy stdout / stderr from remote to local.
+            See `invoke.Runner.run()` for details.
+        :param pty:
+            Enables the actual pseudoterminal. See `invoke.Runner.run()` for details.
+
+            The following properties should be kept in mind:
+
+            - The remote command may behave interactively with `pty=True`, e.g. apply paging, coloring,
+              and hang up expecting user input. This may be mitigated by the command-specific flags and env variables.
+
+            - Stdout and stderr are combined. If parsing is required, it should be resistant
+              to potentially broken formatting due to unexpected errors / warnings redirected from stderr.
+              It may be useful to redirect unnecessary stream to /dev/null
+
+            - The command can be interrupted using SIGINT or ^C, or `timeout`.
+              In case of a Ctrl + C, the derived KeyboardInterrupt is thrown containing current output.
+
+        :param env: a dict to update the remote environment.
+        :param timeout:
+            Close the channel and raise `.GroupException` containing `executor.CommandTimedOut`
+            after the specified number of seconds.
+            Global timeout for all operations: 2700 seconds.
+            **Note:** this does not interrupt the remote command unless `pty=True` is additionally used.
+        :param callback:
+            Callback to process the result of commands.
+            See `executor.Callback.accept()` for details.
+        :return:
+            Depending on a specific class, real `executor.RunnersResult`,
+            or token to obtain the result of deferred command.
+        """
         caller: Optional[Dict[str, object]] = None
         if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("run", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, pty=pty,
+                         env=env, timeout=timeout, callback=callback)
 
     def sudo(self, command: str,
              *,
-             warn: bool = False, hide: bool = True,
+             warn: bool = False, hide: bool = True, pty: bool = False,
              env: Dict[str, str] = None, timeout: int = None,
              callback: Callback = None) -> GROUP_RUN_TYPE:
+        """
+        Execute `fabric.Connection.sudo()` for each node in the group.
+
+        See `.run()` for details.
+        """
         caller: Optional[Dict[str, object]] = None
         if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("sudo", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, pty=pty,
+                         env=env, timeout=timeout, callback=callback)
 
     @abstractmethod
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -677,7 +722,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
     def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout: int = None) -> RunnersGroupResult:
         results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
-        if any(isinstance(result, Exception) or result == initial_boot_history.get(host)
+        if any(isinstance(result, BaseException) or result == initial_boot_history.get(host)
                for host, result in results.items()):
             raise GroupResultException(NodeGroupResult(self.cluster, results))
 
@@ -737,7 +782,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
                     if isinstance(result, UnexpectedExit):
                         logger.debug(result.result.stderr)
                         break
-                    if isinstance(result, Exception):
+                    if isinstance(result, BaseException):
                         raise
 
                     del remained_commands[0]
@@ -854,7 +899,7 @@ class GroupException(exe.GroupException):
         """
         excepted_hosts: List[str] = []
         for host, results in self.results.items():
-            if any(isinstance(result, Exception) for result in results):
+            if any(isinstance(result, BaseException) for result in results):
                 excepted_hosts.append(host)
         return excepted_hosts
 

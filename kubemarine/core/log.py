@@ -293,6 +293,8 @@ class Log:
 
 
 class LoggerWriter:
+    stream = sys.stdout.isatty()
+
     def __init__(self, logger: EnhancedLogger, caller: dict, prefix: str) -> None:
         self.logger = logger
         self.caller = caller
@@ -300,8 +302,11 @@ class LoggerWriter:
         self.buf = ""
 
     def write(self, message: str) -> None:
-        # Both remote stderr and stdout are printed to local stdout
-        sys.stdout.write(message)
+        # Both remote stderr and stdout are printed to local stdout.
+        # For a non-tty stdout, we should not stream the remote (potentially pty) output immediately.
+        # The output should be buffered by lines with converted CRs. See `LoggerWriter._log()`.
+        if LoggerWriter.stream:
+            sys.stdout.write(message)
 
         lines = message.split('\n')
         for line in lines[:-1]:
@@ -314,7 +319,13 @@ class LoggerWriter:
             self._log()
 
     def _log(self) -> None:
-        self.logger.log(logging.DEBUG, self.buf, extra={
+        line = self.buf
+        # Algorithms of CR conversion respects the `connections.RemoteRunner.generate_result()`.
+        if not LoggerWriter.stream:
+            line = line.rstrip('\r').replace("\r", "\n")
+            sys.stdout.write(line + '\n')
+
+        self.logger.log(logging.DEBUG, line, extra={
             'real_caller': self.caller, 'prefix': self.prefix, 'ignore_stdout': True
         })
         self.buf = ""

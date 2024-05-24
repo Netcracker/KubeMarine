@@ -46,7 +46,8 @@ class CLIAction(Action):
             sys.exit(1)
 
         no_stream: bool = self.do_args['no_stream']
-        result = executors_group.sudo(" ".join(self.remote_args), hide=no_stream, warn=True)
+        pty: bool = self.do_args['pty']
+        result = executors_group.sudo(" ".join(self.remote_args), hide=no_stream, pty=pty, warn=True)
         if no_stream:
             print(result)  # pylint: disable=bad-builtin
 
@@ -83,6 +84,10 @@ def create_context(cli_arguments: List[str] = None) -> dict:
     parser.add_argument('--no_stream',
                             action='store_true',
                             help='do not stream all remote results in real-time, show node names')
+
+    parser.add_argument('-p', '--pty',
+                        action='store_true',
+                        help='Use a pty when executing shell commands.')
 
     arguments = vars(parser.parse_args(kubemarine_args))
     configfile_path = arguments.get('config')
