@@ -307,11 +307,10 @@ class Processor(ABC):
         return f'{self.manifest_identity.name}-{self.get_version()}.yaml'
 
     def assign_default_pss_labels(self, manifest: Manifest, namespace: str) -> None:
-        key = f"Namespace_{namespace}"
-        rbac = self.inventory['rbac']
-        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled':
-            from kubemarine import admission  # pylint: disable=cyclic-import
+        from kubemarine import admission  # pylint: disable=cyclic-import
 
+        key = f"Namespace_{namespace}"
+        if admission.is_security_enabled(self.inventory):
             profile = self.get_namespace_to_necessary_pss_profiles()[namespace]
             target_labels = admission.get_labels_to_ensure_profile(self.inventory, profile)
             if not target_labels:

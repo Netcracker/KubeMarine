@@ -1132,9 +1132,6 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
                 self.setUpVersions(old, [new])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
 
                 res = self._run_kubernetes_task()
 
@@ -1157,9 +1154,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
                 self.setUpVersions('v1.27.13', ['v1.28.9'])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
+
                 initial_feature_gates = 'PodSecurity=true'
                 if custom_feature_gates:
                     self.inventory['services']['kubeadm'].update(

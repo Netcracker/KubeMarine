@@ -516,9 +516,6 @@ def init_first_control_plane(group: NodeGroup) -> None:
     # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
     first_control_plane.call(components.patch_kubelet_configmap)
 
-    # Invoke method from admission module for applying the privileged PSP if it is enabled
-    first_control_plane.call(admission.apply_admission)
-
     # Preparing join_dict to init other nodes
     control_plane_lines = list(result.values())[0].stdout. \
                        split("You can now join any number of the control-plane")[1].splitlines()[2:5]

@@ -360,34 +360,6 @@ class CalicoManifestProcessor(Processor):
         self.enrich_env_for_container(
             manifest, key, plugin_service='typha', container_name='calico-typha', env_ensure=env_ensure)
 
-    def enrich_clusterrole_calico_kube_controllers(self, manifest: Manifest) -> None:
-        """
-        The method implements the enrichment procedure for Calico controller ClusterRole
-        :param manifest: Container to operate with manifest objects
-        """
-
-        key = "ClusterRole_calico-kube-controllers"
-        if self.inventory['rbac']['admission'] == "psp" and \
-                self.inventory['rbac']['psp']['pod-security'] == "enabled":
-            source_yaml = manifest.get_obj(key, patch=True)
-            api_list = source_yaml['rules']
-            api_list.append(cluster_role_use_anyuid_psp)
-            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_anyuid_psp}'")
-
-    def enrich_clusterrole_calico_node(self, manifest: Manifest) -> None:
-        """
-        The method implements the enrichment procedure for Calico node ClusterRole
-        :param manifest: Container to operate with manifest objects
-        """
-
-        key = "ClusterRole_calico-node"
-        if self.inventory['rbac']['admission'] == "psp" and \
-                self.inventory['rbac']['psp']['pod-security'] == "enabled":
-            source_yaml = manifest.get_obj(key, patch=True)
-            api_list = source_yaml['rules']
-            api_list.append(cluster_role_use_privileged_psp)
-            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_privileged_psp}'")
-
     def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
         """
         The method implements the enrichment procedure for Calico CRD Felixconfigurations
@@ -461,8 +433,6 @@ class CalicoManifestProcessor(Processor):
             self.enrich_service_account_calico_node,
             self.enrich_daemonset_calico_node,
             self.enrich_deployment_calico_typha,
-            self.enrich_clusterrole_calico_kube_controllers,
-            self.enrich_clusterrole_calico_node,
             self.enrich_crd_felix_configuration,
             self.enrich_metrics,
         ]
@@ -549,7 +519,6 @@ class CalicoApiServerManifestProcessor(Processor):
             self.enrich_service_account_secret_calico_apiserver,
             self.enrich_service_account_calico_apiserver,
             self.enrich_deployment_calico_apiserver,
-            self.enrich_clusterrole_calico_crds,
         ]
 
     def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
@@ -601,31 +570,8 @@ class CalicoApiServerManifestProcessor(Processor):
             manifest, key, plugin_service='apiserver', container_name='calico-apiserver',
             extra_args=additional_args)
 
-    def enrich_clusterrole_calico_crds(self, manifest: Manifest) -> None:
-        key = "ClusterRole_calico-crds"
-        if self.inventory['rbac']['admission'] == "psp" and \
-                self.inventory['rbac']['psp']['pod-security'] == "enabled":
-            source_yaml = manifest.get_obj(key, patch=True)
-            api_list = source_yaml['rules']
-            api_list.append(cluster_role_use_anyuid_psp)
-            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_anyuid_psp}'")
 
-
-cluster_role_use_anyuid_psp = {
-        "apiGroups": ["policy"],
-        "resources": ["podsecuritypolicies"],
-        "verbs":     ["use"],
-        "resourceNames": ["oob-anyuid-psp"]
-}
-
-cluster_role_use_privileged_psp = {
-        "apiGroups": ["policy"],
-        "resources": ["podsecuritypolicies"],
-        "verbs":     ["use"],
-        "resourceNames": ["oob-privileged-psp"]
-}
-
-service_account_secret_calico_apiserver= dedent("""\
+service_account_secret_calico_apiserver = dedent("""\
     apiVersion: v1
     kind: Secret
     metadata:

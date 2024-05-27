@@ -12,11 +12,9 @@ This section describes the features and steps for performing maintenance procedu
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
     - [Reconfigure Procedure](#reconfigure-procedure)
-    - [Manage PSP Procedure](#manage-psp-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
-    - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution From CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
@@ -231,7 +229,6 @@ The configuration format for the plugins is the same.
   The target version must also be the latest patch version supported by Kubemarine.
   For example, upgrade is allowed from v1.26.7 to v1.26.11, or from v1.26.7 to v1.27.8, or from v1.26.7 to v1.28.4 through v1.27.8,
   but not from v1.26.7 to v1.27.1 as v1.27.1 is not the latest supported patch version of Kubernetes v1.27.
-* Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 ### Upgrade Procedure Parameters
 
@@ -505,7 +502,6 @@ backup-Jan-01-21-09-00-00.tar.gz
 │   ├── apiservices.apiregistration.k8s.io.yaml
 │   ├── blockaffinities.crd.projectcalico.org.yaml
 │   ├── ...
-│   ├── podsecuritypolicies.policy.yaml
 │   └── priorityclasses.scheduling.k8s.io.yaml
 │   ├── default
 │   │   ├── endpoints.yaml
@@ -907,7 +903,6 @@ The `add_node` procedure executes the following sequence of tasks:
     * prepull_images
     * init (as join)
     * audit
-  * admission
   * coredns
   * plugins
 * overview
@@ -1224,73 +1219,6 @@ The `reconfigure` procedure executes the following sequence of tasks:
   - kubernetes
     - reconfigure
 
-## Manage PSP Procedure
-
-The manage PSP procedure allows you to change PSP configuration on an already installed cluster. Using this procedure, you can:
-* Add/delete custom policies
-* Enable/disable OOB policies
-* Enable/disable admission controller 
-
-Manage PSP procedure works as follows:
-1. During this procedure the custom policies specified for deletion are deleted.
-   Then the custom policies specified for addition are added.
-2. If OOB policies are reconfigured or admission controller is reconfigured, then all OOB policies are recreated
-   as configured in the **cluster.yaml** and **procedure.yaml**. The values from **procedure.yaml** take precedence.
-   If admission controller is disabled, then all OOB policies are deleted without recreation.
-3. If the admission controller is reconfigured in **procedure.yaml**, then `kubeadm` configmap and `kube-apiserver` manifest is updated accordingly. 
-4. All Kubernetes nodes are `drain-uncordon`ed one-by-one and all daemon-sets are restarted to restart all pods (except system) in order to re-validate pods specifications.
-
-### Configuring Manage PSP Procedure
-
-The procedure accepts required positional argument with the path to the procedure inventory file.
-
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
-
-To manage PSPs on existing cluster, use the configuration similar to PSP installation, except the
-`custom-policies` is replaced by `add-policies` and `delete-policies` as follows:
-
-```yaml
-psp:
-  pod-security: enabled/disabled
-  oob-policies:
-    default: enabled/disabled
-    host-network: enabled/disabled
-    anyuid: enabled/disabled
-  add-policies:
-    psp-list: []
-    roles-list: []
-    bindings-list: []
-  delete-policies:
-    psp-list: []
-    roles-list: []
-    bindings-list: []
-```
-
-For example, if admission controller is disabled on existing cluster and you want to enable it, without enabling
-`host-network` OOB policy, you should specify the following in the **procedure.yaml** file:
-
-```yaml
-psp:
-  pod-security: enabled
-  oob-policies:
-    host-network: disabled
-```
-
-To configure `add-policies` and `delete-policies`, use the configuration format similar to `custom-policies`. For more information, refer to the [Configuring Custom Policies](Installation.md#configuring-custom-policies) section in the _Kubemarine Installation Procedure_.
-
-**Note**: The OOB plugins use OOB policies, so disabling OOB policy breaks some OOB plugins. 
-To avoid this, you need to specify custom policy and bind it using `ClusterRoleBinding` to the `ServiceAccout` plugin.
-
-### Manage PSP Tasks Tree
-
-The `manage_psp` procedure executes the following sequence of tasks:
-
-1. delete_custom
-2. add_custom
-3. reconfigure_psp
-4. restart_pods
-
 ## Manage PSS Procedure
 
 The manage PSS procedure allows:
@@ -1358,12 +1286,13 @@ They are deleted during the procedure in case of using `pod-security: disabled`,
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
 application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
-* Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
-`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster behavior.
+* Pay attention to the fact that PSS is implicitly enabled by default (that is reflected in 
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) prior to Kubernetes v1.28).
+Therefore, all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster behavior.
 
 ### Manage PSS Tasks Tree
 
-The `manage_pss procedure executes the following sequence of tasks:
+The `manage_pss` procedure executes the following sequence of tasks:
 
 1. manage_pss
 2. restart_pods
@@ -1504,77 +1433,6 @@ The `cert_renew` procedure executes the following sequence of tasks:
 2. nginx_ingress_controller
 3. calico
 4. certs_overview
-
-## Admission Migration Procedure
-
-Since Kubernetes v1.20 Pod Security Policy (PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
-from PSP to  another solution is very important. Kubemarine supports Pod Security Standards (PSS) by default as a replacement PSP.
-The most important step in the procedure is to define the PSS profiles for particular namespace. PSS has only three feasible options:
-`privileged`, `baseline`, `restricted` that should be matched with PSP. It's better to use more restrictive the PSS profile 
-for namespace. For proper matching see the following articles:
-* [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
-* [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
-
-**Notes**: 
-* Kubemarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
-* Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
-[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#application-prerequisites)
-* One of the ways to check if the pods in a particular namespace are matched with the PSS profile is that the `pod-security.kubernetes.io/enforce` label in the namespace should be set to `privileged`, whereas the `pod-security.kubernetes.io/warn` and `pod-security.kubernetes.io/audit` labels should be set to `restricted` or `baseline`. When the pods are up and running in the namespace, the audit messages and namespace events can be checked. Any violation of the `restricted` profile is reflected in these messages. The next step is to rework the pods that violate the PSS profile and repeat the procedure.
-
-
-### Procedure Execution Steps
-
-1. Verify that Kubernetes cluster has version v1.23+
-2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
-3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary. The example of `cluster.yaml` part is the following:
-```yaml
-...
-rbac:
-  admission: psp
-  psp:
-    pod-security: enabled
-...
-```
-
-The example of `procedure.yaml` is the following:
-```yaml
-psp:
-  pod-security: disabled
-```
-
-4. Verify if the applications in the cluster work properly.
-5. Set the `admission: pss` options in `cluster.yaml`. An example of the `cluster.yaml` part is as follows:
-
-```yaml
-...
-rbac:
-  admission: pss
-  pss:
-    pod-security: disabled
-...
-```
-
-6. Create the `procedure.yaml` for `migrate_pss` and fill in `namespaces` subsection in `pss` section in procedure file. The example of `procedure.yaml` is the following:
-
-```yaml
-pss:
-  pod-security: enabled
-  namespaces:
-    - namespace_1
-    - namespace_2:
-        enforce: "baseline"
-    - namespace_3
-  namespaces_defaults:
-    enforce: "privileged"
-    enforce-version: latest
-restart-pods: false
-```
-
-7. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution
-8. Restart pods in all namespaces if `restart-pods: false` option was used on previous step
-9. Verify if the applications in cluster work properly
-
-It's possible to switch off `PSS` on dev environment for some reason. In this case migration procedure become shorter and steps #6,7,8 should be skipped.
 
 # Procedure Execution
 

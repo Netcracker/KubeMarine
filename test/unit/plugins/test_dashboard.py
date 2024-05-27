@@ -86,9 +86,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertNotIn), ('restricted', self.assertIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_kubernetes-dashboard")['metadata'].get('labels', {})

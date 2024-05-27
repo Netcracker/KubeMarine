@@ -639,8 +639,6 @@ def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker:
 def generate_procedure_inventory(procedure: str) -> dict:
     procedure_inventory: dict = {}
     # set some commonly required properties
-    if procedure == 'manage_psp':
-        procedure_inventory['psp'] = {}
     if procedure == 'manage_pss':
         procedure_inventory['pss'] = {'pod-security': 'enabled'}
 
