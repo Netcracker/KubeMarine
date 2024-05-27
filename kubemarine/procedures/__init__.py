@@ -51,8 +51,6 @@ def _import_tasks_procedure(name: str) -> TasksProcedure:
         from kubemarine.procedures import check_paas as procedure
     elif name == "install":
         from kubemarine.procedures import install as procedure
-    elif name == "manage_psp":
-        from kubemarine.procedures import manage_psp as procedure
     elif name == "manage_pss":
         from kubemarine.procedures import manage_pss as procedure
     elif name == "migrate_cri":

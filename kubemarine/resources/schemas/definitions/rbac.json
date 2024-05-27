@@ -15,12 +15,9 @@
       "minItems": 1
     },
     "admission": {
-      "enum": ["psp", "pss"],
-      "default": "psp",
-      "description": "PSP/PSS admission implementation switcher"
-    },
-    "psp": {
-      "$ref": "rbac/psp.json"
+      "enum": ["pss"],
+      "default": "pss",
+      "description": "Admission implementation switcher"
     },
     "pss": {
       "$ref": "rbac/pss.json"

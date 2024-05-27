@@ -178,26 +178,12 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
         self.assertEqual(self.new, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
     def test_upgrade_with_default_admission(self):
-        # Upgrade PSP->PSP kuber version
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
-        self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
-        cluster = self.new_cluster()
-        self.assertEqual("psp", cluster.inventory['rbac']['admission'])
-
         # Upgrade PSS->PSS kuber version
         old_kubernetes_version = 'v1.25.2'
         new_kubernetes_version = 'v1.25.7'
         self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         cluster = self.new_cluster()
         self.assertEqual("pss", cluster.inventory['rbac']['admission'])
-
-        # Upgrade PSP->PSS kuber version
-        old_kubernetes_version = 'v1.24.11'
-        new_kubernetes_version = 'v1.25.7'
-        self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
-        with self.assertRaisesRegex(Exception, "PSP is not supported in Kubernetes v1.25 or higher"):
-            self.new_cluster()
 
     def test_incorrect_disable_eviction(self):
         self.upgrade['disable-eviction'] = 'true'
@@ -1056,7 +1042,6 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
 class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
         self.setUpVersions('v1.28.0', ['v1.28.9', 'v1.29.4', 'v1.30.1'])
-        self.inventory.setdefault('rbac', {})['admission'] = 'pss'
 
     def package_names(self, services: dict, package: str, package_names) -> None:
         services.setdefault('packages', {}).setdefault('associations', {}) \
@@ -1167,9 +1152,6 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
                 self.setUpVersions(old, [new])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
 
                 res = self._run_kubernetes_task()
 
@@ -1192,9 +1174,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
                 self.setUpVersions('v1.27.13', ['v1.28.9'])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
+
                 initial_feature_gates = 'PodSecurity=true'
                 if custom_feature_gates:
                     self.inventory['services']['kubeadm'].update(

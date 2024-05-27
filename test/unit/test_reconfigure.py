@@ -197,8 +197,6 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['mountPath'])
 
     def test_pss_managed_arg_not_redefined(self):
-        self.inventory.setdefault('rbac', {})['admission'] = 'pss'
-        self.inventory['rbac']['pss'] = {'pod-security': 'enabled'}
         self.reconfigure['services']['kubeadm'] = {
             'apiServer': {
                 'extraArgs': {'admission-control-config-file': '/some/redefined/path'},

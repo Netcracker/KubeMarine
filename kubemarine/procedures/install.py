@@ -22,7 +22,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import (
     system, sysctl, haproxy, keepalived, kubernetes, plugins,
-    kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor, modprobe
+    kubernetes_accounts, selinux, thirdparties, audit, coredns, cri, packages, apparmor, modprobe
 )
 from kubemarine.core import flow, utils, summary
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
@@ -544,7 +544,6 @@ tasks = OrderedDict({
             "init": deploy_kubernetes_init,
             "audit": deploy_kubernetes_audit,
         },
-        "admission": admission.install,
         "coredns": deploy_coredns,
         "plugins": deploy_plugins,
         "accounts": deploy_accounts

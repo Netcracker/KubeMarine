@@ -52,7 +52,6 @@ The package is structured as follows:
   - **resources** - generic files required for source code
     - **configurations** - set of main configuration files, on the basis of which all package operation is built
     - **drop_ins** - configuration files uploaded unchanged
-    - **psp** - predefined PSP policies
     - **reports** - checker reports related stuff
     - **scripts** - build-in bash scripts for procedures
   - **cri** - contains modules for working with container runtime interfaces

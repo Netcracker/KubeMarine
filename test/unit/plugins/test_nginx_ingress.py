@@ -22,7 +22,6 @@ from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
 
 
-
 class EnrichmentValidation(unittest.TestCase):
     def install(self):
         # pylint: disable=attribute-defined-outside-init
@@ -96,8 +95,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.k8s_1_28_x = self.get_latest_k8s("v1.28")
         # Requires ingress-nginx < v1.9.0
         self.k8s_1_25_x = self.get_latest_k8s("v1.25")
-        # Requires ingress-nginx v1.2.x
-        self.k8s_1_24_x = self.get_latest_k8s("v1.24")
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -182,9 +179,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertIn), ('privileged', self.assertNotIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_ingress-nginx")['metadata'].get('labels', {})
@@ -240,21 +235,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         container_patch = self.get_obj(manifest, "Job_ingress-nginx-admission-patch")\
             ['spec']['template']['spec']['containers'][0]
         self.assertEqual(expected_image, container_patch['image'], "Unexpected patch job image")
-
-    def test_v1_2_x_role_ingress_nginx_difference(self):
-        for k8s_version, admission, presence_checker in (
-            (self.k8s_1_24_x, 'psp', self.assertTrue),
-            (self.k8s_1_24_x, 'pss', self.assertTrue), # This should probably be assertFalse
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "Role_ingress-nginx")['rules']
-                presence_checker(any(("resourceNames", ["oob-host-network-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
 
     def test_all_images_contain_registry(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():

@@ -196,14 +196,14 @@ class IngressNginxManifestProcessor(Processor):
             self.include(manifest, ingres_nginx_cm, custom_headers_cm)
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
-            
+
     def enrich_service_account_secret(self, manifest: Manifest) -> None:
         new_yaml = yaml.safe_load(service_account_secret)
 
         service_account_key = "ServiceAccount_ingress-nginx"
         service_account_index = manifest.all_obj_keys().index(service_account_key) \
             if service_account_key in manifest.all_obj_keys() else -1
-        
+
         self.include(manifest, service_account_index + 1, new_yaml)
 
     def enrich_service_account(self, manifest: Manifest) -> None:
@@ -304,13 +304,6 @@ CUSTOM_HEADERS_CM = {
         "name": "custom-headers",
         "namespace": "ingress-nginx"
     }
-}
-
-psp_ingress_nginx = {
-    "apiGroups": ["extensions"],
-    "resources": ["podsecuritypolicies"],
-    "verbs":     ["use"],
-    "resourceNames": ["oob-host-network-psp"]
 }
 
 service_account_secret = dedent("""\

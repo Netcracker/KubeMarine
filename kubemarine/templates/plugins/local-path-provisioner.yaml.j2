@@ -51,19 +51,6 @@ subjects:
   name: local-path-provisioner-service-account
   namespace: local-path-storage
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: local-path-provisioner-privileged-psp
-roleRef:
-  kind: ClusterRole
-  name: oob-privileged-psp-cr
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-- kind: ServiceAccount
-  name: local-path-provisioner-service-account
-  namespace: local-path-storage
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

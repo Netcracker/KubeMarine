@@ -26,7 +26,6 @@ class EnrichmentValidation(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.inventory['rbac'] = {
-            'admission': 'pss',
             'pss': {
                 'pod-security': 'enabled'
             }
@@ -75,27 +74,21 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['privileged', 'baseline', 'restricted']"):
             self._create_cluster()
 
-    def test_inconsistent_config(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.24.11'
-        self.inventory['rbac']['admission'] = 'psp'
-        with self.assertRaisesRegex(Exception, re.escape(admission.ERROR_INCONSISTENT_INVENTORIES)):
-            self._create_cluster()
-
     def test_defaults_verify_version(self):
         self.manage_pss['pss']['defaults']['enforce-version'] = 'not a version'
-        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+        with self.assertRaisesRegex(Exception, "Incorrect enforce-version 'not a version'"):
             self._create_cluster()
 
     def test_namespaces_verify_version(self):
         self.manage_pss['pss']['namespaces'] = [
             {'custom_ns': {'enforce-version': 'not a version'}}
         ]
-        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+        with self.assertRaisesRegex(Exception, "Incorrect enforce-version 'not a version'"):
             self._create_cluster()
 
     def test_namespaces_defaults_verify_version(self):
         self.manage_pss['pss']['namespaces_defaults'] = {'enforce-version': 'not a version'}
-        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+        with self.assertRaisesRegex(Exception, "Incorrect enforce-version 'not a version'"):
             self._create_cluster()
 
     def test_verify_poth_states_disabled(self):
@@ -109,7 +102,6 @@ class EnrichmentAndFinalization(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.MINIHA)
         self.inventory['rbac'] = {
-            "admission": "pss",
             "pss": {
                 "pod-security": "enabled",
                 "exemptions": {
@@ -217,7 +209,6 @@ class EnrichmentAndFinalization(unittest.TestCase):
                 self.assertEqual('enabled', finalized_inventory['rbac']['pss']['pod-security'])
                 self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
                 self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args.get('admission-control-config-file'))
-                self.assertNotIn('psp', finalized_inventory['rbac'])
 
                 final_inventory = cluster.formatted_inventory
                 apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
@@ -231,7 +222,6 @@ class RunTasks(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.inventory['rbac'] = {
-            'admission': 'pss',
             'pss': {
                 'pod-security': 'enabled',
                 'defaults': {},

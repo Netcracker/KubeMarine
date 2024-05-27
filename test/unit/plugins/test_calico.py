@@ -272,38 +272,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
             self.assertEqual(expected_value, name_to_value.get(expected_name),
                              f"Unexpected value for {expected_name!r} env variable")
 
-    def test_clusterrole_calico_kube_controllers(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-kube-controllers")['rules']
-                presence_checker(any(("resourceNames", ["oob-anyuid-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
-
-    def test_clusterrole_calico_node(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-node")['rules']
-                presence_checker(any(("resourceNames", ["oob-privileged-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
-
     def test_all_images_contain_registry(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
             for typha_enabled, expected_num_images in (
@@ -382,30 +350,12 @@ class APIServerManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertNotIn), ('restricted', self.assertIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_calico-apiserver")['metadata'].get('labels', {})
                 for pss_label in default_pss_labels.items():
                     default_label_checker(pss_label, target_yaml.items(), "PPS labels validation failed")
-
-    def test_clusterrole_calico_crds(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-crds")['rules']
-                presence_checker(any(("resourceNames", ["oob-anyuid-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
 
     def test_redefine_resources(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():

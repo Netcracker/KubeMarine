@@ -1502,9 +1502,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         control_planes = cluster.nodes['control-plane']
         first_control_plane = control_planes.get_first_member()
 
-        expected_state = "disabled"
-        if cluster.inventory["rbac"]["admission"] == "pss":
-            expected_state = cluster.inventory["rbac"]["pss"]["pod-security"]
+        expected_state = cluster.inventory["rbac"]["pss"]["pod-security"]
 
         kubeadm_config = components.KubeadmConfig(cluster)
         cluster_config = kubeadm_config.load('kubeadm-config', first_control_plane)

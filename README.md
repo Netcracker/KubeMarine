@@ -20,7 +20,6 @@ Kubemarine is an open source, lightweight and powerful management tool built for
   - [check_iaas](documentation/Kubecheck.md#iaas-procedure)
   - [check_paas](documentation/Kubecheck.md#paas-procedure)
   - [migrate_kubemarine](documentation/Maintenance.md#kubemarine-migration-procedure)
-  - [manage_psp](documentation/Maintenance.md#manage-psp-procedure)
   - [manage_pss](documentation/Maintenance.md#manage-pss-procedure)
   - [cert_renew](documentation/Maintenance.md#certificate-renew-procedure)
   - [migrate_cri](documentation/Maintenance.md#cri-migration-procedure)

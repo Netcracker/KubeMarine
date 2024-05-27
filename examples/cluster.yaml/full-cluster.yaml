@@ -286,84 +286,20 @@ rbac:
       role: cluster-admin
       namespace: kube-system
 
-  psp:
+  admission: pss
+  pss:
     pod-security: enabled
-    oob-policies:
-      default: enabled
-      host-network: enabled
-      anyuid: enabled
-    custom-policies:
-      psp-list:
-      - apiVersion: policy/v1beta1
-        kind: PodSecurityPolicy
-        metadata:
-          name: most-restricted-psp
-          annotations:
-            seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
-            seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
-        spec:
-          privileged: false
-          # Allow core volume types.
-          hostPID: false
-          hostIPC: false
-          hostNetwork: false
-          volumes:
-            - 'configMap'
-            - 'emptyDir'
-            - 'projected'
-            - 'secret'
-            - 'downwardAPI'
-            - 'persistentVolumeClaim'
-          fsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          readOnlyRootFilesystem: true
-          runAsUser:
-            rule: 'MustRunAsNonRoot'
-          supplementalGroups:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          runAsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          allowPrivilegeEscalation: false
-          seLinux:
-            rule: 'RunAsAny'
-          requiredDropCapabilities:
-            - ALL
-      roles-list:
-      - apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: most-restricted-psp-cr
-        rules:
-          - apiGroups: ['policy']
-            resources: ['podsecuritypolicies']
-            verbs:     ['use']
-            resourceNames:
-              - most-restricted-psp
-      bindings-list:
-      - kind: ClusterRoleBinding
-        apiVersion: rbac.authorization.k8s.io/v1
-        metadata:
-          name: most-restricted-psp-crb
-        roleRef:
-          kind: ClusterRole
-          name: most-restricted-psp-cr
-          apiGroup: rbac.authorization.k8s.io
-        subjects:
-          - kind: ServiceAccount
-            # it is possible to bind to non-existing SA in non-existing namespace
-            name: sa-name
-            namespace: sa-namespace
-
-
+    defaults:
+      enforce: restricted
+      enforce-version: latest
+      audit: restricted
+      audit-version: latest
+      warn: restricted
+      warn-version: latest
+    exemptions:
+      usernames: ["example-user1", "example-user2"]
+      runtimeClasses: ["example-class-1", "example-class-2"]
+      namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
 
 plugin_defaults:
   installation:

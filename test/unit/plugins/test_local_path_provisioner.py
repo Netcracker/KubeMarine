@@ -74,21 +74,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertEqual(expected_image, helperpod_yaml['spec']['containers'][0]['image'],
                          "Unexpected helper pod image")
 
-    def test_clusterrolebinding_privileged_psp(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertTrue), # This should probably be assertFalse
-            (self.get_latest_k8s(), 'pss', self.assertTrue) # This should probably be assertFalse
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                presence_checker("ClusterRoleBinding_local-path-provisioner-privileged-psp" in self.all_obj_keys(manifest),
-                                 "Presence of privileged-psp ClusterRoleBinding validation failed")
-
     def test_pss_labels(self):
         default_pss_labels = {
             'pod-security.kubernetes.io/enforce': 'privileged',
@@ -101,9 +86,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertIn), ('privileged', self.assertNotIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.get_latest_k8s())
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_local-path-storage")['metadata'].get('labels', {})

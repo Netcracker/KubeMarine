@@ -134,10 +134,6 @@ rules:
   verbs:
   - create
   - patch
-- apiGroups: ['extensions']
-  resources: ['podsecuritypolicies']
-  verbs: ['use']
-  resourceNames: ['oob-host-network-psp']
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
