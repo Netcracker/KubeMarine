@@ -161,7 +161,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 def export_etcd(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     etcd_node, is_custom_etcd_node = select_etcd_node(cluster)
-    cluster.context['backup_descriptor']['etcd']['image'] = retrieve_etcd_image(cluster, etcd_node)
+    cluster.context['backup_descriptor']['etcd']['image'] = retrieve_etcd_image(etcd_node)
 
     # Try to detect cluster health and other metadata like db size, leader
     etcd_status = None
