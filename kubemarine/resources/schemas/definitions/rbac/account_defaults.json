@@ -16,13 +16,13 @@
         },
         "configs": {
           "type": "array",
-          "description": "YAML settings for ServiceAccount, ClusterRoleBinding and Secret (since Kubernetes 1.24)",
+          "description": "YAML settings for ServiceAccount, ClusterRoleBinding and Secret",
           "items": [
             {"$ref": "#/definitions/ServiceAccount"},
-            {"$ref": "#/definitions/ClusterRoleBinding"}
+            {"$ref": "#/definitions/ClusterRoleBinding"},
+            {"$ref": "#/definitions/Secret"}
           ],
-          "additionalItems": {"$ref": "#/definitions/Secret"},
-          "minItems": 2,
+          "minItems": 3,
           "maxItems": 3
         }
       }

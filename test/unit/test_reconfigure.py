@@ -234,8 +234,8 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
                 Exception, re.escape(kubernetes.ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE % 'kubelet')):
             self.new_cluster()
 
-    def test_kubeadm_before_v1_25x_supports_patches(self):
-        kubernetes_version = 'v1.24.11'
+    def test_kubeadm_supports_patches(self):
+        kubernetes_version = 'v1.25.2'
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         self.reconfigure['services']['kubeadm_patches'] = {
             'apiServer': [
@@ -243,23 +243,13 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
             ],
             'etcd': [
                 {'groups': ['control-plane'], 'patch': {'etcd_key': 'api_value'}},
-            ]
+            ],
+            'kubelet': [
+                {'nodes': ['master-1'], 'patch': {'maxPods': 111}},
+            ],
         }
         # No error should be raised
         self.new_cluster()
-
-    def test_error_kubeadm_before_v1_25x_dont_support_patches_kubelet(self):
-        kubernetes_version = 'v1.24.11'
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
-        self.reconfigure['services']['kubeadm_patches'] = {
-            'kubelet': [
-                {'nodes': ['master-1'], 'patch': {'maxPods': 111}},
-            ]
-        }
-        with self.assertRaisesRegex(
-                Exception, re.escape(kubernetes.ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(
-                    version=kubernetes_version))):
-            self.new_cluster()
 
 
 class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):

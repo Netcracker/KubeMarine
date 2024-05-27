@@ -171,9 +171,10 @@ def verify_version(owner: str, version: str, kubernetes_version: str) -> None:
     if version != "latest":
         result = re.match(valid_versions_templ, version)
         if result is None:
-            raise Exception("incorrect Kubernetes version %s, valid version(for example): v1.23" % owner)
+            raise Exception(f"Incorrect {owner} {version!r}, "
+                            f"valid version (for example): {utils.minor_version(kubernetes_version)}")
         if utils.minor_version_key(version) > utils.version_key(kubernetes_version)[0:2]:
-            raise Exception("%s version must not be higher than Kubernetes version" % owner)
+            raise Exception(f"{owner} must not be higher than Kubernetes version")
 
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_psp'])
