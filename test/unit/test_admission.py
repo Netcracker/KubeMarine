@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import re
 import unittest
 from copy import deepcopy
 from test.unit import utils as test_utils
@@ -60,7 +60,10 @@ class EnrichmentValidation(unittest.TestCase):
 
     def test_pss_defaults_verify_version(self):
         self._inventory('pss')['defaults'] = {'enforce-version': 'not a version'}
-        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.30.1'
+        with self.assertRaisesRegex(Exception, re.escape(
+                f"Incorrect enforce-version 'not a version', "
+                f"valid version (for example): v1.30")):
             self._new_cluster()
 
     def test_psp_unexpected_oob_policy_flag(self):

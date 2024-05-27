@@ -15,7 +15,7 @@ from textwrap import dedent
 from typing import List, Optional, Dict
 import yaml
 
-from kubemarine.core import summary, utils, log
+from kubemarine.core import summary, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
@@ -127,25 +127,6 @@ class DashboardManifestProcessor(Processor):
         self.enrich_node_selector(manifest, key, plugin_service='metrics-scraper')
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 
-
-class V2_5_X_DashboardManifestProcessor(DashboardManifestProcessor):
-    def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest) -> None:
-        key = "Deployment_dashboard-metrics-scraper"
-        source_yaml = manifest.get_obj(key, patch=True)
-        template_spec: dict = source_yaml['spec']['template']['spec']
-        del template_spec['securityContext']
-        self.log.verbose(f"The 'securityContext' property has been removed from 'spec.template.spec' in the {key}")
-        super().enrich_deployment_dashboard_metrics_scraper(manifest)
-
-
-def get_dashboard_manifest_processor(logger: log.VerboseLogger, inventory: dict,
-                                     yaml_path: Optional[str] = None, destination: Optional[str] = None) -> Processor:
-    version: str = inventory['plugins']['kubernetes-dashboard']['version']
-    kwargs = {'original_yaml_path': yaml_path, 'destination_name': destination}
-    if utils.minor_version(version) == 'v2.5':
-        return V2_5_X_DashboardManifestProcessor(logger, inventory, **kwargs)
-
-    return DashboardManifestProcessor(logger, inventory, **kwargs)
 
 service_account_secret_kubernetes_dashboard = dedent("""\
     apiVersion: v1

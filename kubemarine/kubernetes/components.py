@@ -152,9 +152,7 @@ class KubeadmConfig:
         :param edit_func: function to apply changes
         :param control_plane: Use this control plane node to fetch the ConfigMap.
         """
-        configmap_name = _get_configmap_name(self.cluster, configmap)
-
-        configmap_obj = KubernetesObject(self.cluster, 'ConfigMap', configmap_name, 'kube-system')
+        configmap_obj = KubernetesObject(self.cluster, 'ConfigMap', configmap, 'kube-system')
         configmap_obj.reload(control_plane)
 
         self.loaded_maps[configmap] = configmap_obj
@@ -196,14 +194,6 @@ class KubeadmConfig:
             return config_
 
         return merge_func
-
-
-def kubelet_config_unversioned(cluster: KubernetesCluster) -> bool:
-    return kubernetes_minor_release_at_least(cluster.inventory, "v1.24")
-
-
-def kubelet_supports_patches(cluster: KubernetesCluster) -> bool:
-    return kubernetes_minor_release_at_least(cluster.inventory, "v1.25")
 
 
 def kubeadm_extended_dryrun(cluster: KubernetesCluster) -> bool:
@@ -513,9 +503,8 @@ def patch_kubelet_configmap(control_plane: AbstractGroup[RunResult]) -> None:
     if 'resolvConf' in kubeadm_config.maps['kubelet-config']:
         return
 
-    configmap_name = _get_configmap_name(cluster, 'kubelet-config')
     control_plane.sudo(
-        f'kubectl get cm -n kube-system {configmap_name} -o yaml '
+        f'kubectl get cm -n kube-system kubelet-config -o yaml '
         '| grep -v "resolvConf:" '
         '| sudo kubectl apply -f -')
 
@@ -541,14 +530,12 @@ def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, conf
     defer = control_plane.new_defer()
     collector = CollectorCallback(cluster)
 
-    configmap_name = _get_configmap_name(cluster, configmap)
-
     key = CONFIGMAPS_CONSTANTS[configmap]['key'].replace('.', r'\.')
-    configmap_cmd = f'sudo kubectl get cm -n kube-system {configmap_name} -o=jsonpath="{{.data.{key}}}"'
+    configmap_cmd = f'sudo kubectl get cm -n kube-system {configmap} -o=jsonpath="{{.data.{key}}}"'
 
     # backup
     defer.run(f'sudo mkdir -p {backup_dir}')
-    backup_file = f'{backup_dir}/{configmap_name}.yaml'
+    backup_file = f'{backup_dir}/{configmap}.yaml'
     defer.run(f'(set -o pipefail && {configmap_cmd} | sudo tee {backup_file}) > /dev/null')
 
     # update
@@ -562,16 +549,7 @@ def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, conf
 
     results = collector.results[defer.get_host()]
     return _detect_changes(logger, results[0].stdout, results[1].stdout,
-                           fromfile=backup_file, tofile=f'{configmap_name} ConfigMap')
-
-
-def _get_configmap_name(cluster: KubernetesCluster, configmap: str) -> str:
-    configmap_name = configmap
-    if configmap == 'kubelet-config' and not kubelet_config_unversioned(cluster):
-        kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-        configmap_name += '-' + utils.minor_version(kubernetes_version)[1:]
-
-    return configmap_name
+                           fromfile=backup_file, tofile=f'{configmap} ConfigMap')
 
 
 def _configmap_init_phase_uploader(configmap: str, upload_config: str) -> Callable[[DeferredGroup], None]:
@@ -761,8 +739,7 @@ def _reconfigure_kubelet(cluster: KubernetesCluster, node: DeferredGroup,
     node.sudo(f"cp {config} {backup_file}")
 
     # update
-    patches_flag = ' --patches=/etc/kubernetes/patches' if kubelet_supports_patches(cluster) else ''
-    node.sudo(f'kubeadm upgrade node phase kubelet-config{patches_flag}')
+    node.sudo(f'kubeadm upgrade node phase kubelet-config --patches=/etc/kubernetes/patches')
 
     # compare
     node.sudo(f'cat {backup_file}', callback=collector)
@@ -877,16 +854,13 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
     old_tmp_dirs = CollectorCallback(cluster)
     new_tmp_dirs = CollectorCallback(cluster)
     for defer in nodes.get_ordered_members_list():
-        if with_inventory and kubelet_supports_patches(cluster):
+        if with_inventory:
             defer.sudo(f'mkdir -p {patches_dir}')
             _create_kubeadm_patches_for_component_on_node(
                 cluster, defer, 'kubelet', patches_dir=patches_dir, reset=False)
 
         defer.sudo(tmp_dirs_cmd, callback=old_tmp_dirs)
-
-        patches_flag = f' --patches={patches_dir}' if kubelet_supports_patches(cluster) else ''
-        defer.sudo(f'kubeadm upgrade node phase kubelet-config --dry-run{patches_flag}')
-
+        defer.sudo(f'kubeadm upgrade node phase kubelet-config --dry-run --patches={patches_dir}')
         defer.sudo(tmp_dirs_cmd, callback=new_tmp_dirs)
 
     nodes.flush()

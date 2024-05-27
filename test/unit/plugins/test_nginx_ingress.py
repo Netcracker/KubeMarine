@@ -154,9 +154,12 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertFalse(any(arg.startswith('--enable-metrics=') for arg in args), "--enable-metrics should be absent")
         self.assertIn('--watch-ingress-without-class=true', args, "Required arg not found")
         self.assertIn('--enable-ssl-passthrough', args, "Required arg not found")
-        self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found ")
-        self.assertIn('--disable-full-test', args, "Required arg not found ")
-        self.assertIn('--disable-catch-all', args, "Required arg not found ")
+        self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found")
+        self.assertIn('--disable-full-test', args, "Required arg not found")
+        self.assertIn('--disable-catch-all', args, "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook=') for arg in args), "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook-certificate=') for arg in args), "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook-key=') for arg in args), "Required arg not found")
 
         self.assertEqual([80, 443, 10254, 8443],
                          [item['containerPort'] for item in container['ports']],
@@ -190,7 +193,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def test_webhook_resources_difference(self):
         for k8s_version, expected_num_resources in (
-            (self.k8s_1_24_x, 0),
             (self.k8s_1_25_x, 9),
             (self.k8s_1_28_x, 10),
             (self.k8s_latest, 9)
@@ -221,21 +223,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         data = self.get_obj(manifest, "Service_ingress-nginx-controller")
         self.assertEqual(['IPv6'], data['spec']['ipFamilies'],
                         f"ingress-nginx enrichment error for IPv6 family")
-
-    def test_v1_2_x_controller_container_difference(self):
-        for k8s_version, presence_checker in (
-            (self.k8s_1_24_x, self.assertFalse),
-            (self.k8s_latest, self.assertTrue)
-        ):
-            with self.subTest(k8s_version):
-                cluster = demo.new_cluster(self.inventory(k8s_version))
-                manifest = self.enrich_yaml(cluster)
-                container = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
-                    ['spec']['template']['spec']['containers'][0]
-                args = container['args']
-                presence_checker(any(arg.startswith('--validating-webhook=') for arg in args), "Unexpected arguments")
-                presence_checker(any(arg.startswith('--validating-webhook-certificate=') for arg in args), "Unexpected arguments")
-                presence_checker(any(arg.startswith('--validating-webhook-key=') for arg in args), "Unexpected arguments")
 
     def test_enrich_webhook_resources(self):
         inventory = self.inventory(self.k8s_latest)
@@ -270,13 +257,10 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                                  "Rules list validation failed")
 
     def test_all_images_contain_registry(self):
-        for k8s_version, expected_num_images in (
-            (self.k8s_1_24_x, 1),
-            (self.k8s_latest, 2)
-        ):
+        for k8s_version in self.latest_k8s_supporting_specific_versions.values():
             with self.subTest(k8s_version):
                 num_images = self.check_all_images_contain_registry(self.inventory(k8s_version))
-                self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
+                self.assertEqual(2, num_images, f"Unexpected number of images found: {num_images}")
 
 
 class RedeployIfNeeded(unittest.TestCase):

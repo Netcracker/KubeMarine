@@ -69,22 +69,22 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
             upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version], self.logger)
 
     def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.23.17'
-        new_kubernetes_version = 'v1.25.7'
+        old_kubernetes_version = 'v1.28.9'
+        new_kubernetes_version = 'v1.30.1'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_downgrade(self):
-        old_kubernetes_version = 'v1.25.7'
-        new_kubernetes_version = 'v1.23.17'
+        old_kubernetes_version = 'v1.30.1'
+        new_kubernetes_version = 'v1.29.4'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_same_version(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.2'
+        old_kubernetes_version = 'v1.30.1'
+        new_kubernetes_version = 'v1.30.1'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
@@ -170,13 +170,12 @@ class _AbstractUpgradeEnrichmentTest(unittest.TestCase):
 
 
 class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
+    def setUp(self):
+        self.setUpVersions('v1.29.4', ['v1.30.1'])
 
     def test_correct_inventory(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
-        self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         cluster = self.new_cluster()
-        self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
+        self.assertEqual(self.new, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
     def test_upgrade_with_default_admission(self):
         # Upgrade PSP->PSP kuber version
@@ -201,17 +200,11 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_incorrect_disable_eviction(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
-        self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         self.upgrade['disable-eviction'] = 'true'
         with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'\. Expected: 'boolean'\."):
             self.new_cluster()
 
     def test_unexpected_properties(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
-        self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         self.upgrade['unexpected-property'] = {}
         with self.assertRaisesRegex(Exception, re.escape(kubernetes.ERROR_UPGRADE_UNEXPECTED_PROPERTY % (
                 "'unexpected-property'",))):
@@ -234,8 +227,8 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_failed_enrichment_raise_original_exception(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
+        old_kubernetes_version = 'v1.29.4'
+        new_kubernetes_version = 'v1.30.1'
 
         for stage in (EnrichmentStage.LIGHT, EnrichmentStage.FULL, EnrichmentStage.PROCEDURE):
             with self.subTest(f"stage: {stage.name}"):
@@ -265,7 +258,7 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11'])
+        self.setUpVersions('v1.29.4', ['v1.30.1'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -522,7 +515,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11'])
+        self.setUpVersions('v1.29.4', ['v1.30.1'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -739,7 +732,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
 
 class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11'])
+        self.setUpVersions('v1.29.4', ['v1.30.1'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -1061,8 +1054,8 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
 
 
 class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
-    def setUpVersions(self, old: str, _new: List[str]):
-        super().setUpVersions(old, _new)
+    def setUp(self):
+        self.setUpVersions('v1.28.0', ['v1.28.9', 'v1.29.4', 'v1.30.1'])
         self.inventory.setdefault('rbac', {})['admission'] = 'pss'
 
     def package_names(self, services: dict, package: str, package_names) -> None:
@@ -1074,7 +1067,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})['sandbox_image'] = sandbox_image
 
     def test_plugins_iterative_image_redefinition(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
         self.upgrade[self.upgrade_plan[1]].setdefault('plugins', {})\
             .setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
         self.upgrade[self.upgrade_plan[2]].setdefault('plugins', {})\
@@ -1087,7 +1079,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "Plugin image was not redefined in recreated inventory.")
 
     def test_plugins_iterative_custom_property_redefinition_target_unspecified(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
         self.upgrade[self.upgrade_plan[0]].setdefault('plugins', {}).setdefault('custom-plugin', {})['property'] = 'A'
         self.upgrade[self.upgrade_plan[1]].setdefault('plugins', {}).setdefault('custom-plugin', {})['property'] = 'B'
 
@@ -1098,7 +1089,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "Custom property was not redefined in recreated inventory.")
 
     def test_packages_iterative_package_names_redefinition(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
         self.package_names(self.upgrade[self.upgrade_plan[1]], 'containerd', 'A')
         self.package_names(self.upgrade[self.upgrade_plan[2]], 'containerd', 'B')
@@ -1110,7 +1100,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "Containerd packages associations were not redefined in recreated inventory.")
 
     def test_thirdparties_iterative_source_redefinition(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
         self.upgrade[self.upgrade_plan[1]].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = 'A'
         self.upgrade[self.upgrade_plan[2]].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = {
@@ -1127,7 +1116,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "sha1 of /usr/bin/calicoctl was not redefined in recreated inventory.")
 
     def test_iterative_sandbox_image_redefinition(self):
-        self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
         self.sandbox_image(self.upgrade[self.upgrade_plan[1]], 'A')
         self.sandbox_image(self.upgrade[self.upgrade_plan[2]], 'B')
