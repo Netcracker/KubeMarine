@@ -52,11 +52,11 @@
               "description": "Absolute path on hosts where to unpack the downloaded file. Unpacking is supported only for the following file extensions: .tar, .gz and .zip."
             },
             "group": {
-              "$ref": "../common/node_ref.json#/definitions/DeprecatedRole",
+              "$ref": "../common/node_ref.json#/definitions/Role",
               "description": "The name of the group to whose hosts the file should be uploaded"
             },
             "groups": {
-              "$ref": "../common/node_ref.json#/definitions/DeprecatedRoles",
+              "$ref": "../common/node_ref.json#/definitions/Roles",
               "description": "The list of group names to whose hosts the file should be uploaded"
             },
             "node": {

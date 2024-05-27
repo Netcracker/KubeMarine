@@ -101,7 +101,7 @@ class EnrichmentAndFinalization(test_utils.CommonTest):
             self.assertEqual(should_present, node['name'] in ansible_inventory)
 
     def test_remove_turned_off_balancer_maintenance_mode(self):
-        scheme = {'balancer': 3, 'master': 3, 'worker': 3, 'keepalived': 1, 'haproxy_mntc': 1}
+        scheme = {'balancer': 3, 'control_plane': 3, 'worker': 3, 'keepalived': 1, 'haproxy_mntc': 1}
         self._generate_inventory(scheme)
 
         balancers = [node for node in self.inventory['nodes'] if 'balancer' in node['roles']]

@@ -60,7 +60,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0])
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
-    def test_controlplain_calculated_half_vrrp_half_master(self):
+    def test_controlplain_calculated_half_vrrp_half_control_plane(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0])
@@ -76,7 +76,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0]['ip'])
         self.assertEqual(inventory['control_plain']['external'], inventory['vrrp_ips'][0]['floating_ip'])
 
-    def test_controlplain_calculated_half_fully_master(self):
+    def test_controlplain_calculated_half_fully_control_plane(self):
         inventory = demo.generate_inventory(**demo.MINIHA)
         defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['nodes'][0]['internal_address'])
@@ -115,7 +115,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], '1.1.1.1')
 
-    def test_controlplain_control_half_endpoint_vrrp_half_master(self):
+    def test_controlplain_control_half_endpoint_vrrp_half_control_plane(self):
         inventory = demo.generate_inventory(**demo.MINIHA)
         inventory['vrrp_ips'] = [
             {
@@ -130,7 +130,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
-    def test_controlplain_control_half_endpoint_vrrp_half_endpoint_master(self):
+    def test_controlplain_control_half_endpoint_vrrp_half_endpoint_control_plane(self):
         inventory = demo.generate_inventory(**demo.MINIHA)
         inventory['vrrp_ips'] = [
             {
@@ -165,7 +165,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
-    def test_controlplain_skip_not_bind_half_vrrp_half_master(self):
+    def test_controlplain_skip_not_bind_half_vrrp_half_control_plane(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['vrrp_ips'] = [
             {
@@ -184,16 +184,16 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
     def test_controlplain_skip_vrrp_ips_no_balancers(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=0, keepalived=1)
-        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=0, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'control-plane' in node['roles'])
 
         defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], first_control_plane['internal_address'])
         self.assertEqual(inventory['control_plain']['external'], first_control_plane['address'])
 
     def test_controlplain_skip_vrrp_ips_assigned_not_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
-        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'control-plane' in node['roles'])
         balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
         inventory['vrrp_ips'][0] = {
             'ip': inventory['vrrp_ips'][0],
@@ -205,8 +205,8 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['external'], balancer['address'])
 
     def test_controlplain_skip_vrrp_ips_and_balancer_removed_only_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
-        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'control-plane' in node['roles'])
         balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
@@ -220,7 +220,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['external'], first_control_plane['address'])
 
     def test_controlplain_skip_vrrp_ips_assigned_to_removed_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=2, keepalived=2)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=2, keepalived=2)
         first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
         inventory['vrrp_ips'][0] = {
             'ip': inventory['vrrp_ips'][0],
@@ -315,7 +315,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
                          "Finalized services.kubeadm_kube-proxy should always be overridden with net.netfilter.nf_conntrack_max")
 
     def test_ambiguous_conntrack_max(self):
-        inventory = demo.generate_inventory(master=1, worker=1)
+        inventory = demo.generate_inventory(control_plane=1, worker=1)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': {
@@ -328,7 +328,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
             demo.new_cluster(inventory)
 
     def test_correct_conntrack_max_kubernetes_nodes(self):
-        inventory = demo.generate_inventory(master=1, worker=1)
+        inventory = demo.generate_inventory(control_plane=1, worker=1)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': {

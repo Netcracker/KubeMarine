@@ -108,7 +108,7 @@ class TestTemplate(test_utils.CommonTest):
                 }
 
                 for file in tc["apply_files"]:
-                    result = demo.create_nodegroup_result(cluster.nodes["master"], hide=False)
+                    result = demo.create_nodegroup_result(cluster.nodes["control-plane"], hide=False)
                     cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"], usage_limit=1)
 
                 # If test case is valid just run the function
@@ -116,7 +116,7 @@ class TestTemplate(test_utils.CommonTest):
 
                 for file in tc["apply_files"]:
                     cnt = 0
-                    for host in cluster.nodes['master'].get_hosts():
+                    for host in cluster.nodes['control-plane'].get_hosts():
                         history = cluster.fake_shell.history_find(host, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"])
                         if len(history) == 1 and history[0]["used_times"] == 1:
                             cnt += 1
@@ -138,7 +138,7 @@ class TestTemplate(test_utils.CommonTest):
 
         cluster = demo.new_cluster(inventory)
 
-        result = demo.create_nodegroup_result(cluster.nodes["master"], hide=False)
+        result = demo.create_nodegroup_result(cluster.nodes["control-plane"], hide=False)
         cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/template.yaml"], usage_limit=1)
 
         plugins.install(cluster, {'my_plugin': cluster.inventory['plugins']['my_plugin']})

@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any, Tuple, List, Callable, Union, Sequence, 
 import yaml
 
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine import jinja, keepalived, haproxy, controlplane, kubernetes, thirdparties
+from kubemarine import jinja, keepalived, haproxy, kubernetes, thirdparties
 from kubemarine.core import utils, static, log, os
 from kubemarine.core.proxytypes import Primitive, Index, Node
 from kubemarine.core.yaml_merger import default_merger
@@ -287,8 +287,7 @@ def _append_controlplain(inventory: dict, logger: log.EnhancedLogger) -> None:
                        'Your configuration may be incorrect. Trying to handle this problem automatically...')
 
     if internal_address is None or external_address is None:
-        # 'master' role is not deleted due to unit tests are not refactored
-        for role in ['balancer', 'control-plane', 'master']:
+        for role in ['balancer', 'control-plane']:
             # nodes are not compiled to groups yet
             for node in inventory['nodes']:
                 if role in node['roles']:
@@ -480,10 +479,7 @@ def dump_inventory(cluster: KubernetesCluster, context: dict, filename: str) -> 
     if not utils.is_dump_allowed(context, filename):
         return
 
-    inventory = utils.deepcopy_yaml(cluster.inventory)
-    inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, inventory)
-
-    data = yaml.dump(inventory_for_dump)
+    data = yaml.dump(cluster.inventory)
     utils.dump_file(context, data, filename)
 
 

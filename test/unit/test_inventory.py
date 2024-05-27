@@ -25,7 +25,7 @@ from kubemarine.core import errors
 class TestInventoryValidation(unittest.TestCase):
 
     def test_labels_check(self):
-        inventory = demo.generate_inventory(master=0, balancer=1, worker=0)
+        inventory = demo.generate_inventory(control_plane=0, balancer=1, worker=0)
         inventory["nodes"][0]["labels"] = {"should": "fail"}
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory)
@@ -33,7 +33,7 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertIn("Only 'worker' or 'control-plane' nodes can have labels", str(context.exception))
 
     def test_taints_check(self):
-        inventory = demo.generate_inventory(master=0, balancer=1, worker=0)
+        inventory = demo.generate_inventory(control_plane=0, balancer=1, worker=0)
         inventory["nodes"][0]["taints"] = ["should fail"]
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory)
@@ -41,14 +41,14 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertIn("Only 'worker' or 'control-plane' nodes can have taints", str(context.exception))
 
     def test_invalid_node_name(self):
-        inventory = demo.generate_inventory(master=1, balancer=0, worker=0)
+        inventory = demo.generate_inventory(control_plane=1, balancer=0, worker=0)
         inventory["nodes"][0]["name"] = "bad_node/name"
 
         with self.assertRaises(Exception):
             demo.new_cluster(inventory)
 
     def test_correct_node_name(self):
-        inventory = demo.generate_inventory(master=1, balancer=0, worker=0)
+        inventory = demo.generate_inventory(control_plane=1, balancer=0, worker=0)
         inventory["nodes"][0]["name"] = "correct-node.name123"
         demo.new_cluster(inventory)
 
@@ -193,43 +193,43 @@ class TestInventoryValidation(unittest.TestCase):
     def test_new_group_from_nodes(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
-        group = cluster.create_group_from_groups_nodes_names([], ['balancer-1', 'master-1'])
+        group = cluster.create_group_from_groups_nodes_names([], ['balancer-1', 'control-plane-1'])
         self.assertEqual(2, len(group.nodes))
 
         node_names = group.get_nodes_names()
         self.assertIn('balancer-1', node_names)
-        self.assertIn('master-1', node_names)
+        self.assertIn('control-plane-1', node_names)
 
     def test_new_group_from_groups(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
-        group = cluster.create_group_from_groups_nodes_names(['master', 'balancer'], [])
+        group = cluster.create_group_from_groups_nodes_names(['control-plane', 'balancer'], [])
         self.assertEqual(5, len(group.nodes))
 
         node_names = group.get_nodes_names()
         self.assertIn('balancer-1', node_names)
         self.assertIn('balancer-2', node_names)
-        self.assertIn('master-1', node_names)
-        self.assertIn('master-2', node_names)
-        self.assertIn('master-3', node_names)
+        self.assertIn('control-plane-1', node_names)
+        self.assertIn('control-plane-2', node_names)
+        self.assertIn('control-plane-3', node_names)
 
     def test_new_group_from_nodes_and_groups_multi(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
-        group = cluster.create_group_from_groups_nodes_names(['master'], ['balancer-1'])
+        group = cluster.create_group_from_groups_nodes_names(['control-plane'], ['balancer-1'])
         self.assertEqual(4, len(group.nodes))
 
         node_names = group.get_nodes_names()
         self.assertIn('balancer-1', node_names)
-        self.assertIn('master-1', node_names)
-        self.assertIn('master-2', node_names)
-        self.assertIn('master-3', node_names)
+        self.assertIn('control-plane-1', node_names)
+        self.assertIn('control-plane-2', node_names)
+        self.assertIn('control-plane-3', node_names)
 
     def test_roles_in_inventory(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        nodes = cluster.nodes['master'].get_ordered_members_list()
+        nodes = cluster.nodes['control-plane'].get_ordered_members_list()
         self.assertEqual(3, len(nodes))
         nodes = cluster.nodes['control-plane'].get_ordered_members_list()
         self.assertEqual(3, len(nodes))
@@ -303,7 +303,7 @@ class TestInventoryValidation(unittest.TestCase):
         # This check validates, that default value is calculated correctly for different schemas
 
         # All-in-one without balancers
-        inventory = demo.generate_inventory(balancer=0, worker=1, master=1)
+        inventory = demo.generate_inventory(balancer=0, worker=1, control_plane=1)
         cluster = demo.new_cluster(inventory)
         self.assertEqual(80, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
@@ -367,7 +367,7 @@ class TestInventoryValidation(unittest.TestCase):
         # This check validates, that default value is calculated correctly for different schemas
 
         # All-in-one without balancers
-        inventory = demo.generate_inventory(balancer=0, worker=1, master=1)
+        inventory = demo.generate_inventory(balancer=0, worker=1, control_plane=1)
         cluster = demo.new_cluster(inventory)
         self.assertEqual('false', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
 

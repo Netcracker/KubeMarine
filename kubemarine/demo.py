@@ -554,7 +554,7 @@ def generate_nodes_context(inventory: dict, procedure_inventory: dict = None, co
     return context
 
 
-def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker: _ROLE_SPEC = 1,
+def generate_inventory(balancer: _ROLE_SPEC = 1, control_plane: _ROLE_SPEC = 1, worker: _ROLE_SPEC = 1,
                        keepalived: _ROLE_SPEC = 0, haproxy_mntc: _ROLE_SPEC = 0) -> dict:
     inventory: dict = {
         'node_defaults': {
@@ -570,28 +570,19 @@ def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker:
 
     id_roles_map: Dict[str, List[str]] = {}
 
-    for role_name, item in (('balancer', balancer), ('master', master), ('worker', worker)):
+    for role_name, item in (('balancer', balancer), ('control-plane', control_plane), ('worker', worker)):
 
         if isinstance(item, int):
-            ids = []
-            if item > 0:
-                for i in range(0, item):
-                    ids.append('%s-%s' % (role_name, i + 1))
-            item = ids
+            item = [f'{role_name}-{i + 1}' for i in range(item)]
 
-        if item:
-            for id_ in item:
-                roles = id_roles_map.get(id_)
-                if roles is None:
-                    roles = []
-                roles.append(role_name)
-                id_roles_map[id_] = roles
+        for id_ in item:
+            id_roles_map.setdefault(id_, []).append(role_name)
 
     ip_i = 0
 
     for id_, roles in id_roles_map.items():
         ip_i = ip_i + 1
-        if "master" in roles and worker == 0:
+        if "control-plane" in roles and worker == 0:
             roles.append('worker')
         inventory['nodes'].append({
             'name': id_,
@@ -686,11 +677,17 @@ def new_scheme(scheme: dict, role: str, number: int) -> dict:
     return scheme
 
 
-FULLHA: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': 3}
-FULLHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
-FULLHA_NOBALANCERS: Dict[str, _ROLE_SPEC] = {'balancer': 0, 'master': 3, 'worker': 3}
-ALLINONE: Dict[str, _ROLE_SPEC] = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
-MINIHA: Dict[str, _ROLE_SPEC] = {'master': 3}
-MINIHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
-                                            'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
-NON_HA_BALANCER: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}
+FULLHA: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'control_plane': 3, 'worker': 3}
+FULLHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'balancer': 2, 'control_plane': 3, 'worker': 3, 'keepalived': 1}
+FULLHA_NOBALANCERS: Dict[str, _ROLE_SPEC] = {'balancer': 0, 'control_plane': 3, 'worker': 3}
+ALLINONE: Dict[str, _ROLE_SPEC] = {
+    'control_plane': 1, 'balancer': ['control-plane-1'], 'worker': ['control-plane-1'],
+    'keepalived': 1}
+MINIHA: Dict[str, _ROLE_SPEC] = {'control_plane': 3}
+MINIHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {
+    'control_plane': 3,
+    'balancer': ['control-plane-1', 'control-plane-2', 'control-plane-3'],
+    'worker': ['control-plane-1', 'control-plane-2', 'control-plane-3'],
+    'keepalived': 1}
+NON_HA_BALANCER: Dict[str, _ROLE_SPEC] = {
+    'balancer': 1, 'control_plane': 3, 'worker': ['control-plane-1', 'control-plane-2', 'control-plane-3']}

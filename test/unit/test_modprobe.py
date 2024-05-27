@@ -28,7 +28,7 @@ def actual_kernel_modules(node: NodeGroup) -> List[str]:
 
 class ModulesEnrichment(unittest.TestCase):
     def setUp(self):
-        self.inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        self.inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         self.inventory['services'].setdefault('modprobe', {})['debian'] = []
 
@@ -54,7 +54,7 @@ class ModulesEnrichment(unittest.TestCase):
             {'modulename': 'custom_module', 'groups': ['control-plane']}
         ]
         cluster = self.new_cluster()
-        self.assertEqual({'master-1'},
+        self.assertEqual({'control-plane-1'},
                          self._nodes_having_modules(cluster, 'custom_module'))
 
     def test_generate_config_specific_nodes(self):
@@ -126,12 +126,12 @@ class ModulesEnrichment(unittest.TestCase):
 
     def test_multiple_os_family_merge(self):
         supported_os_families = list(packages.get_associations_os_family_keys())
-        self.inventory = demo.generate_inventory(master=len(supported_os_families))
+        self.inventory = demo.generate_inventory(control_plane=len(supported_os_families))
         self.nodes_context = demo.generate_nodes_context(self.inventory)
 
         control_plane_i = 0
         for node in self.inventory['nodes']:
-            if 'master' not in node['roles']:
+            if 'control-plane' not in node['roles']:
                 continue
 
             os_family = supported_os_families[control_plane_i]
@@ -161,7 +161,7 @@ class ModulesEnrichment(unittest.TestCase):
     def test_default_enrichment(self):
         for os_family in packages.get_associations_os_family_keys():
             with self.subTest(os_family):
-                self.inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+                self.inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
                 os_name, os_version = self._get_os_context(os_family)
                 self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
 
@@ -179,7 +179,7 @@ class ModulesEnrichment(unittest.TestCase):
     def test_ipv6_default_enrichment(self):
         for os_family in packages.get_associations_os_family_keys():
             with self.subTest(os_family):
-                self.inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+                self.inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
                 os_name, os_version = self._get_os_context(os_family)
                 self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
                 for i, node in enumerate(self.inventory['nodes']):

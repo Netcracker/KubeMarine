@@ -33,21 +33,21 @@ class KubernetesClusterTest(unittest.TestCase):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_make_group_from_strs(self):
-        expected_group = self.cluster.nodes['master']
+        expected_group = self.cluster.nodes['control-plane']
         actual_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3', '10.101.1.4'])
-        self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to master group")
+        self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to control-plane group")
 
     def test_make_group_from_nodegroups(self):
-        masters = self.cluster.nodes['master']
+        control_planes = self.cluster.nodes['control-plane']
         balancer = self.cluster.nodes['balancer']
-        expected_group = balancer.include_group(masters)
-        actual_group = self.cluster.make_group([balancer, masters])
+        expected_group = balancer.include_group(control_planes)
+        actual_group = self.cluster.make_group([balancer, control_planes])
         self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to merged group")
 
     def test_make_group_from_mixed_types(self):
         actual_group = self.cluster.make_group([
             '10.101.1.1',
-            self.cluster.nodes['master'],
+            self.cluster.nodes['control-plane'],
             '10.101.1.5',
             '10.101.1.6',
             '10.101.1.7'
@@ -254,8 +254,8 @@ class LightClusterTest(unittest.TestCase):
 
         cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
 
-        self.assertIn('control-plane', cluster.inventory['nodes'][0]['roles'])
-        self.assertEqual('control-plane-1', cluster.nodes['control-plane'].get_node_name())
+        self.assertIn('master', cluster.inventory['nodes'][0]['roles'])
+        self.assertEqual('control-plane-1', cluster.nodes['master'].get_node_name())
 
     def test_recursive_compile_inventory(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)

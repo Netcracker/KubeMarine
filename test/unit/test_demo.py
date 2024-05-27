@@ -25,7 +25,7 @@ from kubemarine import demo, system
 class TestInventoryGenerator(unittest.TestCase):
 
     def test_fullha_generation(self):
-        inventory = demo.generate_inventory(balancer=1, master=3, worker=3)
+        inventory = demo.generate_inventory(balancer=1, control_plane=3, worker=3)
         self.assertEqual(7, len(inventory['nodes']), msg="The received number of nodes does not match the expected")
 
 
@@ -61,9 +61,9 @@ class TestFakeShell(unittest.TestCase):
         self.cluster.fake_shell.add(demo.create_nodegroup_result(self.cluster.nodes['all'], stdout='example result 2'),
                                     'run', ["sudo -S -p '[sudo] password: ' last reboot"], usage_limit=1)
 
-        system.reboot_group(self.cluster.nodes['master'])
+        system.reboot_group(self.cluster.nodes['control-plane'])
 
-        for host in self.cluster.nodes['master'].get_hosts():
+        for host in self.cluster.nodes['control-plane'].get_hosts():
             self.assertEqual(1,
                              len(self.cluster.fake_shell.history_find(host, 'sudo', ['last reboot'])),
                              msg="Wrong number of reboots in history")
@@ -86,7 +86,7 @@ class TestFakeFS(unittest.TestCase):
             with open(file, 'rb') as f:
                 expected_data = f.read().decode('utf-8')
 
-            node_hostname = self.cluster.nodes['master'].get_hosts()[0]
+            node_hostname = self.cluster.nodes['control-plane'].get_hosts()[0]
 
             self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', file)
             actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
@@ -95,7 +95,7 @@ class TestFakeFS(unittest.TestCase):
 
     def test_put_bytesio(self):
         expected_data = io.BytesIO(b'hello\nworld')
-        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
+        node_hostname = self.cluster.nodes['control-plane'].get_hosts()[0]
 
         self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', expected_data)
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt').encode('utf-8')
@@ -103,7 +103,7 @@ class TestFakeFS(unittest.TestCase):
         self.assertEqual(expected_data.getvalue(), actual_data, msg="Written and read data are not equal")
 
     def test_get_nonexistent(self):
-        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
+        node_hostname = self.cluster.nodes['control-plane'].get_hosts()[0]
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
         self.assertIsNone(actual_data, msg="Reading did not return None in response")
 
