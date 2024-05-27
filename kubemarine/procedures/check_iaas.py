@@ -1420,13 +1420,6 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
                 cri_root = cluster.inventory['services']['cri']['containerdConfig']['root']
             else:
                 cri_root = "/var/lib/containerd"
-        # Get rid of that part after KubeMarine stop supporting Kubernetes version lower v1.24
-        if cluster.inventory['services']['cri']['containerRuntime'] == "docker":
-            # Docker root
-            if cluster.inventory['services']['cri']['dockerConfig'].get('data-root', ""):
-                cri_root = cluster.inventory['services']['cri']['dockerConfig']['data-root']
-            else:
-                cri_root = "/var/lib/docker"
         if not cri_root:
             raise TestWarn("Check cannot be completed, unknown CRI")
         cluster.log.debug("Mount options check")

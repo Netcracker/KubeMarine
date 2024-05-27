@@ -53,7 +53,7 @@ def services_status(cluster: KubernetesCluster, service_type: str) -> None:
             group = cluster.make_group_from_roles(['balancer'])
         elif service_type == 'keepalived':
             group = cluster.make_group_from_roles(['keepalived'])
-        elif service_type in ('docker', 'containerd', 'kubelet'):
+        elif service_type in ('containerd', 'kubelet'):
             group = cluster.make_group_from_roles(['control-plane', 'worker'])
 
         if group.is_empty():
@@ -177,7 +177,7 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str) -> Non
 
         check_packages_versions(cluster, tc, hosts_to_packages, require_same_version, raise_successful=False)
 
-        if pckg_alias in ["haproxy", "keepalived", "containerd", "docker"]:
+        if pckg_alias in ["haproxy", "keepalived", "containerd"]:
             recommended_system_package_versions(cluster, pckg_alias)
         tc.success("all packages have correct versions")
 
@@ -1086,7 +1086,6 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
     cri_impl: str = cluster.inventory['services']['cri']['containerRuntime']
     with TestCase(cluster, '204', "Services", f"{cri_impl.capitalize()} Configuration Check") as tc:
         if cluster.inventory['services']['cri']['containerRuntime'] != 'containerd':
-            # Check for docker is not yet implemented
             return tc.success(results='valid')
 
         expected_config = containerd.get_config_as_toml(cluster.inventory['services']['cri']['containerdConfig'])

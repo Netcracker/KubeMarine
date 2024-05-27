@@ -63,15 +63,13 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     ]
 
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
-    if cri_impl == "docker":
-        backup_files_list.append("/etc/docker/daemon.json")
-    elif cri_impl == "containerd":
-        backup_files_list.append("/etc/containerd/config.toml")
-        backup_files_list.append("/etc/crictl.yaml")
-        backup_files_list.append("/etc/ctr/kubemarine_ctr_flags.conf")
-        config_path = containerd.get_config_path(cluster.inventory)
-        if config_path:
-            backup_files_list.append(config_path)
+
+    backup_files_list.append("/etc/containerd/config.toml")
+    backup_files_list.append("/etc/crictl.yaml")
+    backup_files_list.append("/etc/ctr/kubemarine_ctr_flags.conf")
+    config_path = containerd.get_config_path(cluster.inventory)
+    if config_path:
+        backup_files_list.append(config_path)
 
 
     return backup_files_list
@@ -231,27 +229,16 @@ def select_etcd_node(cluster: KubernetesCluster) -> Tuple[NodeGroup, bool]:
 def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup) -> str:
     # TODO: Detect ETCD version via /etc/kubernetes/manifests/etcd.yaml config if presented, otherwise use containers
     node_name = etcd_node.get_node_name()
-    if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
-        cont_inspect = "docker inspect $(sudo docker ps -a | grep etcd-%s | awk '{print $1; exit}')" % node_name
-        etcd_container_json = json.loads(list(etcd_node.sudo(cont_inspect).values())[0].stdout)[0]
-        etcd_image_sha = etcd_container_json['Image'][7:]  # remove "sha256:" prefix
 
-        images_result = etcd_node.sudo("docker image ls --format '{{json .}}'")
-        formatted_images_result = "[" + ",".join(list(images_result.values())[0].stdout.strip().split('\n')) + "]"
-        images_json = json.loads(formatted_images_result)
-        for image in images_json:
-            if image['ID'] == etcd_image_sha[:len(image['ID'])]:
-                return f"{image['Repository']}:{image['Tag']}"
-    else:
-        cont_search = "sudo crictl ps --label io.kubernetes.pod.name=etcd-%s -aq | awk '{print $1; exit}'" % node_name
-        cont_inspect = f"crictl inspect $({cont_search})"
-        etcd_container_json = json.loads(list(etcd_node.sudo(cont_inspect).values())[0].stdout)
-        etcd_image_sha = etcd_container_json['info']['config']['image']['image']
+    cont_search = "sudo crictl ps --label io.kubernetes.pod.name=etcd-%s -aq | awk '{print $1; exit}'" % node_name
+    cont_inspect = f"crictl inspect $({cont_search})"
+    etcd_container_json = json.loads(list(etcd_node.sudo(cont_inspect).values())[0].stdout)
+    etcd_image_sha = etcd_container_json['info']['config']['image']['image']
 
-        images_json = json.loads(list(etcd_node.sudo("crictl images -v -o json").values())[0].stdout)['images']
-        for image in images_json:
-            if image['id'] == etcd_image_sha:
-                return f"{image['repoTags'][0]}"
+    images_json = json.loads(list(etcd_node.sudo("crictl images -v -o json").values())[0].stdout)['images']
+    for image in images_json:
+        if image['id'] == etcd_image_sha:
+            return f"{image['repoTags'][0]}"
 
     raise Exception("Unable to find etcd image on node %s" % node_name)
 
