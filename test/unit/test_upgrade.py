@@ -1118,7 +1118,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
         # pylint: disable-next=attribute-defined-outside-init
         self.context = demo.create_silent_context(['fake_path.yaml', '--tasks', tasks_filter], procedure='upgrade')
 
-        kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'master', 'control-plane'})]
+        kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'control-plane'})]
         with utils.mock_call(kubernetes.autodetect_non_upgraded_nodes, return_value=kubernetes_nodes):
             return self.run_actions()
 
@@ -1141,7 +1141,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
         return [node for node in self.inventory['nodes'] if set(node['roles']) & roles]
 
     def _first_control_plane(self) -> dict:
-        return self._get_nodes({'master', 'control-plane'})[0]
+        return self._get_nodes({'control-plane'})[0]
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (

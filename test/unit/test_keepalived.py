@@ -129,7 +129,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
 
     def test_vrrp_defined_no_hosts_and_balancers(self):
         # vrrp_ip defined, but hosts for it is not defined + no balancers to auto determine
-        inventory = demo.generate_inventory(balancer=0, master=3, worker=3, keepalived=1)
+        inventory = demo.generate_inventory(balancer=0, control_plane=3, worker=3, keepalived=1)
         # Cluster is enriched with warnings, and the VRRP IP is not taken into account.
         cluster = demo.new_cluster(inventory)
 
@@ -141,8 +141,8 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertEqual([], finalized_inventory['vrrp_ips'][0]['hosts'])
 
     def test_vrrp_assigned_not_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
-        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'control-plane' in node['roles'])
         inventory['vrrp_ips'][0] = {
             'ip': inventory['vrrp_ips'][0],
             'hosts': [first_control_plane['name']]
@@ -159,7 +159,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertEqual(first_control_plane['name'], finalized_inventory['vrrp_ips'][0]['hosts'][0]['name'])
 
     def test_vrrp_remove_only_balancer_enrich_group_finalized_hosts_empty(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
         balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         cluster = self._new_remove_node_cluster(inventory, [balancer])
@@ -180,7 +180,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertEqual(inventory['vrrp_ips'], cluster.formatted_inventory['vrrp_ips'])
 
     def test_vrrp_assigned_to_removed_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=2, keepalived=2)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=2, keepalived=2)
         balancers = [node for node in inventory['nodes'] if 'balancer' in node['roles']]
         inventory['vrrp_ips'][0] = {
             'ip': inventory['vrrp_ips'][0],
@@ -213,7 +213,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertEqual(inventory['vrrp_ips'], cluster.formatted_inventory['vrrp_ips'])
 
     def test_remove_and_add_only_balancer(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
         balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         cluster = self._new_remove_node_cluster(inventory, [balancer])
@@ -366,7 +366,7 @@ class TestKeepalivedInstallation(unittest.TestCase):
 class TestKeepalivedConfigGeneration(unittest.TestCase):
 
     def test_skip_vrrp_not_assigned(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=2, keepalived=2)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=2, keepalived=2)
         first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
         inventory['vrrp_ips'][0] = {
             'ip': inventory['vrrp_ips'][0],
@@ -387,7 +387,7 @@ class TestKeepalivedConfigGeneration(unittest.TestCase):
         self.assertIn(f"vrrp_instance balancer_{enriched_vrrp_ips[1]['id']}", config_2)
 
     def test_skip_removed_peers(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=3, keepalived=1)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=3, keepalived=1)
         first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
@@ -410,7 +410,7 @@ class TestKeepalivedConfigGeneration(unittest.TestCase):
         self.assertIn(only_left_peer_template.format(peer=balancers[1]['internal_address']), config_3)
 
     def test_default_global_defs(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
         first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         cluster = demo.new_cluster(inventory)
@@ -419,7 +419,7 @@ class TestKeepalivedConfigGeneration(unittest.TestCase):
         self.assertNotIn("global_defs", config_1)
 
     def test_default_overriden_global_defs(self):
-        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        inventory = demo.generate_inventory(control_plane=3, worker=3, balancer=1, keepalived=1)
         first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
 
         vrrp_garp_master_refresh = 60

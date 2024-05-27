@@ -249,7 +249,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # if nginx-ingress-controller plugin is disabled at all
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -273,7 +273,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # if no balancers are presented (in current cluster and as part of add/remove configuration)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=0)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=0)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = inventory['nodes'][0]
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -290,7 +290,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_node_not_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we don't add balancers
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -301,7 +301,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_remove_node_not_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we don't remove balancers
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -311,7 +311,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_node_not_first_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we add not first balancer
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=2)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -322,7 +322,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_remove_node_not_last_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we remove the last balancer from cluster
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=2)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -333,7 +333,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # Need to redeploy nginx-ingress-controller for add_node procedure,
         # if we add the first balancer
         # and changed parameters are not overriden by user
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -345,7 +345,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # Need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we remove the last balancer
         # and changed parameters are not overriden by user
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -358,7 +358,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only use-proxy-protocol (ingress ports should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -385,7 +385,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only one http port (use-proxy-protocol and https port should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -412,7 +412,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only one https port (use-proxy-protocol and http port should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -439,7 +439,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # but user overrides use-proxy protocol and target http/https port (constant configuration)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -474,7 +474,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides ds ports directly, that has more priority (use-proxy-protocol should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -507,7 +507,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides use-proxy-protocol and ds ports directly, that has more priority
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {

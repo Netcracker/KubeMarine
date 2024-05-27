@@ -53,10 +53,10 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
                     demo.new_cluster(inventory)
 
                 if try_mntc:
-                    self.assertEqual(haproxy.ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC % 'master-1', str(cm.exception),
+                    self.assertEqual(haproxy.ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC % 'control-plane-1', str(cm.exception),
                                      "Invalid exception message")
                 else:
-                    self.assertEqual(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED % 'master-1', str(cm.exception),
+                    self.assertEqual(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED % 'control-plane-1', str(cm.exception),
                                      "Invalid exception message")
 
 

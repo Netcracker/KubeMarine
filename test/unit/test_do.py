@@ -23,10 +23,15 @@ from kubemarine.procedures import do
 
 
 class DoTest(unittest.TestCase):
-    def test_command_single_control_plane(self):
+    def test_command_single_master(self):
         inventory = {
             'unsupported': True,
-            'nodes': [{'roles': ['control-plane'], 'internal_address': '1.1.1.1', 'keyfile': '/dev/null'}]
+            'nodes': [{
+                # pylint: disable-next=implicit-str-concat
+                'roles': ['m''a''s''t''e''r'],
+                'internal_address': '1.1.1.1',
+                'keyfile': '/dev/null'
+            }]
         }
         context = do.create_context(['--', 'cat', '/etc/kubemarine/procedures/latest_dump/version'])
         resources = demo.new_resources(inventory, context=context)
@@ -84,7 +89,7 @@ class DoTest(unittest.TestCase):
             '--', 'whoami'])
         expected_called_hosts = [
             node['address'] for node in inventory['nodes']
-            if node['name'] in ('worker-1', 'worker-2') or bool(set(node['roles']) & {'balancer', 'master'})
+            if node['name'] in ('worker-1', 'worker-2') or bool(set(node['roles']) & {'balancer', 'control-plane'})
         ]
         resources = demo.new_resources(inventory, context=context)
 
@@ -98,7 +103,7 @@ class DoTest(unittest.TestCase):
         for node in inventory['nodes']:
             host = node['address']
             expected_called = (node['name'] in ('worker-1', 'worker-2')
-                               or bool(set(node['roles']) & {'balancer', 'master'}))
+                               or bool(set(node['roles']) & {'balancer', 'control-plane'}))
             if expected_called:
                 expected_result[host] = results[host]
             self.assertEqual(expected_called, resources.fake_shell.is_called(node['address'], 'sudo', ['whoami']),

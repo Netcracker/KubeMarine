@@ -1170,8 +1170,7 @@ def get_actual_roles(nodes_description: dict) -> Dict[str, List[str]]:
         node_name = node_description['metadata']['name']
         labels = node_description['metadata']['labels']
         result[node_name] = []
-        # TODO check label accordingly to Kubernetes version
-        if 'node-role.kubernetes.io/master' in labels or 'node-role.kubernetes.io/control-plane' in labels:
+        if 'node-role.kubernetes.io/control-plane' in labels:
             result[node_name].append('control-plane')
         if 'node-role.kubernetes.io/worker' in labels:
             result[node_name].append('worker')

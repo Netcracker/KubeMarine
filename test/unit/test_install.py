@@ -30,7 +30,7 @@ class ManageMandatoryPackages(unittest.TestCase):
         for node in self.inventory['nodes']:
             host = node['address']
             for pkg in ('conntrack', 'iptables'):
-                if 'master' in node['roles'] or 'worker' in node['roles']:
+                if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                     self.mandatory_pkgs_setup[pkg].append(host)
             for pkg in ('openssl', 'curl', 'kmod'):
                 self.mandatory_pkgs_setup[pkg].append(host)
@@ -86,7 +86,7 @@ class ManageMandatoryPackages(unittest.TestCase):
 
     def test_install_unzip(self):
         thirdparties = self.inventory.setdefault('services', {}).setdefault('thirdparties', {})
-        nodes = ['balancer-1', 'master-2']
+        nodes = ['balancer-1', 'control-plane-2']
         thirdparties['target.zip'] = {
             "source": "source.zip",
             "unpack": "target/dir",
