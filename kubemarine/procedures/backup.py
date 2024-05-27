@@ -62,8 +62,6 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
         "/etc/systemd/system/kubelet.service"
     ]
 
-    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
-
     backup_files_list.append("/etc/containerd/config.toml")
     backup_files_list.append("/etc/crictl.yaml")
     backup_files_list.append("/etc/ctr/kubemarine_ctr_flags.conf")
@@ -226,7 +224,7 @@ def select_etcd_node(cluster: KubernetesCluster) -> Tuple[NodeGroup, bool]:
         return cluster.nodes['control-plane'].get_any_member(), False
 
 
-def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup) -> str:
+def retrieve_etcd_image(etcd_node: NodeGroup) -> str:
     # TODO: Detect ETCD version via /etc/kubernetes/manifests/etcd.yaml config if presented, otherwise use containers
     node_name = etcd_node.get_node_name()
 
