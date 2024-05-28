@@ -42,7 +42,6 @@ def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
 
 def prepull_images(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Prepulling Kubernetes images...")
-    fix_cri_socket(cluster)
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
@@ -277,20 +276,6 @@ def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str], logger: 
         logger.debug(f"Cannot early validate upgrade versions for jinja templates")
 
     return upgrade_plan
-
-
-def fix_cri_socket(cluster: KubernetesCluster) -> None:
-    """
-    This method fixs the issue with 'kubeadm.alpha.kubernetes.io/cri-socket' node annotation
-    and delete the docker socket if it exists
-    """
-
-    if cluster.inventory["services"]["cri"]["containerRuntime"] == "containerd":
-        control_plane = cluster.nodes["control-plane"].get_first_member()
-        control_plane.sudo(f"sudo kubectl annotate nodes --all "
-                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
-        upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-        upgrade_group.sudo("rm -rf /var/run/docker.sock")
 
 
 if __name__ == '__main__':

@@ -21,7 +21,7 @@ from typing import List, Union
 import yaml
 
 import kubemarine.patches
-from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties, haproxy, keepalived
+from kubemarine import kubernetes, plugins, packages, etcd, thirdparties, haproxy, keepalived
 from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
@@ -108,14 +108,13 @@ class CriUpgradeAction(Action):
         if not self._associations_changed(cluster):
             return
 
-        cri_impl = cri.get_cri_impl(cluster.inventory)
-        res.context['upgrading_package'] = cri_impl
+        res.context['upgrading_package'] = 'containerd'
         res.reset_cluster(EnrichmentStage.DEFAULT)
 
         # Run full enrichment to apply procedure inventory based on new context.
         cluster = res.cluster(EnrichmentStage.PROCEDURE)
-        if cri_impl not in cluster.context["upgrade"]["required"]['packages']:
-            res.logger().info(f"Nothing has changed in associations of {cri_impl!r}. Upgrade is not required.")
+        if 'containerd' not in cluster.context["upgrade"]["required"]['packages']:
+            res.logger().info(f"Nothing has changed in associations of 'containerd'. Upgrade is not required.")
             self._reset_upgrade_context(res.context)
             res.reset_cluster(EnrichmentStage.DEFAULT)
             return
@@ -169,7 +168,6 @@ class CriUpgradeAction(Action):
         Detects if upgrade is required for the given Kubernetes version, OS family and CRI implementation.
         """
         version = kubernetes.get_kubernetes_version(cluster.inventory)
-        cri_impl = cri.get_cri_impl(cluster.inventory)
 
         os_family = cluster.get_os_family()
         if os_family not in packages.get_associations_os_family_keys():
@@ -177,7 +175,7 @@ class CriUpgradeAction(Action):
         version_key = packages.get_compatibility_version_key(os_family)
 
         changes_detected = False
-        packages_names = static.GLOBALS['packages'][os_family][cri_impl]['package_name']
+        packages_names = static.GLOBALS['packages'][os_family]['containerd']['package_name']
         for kv in packages_names:
             software_name = list(kv.values())[0]
             kubernetes_upgrade_list = self.upgrade_config['packages'][software_name][version_key]
@@ -185,7 +183,7 @@ class CriUpgradeAction(Action):
 
         if not changes_detected:
             cluster.log.info(f"Patch is not relevant for Kubernetes {version}, "
-                             f"based on {cri_impl} and {os_family!r} OS family")
+                             f"based on 'containerd' and {os_family!r} OS family")
 
         return changes_detected
 

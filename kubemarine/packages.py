@@ -256,7 +256,7 @@ def _get_system_packages_support_upgrade(cluster: KubernetesCluster) -> List[str
     context = cluster.context
     procedure = context["initial_procedure"]
     if procedure == 'upgrade':
-        return [cluster.previous_inventory['services']['cri']['containerRuntime']]
+        return ['containerd']
     elif procedure == "migrate_kubemarine" and "upgrading_package" in context:
         return [context['upgrading_package']]
 
@@ -364,10 +364,6 @@ def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory
         groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
         relevant_group = cluster.make_group_from_roles(groups)
 
-    if association_name in ('docker', 'containerd') \
-            and association_name != inventory['services']['cri']['containerRuntime']:
-        relevant_group = cluster.make_group([])
-
     relevant_group = relevant_group.intersection_group(group)
 
     for node in relevant_group.get_ordered_members_list():
@@ -423,8 +419,7 @@ def _cache_package_associations(group: NodeGroup, inventory: dict,
             final_packages_list.append(final_package)
 
         # if non-multiple value, then convert to simple string
-        # packages can contain multiple package values, like docker package
-        # (it has docker-ce, docker-cli and containerd.io packages for installation)
+        # packages can contain multiple package values
         if len(final_packages_list) == 1:
             associated_params['package_name'] = final_packages_list[0]
         else:

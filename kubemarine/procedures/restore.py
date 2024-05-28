@@ -98,11 +98,13 @@ def unpack_data(resources: DynamicResources) -> None:
 
 def stop_cluster(cluster: KubernetesCluster) -> None:
     cluster.log.debug('Stopping the existing cluster...')
-    result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
-                                              'sudo crictl rm -fa; '
-                                              'sudo crictl ps -a; '
-                                              'sudo rm -rf /var/lib/etcd; '
-                                              'sudo mkdir -p /var/lib/etcd', warn=True)
+    result = cluster.nodes['control-plane'].sudo(
+        'systemctl stop kubelet; '
+        'sudo crictl rm -fa; '
+        'sudo crictl ps -a; '
+        'sudo rm -rf /var/lib/etcd; '
+        'sudo mkdir -p /var/lib/etcd',
+        warn=True)
     cluster.log.verbose(result)
 
 
@@ -171,13 +173,9 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         initial_cluster_list_without_names.append('https://' + control_plane["internal_address"] + ":2379")
     initial_cluster = ','.join(initial_cluster_list)
 
-    cont_runtime = "ctr"
     container_name = f'etcd-{uuid.uuid4().hex}'
-    network_options = '--net-host'
     mount_options = '-mount type=bind,src=/var/lib/etcd,dst=/var/lib/etcd,options=rbind:rw ' \
                     '-mount type=bind,src=/etc/kubernetes/pki/etcd,dst=/etc/kubernetes/pki/etcd,options=rbind:rw'
-    name_option = ''
-    container_id = f'{container_name}'
 
     etcd_instances = 0
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
@@ -201,10 +199,10 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         _ = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
             f'sudo rm -rf /var/lib/etcd/snapshot {snap_name} && '
-            f'sudo {cont_runtime} run -d {network_options} '
-            f'--env ETCDCTL_API=3 {name_option} '
+            f'sudo ctr run -d --net-host '
+            f'--env ETCDCTL_API=3 '
             f'{mount_options} '
-            f'{etcd_image} {container_id} etcd '
+            f'{etcd_image} {container_name} etcd '
             f'--advertise-client-urls=https://{control_plane["internal_address"]}:2379 '
             f'--cert-file={etcd_cert} '
             f'--key-file={etcd_key} '
@@ -249,8 +247,9 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         cluster.log.verbose('It is not possible to verify db size - descriptor do not contain such information')
 
     # Stop and remove container
-    cluster.nodes['control-plane'].sudo(f"ctr task rm -f {container_name} && "
-                                            f"sudo ctr container rm {container_name}")
+    cluster.nodes['control-plane'].sudo(
+        f"ctr task rm -f {container_name} && "
+        f"sudo ctr container rm {container_name}")
 
 
 def reboot(cluster: KubernetesCluster) -> None:

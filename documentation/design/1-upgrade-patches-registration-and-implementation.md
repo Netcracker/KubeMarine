@@ -24,7 +24,7 @@ New config file `kubemarine/patches/software_upgrade.yaml` holds what software f
 The file is mostly automatically managed by third-party management tool `scripts/thirdparties/sync.py`.
 It should still be possible to manually specify what packages to upgrade.
 
-Supported software for upgrade: crictl, cri (containerd, docker), haproxy, keepalived, all out-of-box plugins.
+Supported software for upgrade: crictl, cri (containerd), haproxy, keepalived, all out-of-box plugins.
 
 The file is automatically cleared after new Kubemarine release / iteration.
 

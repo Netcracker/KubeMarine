@@ -52,8 +52,7 @@ class Packages(SoftwareType):
         """
         Actualize compatibility_map of all packages.
         """
-        package_names = ['docker', 'containerd', 'containerdio',
-                         'haproxy', 'keepalived']
+        package_names = ['containerd', 'containerdio', 'haproxy', 'keepalived']
         k8s_versions = summary_tracker.all_k8s_versions
 
         upgrade_packages = UpgradePackages(self.upgrade_config, self.name, package_names)
@@ -92,6 +91,8 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
         keys.remove('version_rhel')
         keys.remove('version_rhel8')
         keys.remove('version_rhel9')
+    elif package_name == 'containerdio':
+        keys.remove('version_debian')
 
     return keys
 

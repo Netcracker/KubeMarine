@@ -127,7 +127,6 @@ services:
       group: control-plane
     /usr/bin/calicoctl:
       group: control-plane
-    # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       unpack: /usr/bin/
 
@@ -140,17 +139,6 @@ services:
         runtime_type: "io.containerd.runc.v2"
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
         SystemdCgroup: '{% if services.kubeadm_kubelet.cgroupDriver == "systemd" %}true{% else %}false{% endif %}'
-    dockerConfig:
-      ipv6: False
-      log-driver: json-file
-      log-opts:
-        max-size: 64m
-        max-file: "3"
-      exec-opts:
-        - native.cgroupdriver=systemd
-      icc: False
-      live-restore: True
-      userland-proxy: False
 
   modprobe:
     rhel:

@@ -1083,11 +1083,7 @@ def etcd_health_status(cluster: KubernetesCluster) -> None:
 
 
 def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
-    cri_impl: str = cluster.inventory['services']['cri']['containerRuntime']
-    with TestCase(cluster, '204', "Services", f"{cri_impl.capitalize()} Configuration Check") as tc:
-        if cluster.inventory['services']['cri']['containerRuntime'] != 'containerd':
-            return tc.success(results='valid')
-
+    with TestCase(cluster, '204', "Services", f"Containerd Configuration Check") as tc:
         expected_config = containerd.get_config_as_toml(cluster.inventory['services']['cri']['containerdConfig'])
         expected_registries = {registry: containerd.get_config_as_toml(registry_conf)
                                for registry, registry_conf in
@@ -1738,8 +1734,7 @@ tasks = OrderedDict({
             'status': lambda cluster: services_status(cluster, 'keepalived'),
         },
         'container_runtime': {
-            'status': lambda cluster:
-                services_status(cluster, cluster.inventory['services']['cri']['containerRuntime']),
+            'status': lambda cluster: services_status(cluster, 'containerd'),
             'configuration': container_runtime_configuration_check,
         },
         'kubelet': {
@@ -1753,8 +1748,7 @@ tasks = OrderedDict({
         },
         'packages': {
             'system': {
-                'cri_version': lambda cluster:
-                    system_packages_versions(cluster, cluster.inventory['services']['cri'][ 'containerRuntime']),
+                'cri_version': lambda cluster: system_packages_versions(cluster, 'containerd'),
                 'haproxy_version': lambda cluster: system_packages_versions(cluster, 'haproxy'),
                 'keepalived_version': lambda cluster: system_packages_versions(cluster, 'keepalived'),
                 'audit_version': lambda cluster: system_packages_versions(cluster, 'audit'),

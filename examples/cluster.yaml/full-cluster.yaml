@@ -100,19 +100,26 @@ services:
         enable-admission-plugins: NodeRestriction,PodNodeSelector
 
   cri:
-    containerRuntime: docker
-    dockerConfig:
-      ipv6: True
-      log-driver: json-file
-      log-opts:
-        max-size: 128m
-        max-file: "5"
-      exec-opts:
-        - native.cgroupdriver=systemd
-      insecure-registries:
-        - artifactory.example.com:5443
-      registry-mirrors:
-        - https://artifactory.example.com:5443
+    containerRuntime: containerd
+
+    containerdConfig:
+      version: 2
+      plugins."io.containerd.grpc.v1.cri":
+        sandbox_image: registry.k8s.io/pause:3.9
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
+        runtime_type: "io.containerd.runc.v2"
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
+        SystemdCgroup: true
+      plugins."io.containerd.grpc.v1.cri".registry:
+        config_path: "/etc/containerd/certs.d"
+      plugins."io.containerd.grpc.v1.cri".registry.configs."artifactory.example.com:5443".auth:
+        auth: "bmMtdXNlcjperfr="
+
+    containerdRegistriesConfig:
+      artifactory.example.com:5443:
+        host."https://artifactory.example.com:5443":
+          capabilities: ["pull", "resolve"]
+          skip_verify: true
 
   resolv.conf:
     search: default
@@ -243,10 +250,9 @@ services:
         package_name: 'haproxy'
         service_name: 'haproxy'
         config_location: '/etc/haproxy/haproxy.cfg'
-      docker:
+      containerd:
         package_name:
-          - 'docker-ce-19.03*'
-          - 'docker-ce-cli-19.03*'
+          - 'containerd.io-1.6*'
     install:
       include:
       - ethtool

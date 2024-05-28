@@ -1442,18 +1442,11 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '018', 'System', 'Filesystem mount options'):
 
         failed_nodes: Set[str] = set()
-        cri_root = ""
         # Only Kubernetes nodes should be checked
         group = cluster.make_group_from_roles(['control-plane', 'worker']).get_sudo_nodes()
-        # Get CRI root
-        if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
-            # Containerd root
-            if cluster.inventory['services']['cri']['containerdConfig'].get('root', ""):
-                cri_root = cluster.inventory['services']['cri']['containerdConfig']['root']
-            else:
-                cri_root = "/var/lib/containerd"
-        if not cri_root:
-            raise TestWarn("Check cannot be completed, unknown CRI")
+        # Containerd root
+        cri_root = cluster.inventory['services']['cri']['containerdConfig'].get('root', '/var/lib/containerd')
+
         cluster.log.debug("Mount options check")
         # Check the mount options for filesystem where containerd root is located.
         # If containerd root doesn't exist the script check the parent directory and so forth.

@@ -643,8 +643,6 @@ def generate_procedure_inventory(procedure: str) -> dict:
         procedure_inventory['psp'] = {}
     if procedure == 'manage_pss':
         procedure_inventory['pss'] = {'pod-security': 'enabled'}
-    if procedure == 'migrate_cri':
-        procedure_inventory['cri'] = {'containerRuntime': 'containerd'}
 
     return procedure_inventory
 

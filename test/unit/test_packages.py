@@ -177,23 +177,27 @@ class AssociationsEnrichment(unittest.TestCase):
 
     def test_propagate_global_section_to_os_specific(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = ['containerd=1.5.*']
-        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs
+        expected_pkgs_1 = 'haproxy'
+        expected_pkgs_2 = ['containerd=1.5.*']
+        package_associations(inventory, None, 'haproxy')['package_name'] = expected_pkgs_1
+        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs_2
         cluster = new_debian_cluster(inventory)
         associations = global_associations(cluster.inventory)
         self.assertEqual({'debian'}, associations.keys(),
                          "Associations should have only OS family specific sections")
 
         defs = get_compiled_defaults(cluster)
-        self.assertNotEqual(expected_pkgs, defs['debian']['containerd']['package_name'])
-        defs['debian']['containerd']['package_name'] = expected_pkgs
+        self.assertNotEqual(expected_pkgs_1, defs['debian']['haproxy']['package_name'])
+        self.assertNotEqual(expected_pkgs_2, defs['debian']['containerd']['package_name'])
+        defs['debian']['haproxy']['package_name'] = expected_pkgs_1
+        defs['debian']['containerd']['package_name'] = expected_pkgs_2
         self.assertEqual(defs, associations,
                          "Debian associations section was not enriched")
 
     def test_error_if_global_section_redefined_for_multiple_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = 'docker-ce'
-        package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs
+        expected_pkgs = 'containerd'
+        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context()
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
@@ -202,8 +206,8 @@ class AssociationsEnrichment(unittest.TestCase):
 
     def test_error_if_global_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = 'docker-ce'
-        package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs
+        expected_pkgs = 'containerd'
+        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
@@ -214,8 +218,8 @@ class AssociationsEnrichment(unittest.TestCase):
 
     def test_no_error_if_global_section_redefined_for_check_iaas_all_nodes_inaccessible(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = 'docker-ce'
-        package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs
+        expected_pkgs = 'containerd'
+        package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(procedure='check_iaas')
         nodes_context = {node['address']: demo.generate_node_context(accessible=False) for node in inventory['nodes']}
         # no error
@@ -223,8 +227,8 @@ class AssociationsEnrichment(unittest.TestCase):
 
     def test_success_if_os_specific_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        expected_pkgs = 'docker-ce'
-        package_associations(inventory, 'rhel', 'docker')['package_name'] = expected_pkgs
+        expected_pkgs = 'containerd'
+        package_associations(inventory, 'rhel', 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
