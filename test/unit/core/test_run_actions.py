@@ -25,7 +25,7 @@ from test.unit import utils as test_utils
 import yaml
 
 from kubemarine import demo, kubernetes, testsuite, procedures
-from kubemarine.core import flow, errors, action, utils, schema, resources as res, summary, defaults
+from kubemarine.core import flow, action, utils, schema, resources as res, summary, defaults
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import upgrade, install, check_iaas, check_paas, migrate_kubemarine
@@ -116,11 +116,8 @@ class RunActionsTest(test_utils.CommonTest):
         if exception_message is None:
             flow.run_actions(resources, actions)
         else:
-            with self.assertRaisesRegex(Exception, exception_message):
-                try:
-                    flow.run_actions(resources, actions)
-                except errors.FailException as e:
-                    raise e.reason
+            with test_utils.assert_raises_regex(self, Exception, exception_message):
+                flow.run_actions(resources, actions)
 
         return resources.cluster(EnrichmentStage.LIGHT).uploaded_archives
 
@@ -220,7 +217,7 @@ class RunActionsTest(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_upgrade_templates_two_versions(self):
-        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through, after = 'v1.26.11', 'v1.27.13', 'v1.28.9'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -252,7 +249,7 @@ class RunActionsTest(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_upgrade_templates_second_version_failed_task(self):
-        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through, after = 'v1.26.11', 'v1.27.13', 'v1.28.9'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -292,21 +289,21 @@ class RunActionsTest(test_utils.CommonTest):
             'kubernetesVersion': 'v1.26.11'
         }
         self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        self.procedure_inventory['upgrade_plan'] = ['v1.27.8']
+        self.procedure_inventory['upgrade_plan'] = ['v1.27.13']
 
         self._run_upgrade_with_failed_enrichment(version_verified=False)
 
-        dump_content = {'debug.log', 'v1.27.8'}
+        dump_content = {'debug.log', 'v1.27.13'}
         self.assertEqual(dump_content, self._list_dump_content())
-        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.8', 'cluster.yaml')))
-        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.8', 'cluster_finalized.yaml')))
+        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.13', 'cluster.yaml')))
+        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.13', 'cluster_finalized.yaml')))
 
     def test_upgrade_templates_failed_enrichment(self):
         for verified in (False, True):
             with self.subTest(f"version verified: {verified}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {
-                    'before': 'v1.26.11', 'after': 'v1.27.8'
+                    'before': 'v1.26.11', 'after': 'v1.27.13'
                 }
                 self.inventory['services']['kubeadm'] = {
                     'kubernetesVersion': '{{ values.before }}'
@@ -318,7 +315,7 @@ class RunActionsTest(test_utils.CommonTest):
 
                 dump_subdir = 'upgrade'
                 if verified:
-                    dump_subdir = 'v1.27.8'
+                    dump_subdir = 'v1.27.13'
 
                 dump_content = {'debug.log', dump_subdir}
                 self.assertEqual(dump_content, self._list_dump_content())
@@ -349,7 +346,7 @@ class RunActionsTest(test_utils.CommonTest):
         procedure_inventory_text = dedent("""\
             upgrade_plan:
               # comment
-              - "v1.27.8"
+              - "v1.27.13"
         """)
         self.procedure_inventory = yaml.safe_load(procedure_inventory_text)
         upgrade_plan = self.procedure_inventory['upgrade_plan']
@@ -558,7 +555,7 @@ class RunActionsTest(test_utils.CommonTest):
                     'kubernetesVersion': 'v1.26.11'
                 }
                 self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
-                self.procedure_inventory['upgrade_plan'] = ['v1.27.8']
+                self.procedure_inventory['upgrade_plan'] = ['v1.27.13']
                 self.prepare_context(procedure='upgrade')
                 self.context['upgrade_step'] = 0
 
@@ -665,7 +662,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
         ):
             with self.subTest(procedure):
                 inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-                kubernetes_version = 'v1.24.11' if procedure in 'manage_psp' else 'v1.27.8'
+                kubernetes_version = 'v1.24.11' if procedure in 'manage_psp' else 'v1.27.13'
                 inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
                 cri = 'containerd'
                 inventory['services'].setdefault('cri', {})['containerRuntime'] = cri
@@ -682,7 +679,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
                     procedure_inventory['backup_location'] = 'fake.tar.gz'
                     context['backup_descriptor'] = {}
                 elif procedure == 'upgrade':
-                    procedure_inventory['upgrade_plan'] = ['v1.28.8']
+                    procedure_inventory['upgrade_plan'] = ['v1.28.9']
                     context['upgrade_step'] = 0
 
                 with self._expected_calls(expected_calls):
@@ -693,7 +690,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.27.1'
 
         procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        upgrade_plan = ['v1.27.8', 'v1.28.8']
+        upgrade_plan = ['v1.27.13', 'v1.28.9']
         procedure_inventory['upgrade_plan'] = upgrade_plan
 
         context = demo.create_silent_context(['fake.yaml', '--without-act'], procedure='upgrade')
@@ -707,7 +704,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
         # pylint: disable=protected-access
 
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        kubernetes_version = 'v1.27.8'
+        kubernetes_version = 'v1.27.13'
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
 

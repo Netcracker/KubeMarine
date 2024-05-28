@@ -15,6 +15,7 @@
 
 
 import unittest
+from test.unit import utils as test_utils
 
 from kubemarine import coredns, system, demo
 
@@ -155,14 +156,23 @@ data:
 
     def test_configmap_generation_with_corefile_defaults(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+
+        def test(cluster_: demo.FakeKubernetesCluster):
+            config = coredns.generate_configmap(cluster_.inventory)
+            self.assertIn('prometheus :9153', config)
+            self.assertIn('cache 30', config)
+            self.assertIn('loadbalance', config)
+            self.assertIn('hosts /etc/coredns/Hosts', config)
+            self.assertIn('template IN A k8s.fake.local', config)
+            self.assertIn('forward . /etc/resolv.conf', config)
+            self.assertIn('answer "{{ .Name }} 3600 IN A %s"' % (cluster_.inventory['control_plain']['internal'],), config)
+            self.assertIn('authority "{{ .Name }} 3600 IN SOA', config)
+
         cluster = demo.new_cluster(inventory)
-        config = coredns.generate_configmap(cluster.inventory)
-        self.assertIn('prometheus :9153', config)
-        self.assertIn('cache 30', config)
-        self.assertIn('loadbalance', config)
-        self.assertIn('hosts /etc/coredns/Hosts', config)
-        self.assertIn('template IN A k8s.fake.local', config)
-        self.assertIn('forward . /etc/resolv.conf', config)
+        test(cluster)
+
+        cluster = demo.new_cluster(test_utils.make_finalized_inventory(cluster))
+        test(cluster)
 
     def test_configmap_generation_with_corefile_defaults_disabled(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -186,6 +196,8 @@ data:
         self.assertNotIn('hosts /etc/coredns/Hosts', config)
         self.assertIn('template IN A k8s.fake.local', config)
         self.assertNotIn('forward . /etc/resolv.conf', config)
+        self.assertIn('answer "{{ .Name }} 3600 IN A %s"' % (cluster.inventory['control_plain']['internal'],), config)
+        self.assertIn('authority "{{ .Name }} 3600 IN SOA', config)
 
 
 if __name__ == '__main__':

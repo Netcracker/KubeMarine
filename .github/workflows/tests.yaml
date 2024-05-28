@@ -69,7 +69,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-#          - "3.7"  # Currently used version of mypy does not work on Python 3.7
           - "3.8"
           - "3.9"
           - "3.10"

@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import pathlib
+import urllib.request
+import urllib.error
 from collections.abc import Hashable
 from textwrap import dedent
-from typing import List, Dict, Callable, Union, cast
+from typing import List, Dict, Union, cast
 
 import jsonschema
+import referencing
+import referencing.exceptions
+import referencing.retrieval
 from ordered_set import OrderedSet
 
 from kubemarine.core import utils, log, errors
@@ -64,15 +68,10 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     if not root_schema.exists():
         raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
 
-    with utils.open_internal(root_schema_resource) as f:
-        schema = json.load(f)
-
-    validator_cls = jsonschema.validators.validator_for(schema)
-    validator_cls.check_schema(schema)
-
     root_schema_uri = root_schema.as_uri()
-    resolver = jsonschema.RefResolver(base_uri=root_schema_uri, referrer=schema)
-    validator = validator_cls(schema, resolver=resolver)
+
+    registry = referencing.Registry(retrieve=retrieve_uri_filesystem)  # type: ignore[call-arg, var-annotated]
+    validator = jsonschema.Draft7Validator({"$ref": root_schema_uri}, registry=registry)
 
     errs = list(validator.iter_errors(inventory))
     if not errs:
@@ -103,8 +102,18 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     raise errors.FailException(msg, hint=hint)
 
 
+@referencing.retrieval.to_cached_resource()  # type: ignore[arg-type]
+def retrieve_uri_filesystem(uri: str) -> str:
+    try:
+        with urllib.request.urlopen(uri) as url:
+            content: str = url.read().decode("utf-8")
+            return content
+    except urllib.error.URLError:
+        raise referencing.exceptions.NoSuchResource(ref=uri) from None  # type: ignore[call-arg]
+
+
 def _resolve_errors(errs: List[jsonschema.ValidationError]) -> List[jsonschema.ValidationError]:
-    key = _extended_relevance()
+    key = _extended_relevance
     for error in errs:
         _unnest_errors(error)
 
@@ -154,7 +163,7 @@ def _descend_errors(error: jsonschema.ValidationError) -> List[jsonschema.Valida
     for child in context:
         errors_by_subschema.setdefault(child.schema_path[0], []).append(child)
 
-    key = _extended_relevance()
+    key = _extended_relevance
 
     for errors in errors_by_subschema.values():
         errors.sort(key=key, reverse=True)
@@ -265,22 +274,29 @@ def _unnest_required_subschema_errors(error: jsonschema.ValidationError,
         subschemas_errors.clear()
 
 
-def _extended_relevance() -> Callable[[jsonschema.ValidationError], tuple]:
+def _extended_relevance(error: jsonschema.ValidationError) -> tuple:
+    # jsonschema v4.22.0 introduced an improvement of default relevance for `anyOf` / `oneOf`.
+    # It solves the problem very partially, and we have own algorithm more suitable for our schemes.
+    # Pin algorithm of jsonschema.exceptions.relevance for jsonschema < 4.22.0
+    is_week = any(_validated_by(error, validator)
+                  for validator in jsonschema.exceptions.WEAK_MATCHES)
+    matches_type = error._matches_type()  # type: ignore[attr-defined] # pylint: disable=protected-access
+    relevance_value: tuple = (      # prefer errors which are ...
+        -len(error.path),           # 'deeper' and thereby more specific
+        not is_week,                # for a non-low-priority keyword
+        not matches_type,           # at least match the instance's type
+    )                               # otherwise we'll treat them the same
+
     # The extended relevance function is intended to improve heuristic for oneOf|anyOf,
     # when it is necessary to choose the most suitable branch.
-
-    def relevance(error: jsonschema.ValidationError) -> tuple:
-        relevance_value: tuple = jsonschema.exceptions.relevance(error)  # type: ignore[assignment]
-        if error.parent is None:
-            return relevance_value
-
-        relevance_value = _apply_property_names_heuristic(error, relevance_value)
-        relevance_value = _apply_list_merging_strong_heuristic(error, relevance_value)
-        relevance_value = _apply_required_and_optional_properties_heuristic(error, relevance_value)
-
+    if error.parent is None:
         return relevance_value
 
-    return relevance
+    relevance_value = _apply_property_names_heuristic(error, relevance_value)
+    relevance_value = _apply_list_merging_strong_heuristic(error, relevance_value)
+    relevance_value = _apply_required_and_optional_properties_heuristic(error, relevance_value)
+
+    return relevance_value
 
 
 def _apply_property_names_heuristic(error: jsonschema.ValidationError, relevance_value: tuple) -> tuple:
@@ -294,7 +310,7 @@ def _apply_property_names_heuristic(error: jsonschema.ValidationError, relevance
         # See jsonschema._validators.propertyNames. So type is always matched.
         type_matched = True
         mutate_relevance = list(relevance_value)
-        mutate_relevance[3] = not type_matched
+        mutate_relevance[2] = not type_matched
         return tuple(mutate_relevance)
 
     return relevance_value

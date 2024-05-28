@@ -23,6 +23,8 @@ kube-apiserver:
     version: v1.27.4
   v1.27.8:
     version: v1.27.8
+  v1.27.13:
+    version: v1.27.13
   v1.28.0:
     version: v1.28.0
   v1.28.3:
@@ -33,8 +35,14 @@ kube-apiserver:
     version: v1.28.6
   v1.28.8:
     version: v1.28.8
+  v1.28.9:
+    version: v1.28.9
   v1.29.1:
     version: v1.29.1
+  v1.29.4:
+    version: v1.29.4
+  v1.30.1:
+    version: v1.30.1
 kube-controller-manager:
   v1.24.2:
     version: v1.24.2
@@ -58,6 +66,8 @@ kube-controller-manager:
     version: v1.27.4
   v1.27.8:
     version: v1.27.8
+  v1.27.13:
+    version: v1.27.13
   v1.28.0:
     version: v1.28.0
   v1.28.3:
@@ -68,8 +78,14 @@ kube-controller-manager:
     version: v1.28.6
   v1.28.8:
     version: v1.28.8
+  v1.28.9:
+    version: v1.28.9
   v1.29.1:
     version: v1.29.1
+  v1.29.4:
+    version: v1.29.4
+  v1.30.1:
+    version: v1.30.1
 kube-scheduler:
   v1.24.2:
     version: v1.24.2
@@ -93,6 +109,8 @@ kube-scheduler:
     version: v1.27.4
   v1.27.8:
     version: v1.27.8
+  v1.27.13:
+    version: v1.27.13
   v1.28.0:
     version: v1.28.0
   v1.28.3:
@@ -103,8 +121,14 @@ kube-scheduler:
     version: v1.28.6
   v1.28.8:
     version: v1.28.8
+  v1.28.9:
+    version: v1.28.9
   v1.29.1:
     version: v1.29.1
+  v1.29.4:
+    version: v1.29.4
+  v1.30.1:
+    version: v1.30.1
 kube-proxy:
   v1.24.2:
     version: v1.24.2
@@ -128,6 +152,8 @@ kube-proxy:
     version: v1.27.4
   v1.27.8:
     version: v1.27.8
+  v1.27.13:
+    version: v1.27.13
   v1.28.0:
     version: v1.28.0
   v1.28.3:
@@ -138,8 +164,14 @@ kube-proxy:
     version: v1.28.6
   v1.28.8:
     version: v1.28.8
+  v1.28.9:
+    version: v1.28.9
   v1.29.1:
     version: v1.29.1
+  v1.29.4:
+    version: v1.29.4
+  v1.30.1:
+    version: v1.30.1
 pause:
   v1.24.2:
     version: '3.7'
@@ -163,6 +195,8 @@ pause:
     version: '3.9'
   v1.27.8:
     version: '3.9'
+  v1.27.13:
+    version: '3.9'
   v1.28.0:
     version: '3.9'
   v1.28.3:
@@ -173,7 +207,13 @@ pause:
     version: '3.9'
   v1.28.8:
     version: '3.9'
+  v1.28.9:
+    version: '3.9'
   v1.29.1:
+    version: '3.9'
+  v1.29.4:
+    version: '3.9'
+  v1.30.1:
     version: '3.9'
 etcd:
   v1.24.2:
@@ -198,6 +238,8 @@ etcd:
     version: 3.5.7-0
   v1.27.8:
     version: 3.5.9-0
+  v1.27.13:
+    version: 3.5.12-0
   v1.28.0:
     version: 3.5.9-0
   v1.28.3:
@@ -208,8 +250,14 @@ etcd:
     version: 3.5.10-0
   v1.28.8:
     version: 3.5.12-0
+  v1.28.9:
+    version: 3.5.12-0
   v1.29.1:
     version: 3.5.10-0
+  v1.29.4:
+    version: 3.5.12-0
+  v1.30.1:
+    version: 3.5.12-0
 coredns/coredns:
   v1.24.2:
     version: v1.8.6
@@ -233,6 +281,8 @@ coredns/coredns:
     version: v1.10.1
   v1.27.8:
     version: v1.10.1
+  v1.27.13:
+    version: v1.10.1
   v1.28.0:
     version: v1.10.1
   v1.28.3:
@@ -243,5 +293,11 @@ coredns/coredns:
     version: v1.10.1
   v1.28.8:
     version: v1.10.1
+  v1.28.9:
+    version: v1.10.1
   v1.29.1:
+    version: v1.11.1
+  v1.29.4:
+    version: v1.11.1
+  v1.30.1:
     version: v1.11.1

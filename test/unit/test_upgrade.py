@@ -342,7 +342,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                     self.new_cluster()
 
     def test_require_package_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.13', 'v1.28.9'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -367,7 +367,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_package_redefinition_first_step(self):
-        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
+        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.13'])
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
         self.upgrade[self.upgrade_plan[0]]['packages']['associations']['containerd']['package_name'] = 'containerd-upgrade1'
 
@@ -570,7 +570,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
             self.new_cluster()
 
     def test_require_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.13', 'v1.28.9'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -597,7 +597,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
                 self.run_actions()
 
     def test_require_image_redefinition_first_step(self):
-        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
+        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.13'])
         self.inventory['plugins'].setdefault('kubernetes-dashboard', {})\
             .setdefault('dashboard', {})['image'] = 'dashboard-redefined'
         self.upgrade[self.upgrade_plan[0]]['plugins'].setdefault('kubernetes-dashboard', {})\
@@ -847,7 +847,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_dont_require_redefinition_source_template_defaults_changed_second_step(self):
-        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
+        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.13'])
         set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
@@ -889,7 +889,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_source_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.13', 'v1.28.9'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -965,7 +965,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_sandbox_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.8', 'v1.28.8'
+        before, through1, through2, after = 'v1.26.3', 'v1.26.11', 'v1.27.13', 'v1.28.9'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -987,7 +987,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_sandbox_image_redefinition_first_step(self):
-        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
+        self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.13'])
         self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-redefined'
         self._grpc_cri(self.upgrade[self.upgrade_plan[0]])['sandbox_image'] = 'pause-upgrade1'
 
@@ -1159,9 +1159,9 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.26.11', 'v1.27.8', False),
-                ('v1.27.8', 'v1.28.8', True),
-                ('v1.28.3', 'v1.28.8', False),
+                ('v1.26.11', 'v1.27.13', False),
+                ('v1.27.13', 'v1.28.9', True),
+                ('v1.28.3', 'v1.28.9', False),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
@@ -1190,7 +1190,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                     utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
-                self.setUpVersions('v1.27.8', ['v1.28.8'])
+                self.setUpVersions('v1.27.13', ['v1.28.9'])
                 self.inventory.setdefault('rbac', {}).update({
                     'admission': 'pss', 'pss': {'pod-security': 'enabled'}
                 })
@@ -1220,8 +1220,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
 
     def test_kubernetes_preconfigure_kube_proxy_conntrack_min_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.27.8', 'v1.28.8', False),
-                ('v1.28.4', 'v1.29.1', True),
+                ('v1.27.13', 'v1.28.9', False),
+                ('v1.28.4', 'v1.29.4', True),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
@@ -1246,7 +1246,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                 utils.mock_call(kubernetes.components._reconfigure_node_components), \
                 utils.mock_call(kubernetes.components._update_configmap, return_value=True), \
                 utils.mock_call(kubernetes.components._kube_proxy_configmap_uploader) as kube_proxy_uploader:
-            self.setUpVersions('v1.28.4', ['v1.29.1'])
+            self.setUpVersions('v1.28.4', ['v1.29.4'])
 
             self._stub_load_configmap('kube-proxy', {'data': {'config.conf': yaml.dump({
                 'kind': 'KubeProxyConfiguration',

@@ -256,10 +256,6 @@ class PrimitiveValuesAsString(unittest.TestCase):
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
         self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
 
-        typha = inventory['plugins']['calico']['typha']
-        self.assertEqual(False, typha['enabled'])
-        self.assertEqual(2, typha['replicas'])
-
         nginx_ingress_ports = inventory['plugins']['nginx-ingress-controller']['ports']
         self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
         self.assertEqual(20443, [port for port in nginx_ingress_ports if port['name'] == 'https'][0]['hostPort'])
@@ -437,6 +433,18 @@ class PrimitiveValuesAsString(unittest.TestCase):
             self.assertNotIn('custom_parameter6', sysctl_config)
 
         self.assertEqual(True, inventory['plugins']['kubernetes-dashboard']['install'])
+
+    def test_recursive_reference_primitive_template(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['plugins'] = {'my_plugin': {
+            'var1': '{% if plugins.my_plugin.install %}unexpected{% else %}ok{% endif %}',
+            'install': '{{ "false" }}',
+        }}
+
+        cluster = demo.new_cluster(inventory)
+        inventory = cluster.inventory
+        self.assertEqual(False, inventory['plugins']['my_plugin']['install'])
+        self.assertEqual('ok', inventory['plugins']['my_plugin']['var1'])
 
     def _actual_sysctl_params(self, cluster: demo.FakeKubernetesCluster, node: NodeGroup) -> Set[str]:
         return {

@@ -336,12 +336,16 @@ class CalicoManifestProcessor(Processor):
         self.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
 
         self.enrich_node_selector(manifest, key, plugin_service='typha')
-        self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
+        self.enrich_deployment_calico_typha_tolerations(manifest, default_tolerations)
         self.enrich_image_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha', is_init_container=False)
         self.enrich_deployment_calico_typha_container_env(manifest)
         self.enrich_resources_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha')
+
+    def enrich_deployment_calico_typha_tolerations(self, manifest: Manifest, default_tolerations: List[dict]) -> None:
+        key = "Deployment_calico-typha"
+        self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
 
     def enrich_deployment_calico_typha_container_env(self, manifest: Manifest) -> None:
         key = "Deployment_calico-typha"
@@ -463,6 +467,28 @@ class CalicoManifestProcessor(Processor):
             self.enrich_metrics,
         ]
 
+
+class CalicoLess_3_27_ManifestProcessor(CalicoManifestProcessor):
+    def enrich_deployment_calico_typha_tolerations(self, manifest: Manifest, default_tolerations: List[dict]) -> None:
+        # "backport" issue https://github.com/projectcalico/calico/pull/7979
+        # to allow Typha to be scheduled on control-planes
+        for toleration in self.get_typha_schedule_control_plane_extra_tolerations(manifest):
+            default_tolerations.insert(0, toleration)
+
+        super().enrich_deployment_calico_typha_tolerations(manifest, default_tolerations)
+
+    def get_typha_schedule_control_plane_extra_tolerations(self, manifest: Manifest) -> List[dict]:
+        key = "Deployment_calico-typha"
+        source_yaml = manifest.get_obj(key, patch=True)
+
+        schedule_control_plane = [{'effect': 'NoExecute', 'operator': 'Exists'},
+                                  {'effect': 'NoSchedule', 'operator': 'Exists'}]
+
+        original_tolerations: List[dict] = source_yaml['spec']['template']['spec'].get('tolerations', [])
+        return [toleration for toleration in schedule_control_plane
+                if toleration not in original_tolerations]
+
+
 service_account_secret_calico_node = dedent("""\
     apiVersion: v1
     kind: Secret
@@ -483,6 +509,17 @@ service_account_secret_calico_kube_controllers = dedent("""\
         kubernetes.io/service-account.name: calico-kube-controllers
     type: kubernetes.io/service-account-token  
 """)
+
+
+def get_calico_manifest_processor(logger: log.VerboseLogger, inventory: dict,
+                                  yaml_path: Optional[str] = None, destination: Optional[str] = None) -> Processor:
+    version: str = inventory['plugins']['calico']['version']
+    kwargs = {'original_yaml_path': yaml_path, 'destination_name': destination}
+    if utils.version_key(version)[0:2] < utils.minor_version_key("v3.27"):
+        return CalicoLess_3_27_ManifestProcessor(logger, inventory, **kwargs)
+
+    return CalicoManifestProcessor(logger, inventory, **kwargs)
+
 
 class CalicoApiServerManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,

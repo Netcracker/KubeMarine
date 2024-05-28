@@ -23,6 +23,7 @@ from typing import Dict, Union, Optional, List, cast
 from kubemarine.core import utils, inventory
 from kubemarine.core.cluster import KubernetesCluster, enrichment, EnrichmentStage
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult
+from kubemarine.core.yaml_merger import default_merger
 
 ERROR_PID_MAX_NOT_SET = "The 'kernel.pid_max' value is not set for node {node!r}"
 ERROR_PID_MAX_EXCEEDS = ("The 'kernel.pid_max' value = {value!r} for node {node!r} "
@@ -53,6 +54,15 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
 
     # Other verifications
     _verify_pid_max(cluster)
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['reconfigure'])
+def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
+    sysctl_config = utils.subdict_yaml(
+        cluster.procedure_inventory.get('services', {}), ['sysctl'])
+
+    if sysctl_config:
+        default_merger.merge(cluster.inventory.setdefault('services', {}), utils.deepcopy_yaml(sysctl_config))
 
 
 def _format_inventory(config: dict, path: List[Union[str, int]]) -> None:
@@ -243,6 +253,21 @@ def reload(group: NodeGroup) -> RunnersGroupResult:
     Reloads sysctl configuration in the specified group.
     """
     return group.sudo('sysctl --system')
+
+
+def setup_sysctl(group: NodeGroup) -> bool:
+    cluster: KubernetesCluster = group.cluster
+
+    if is_valid(group):
+        cluster.log.debug("Skipped - all necessary kernel parameters are presented")
+        return False
+
+    group.call_batch([
+        configure,
+        reload,
+    ])
+
+    return True
 
 
 def _get_pid_max(cluster: KubernetesCluster, node: NodeGroup = None) -> int:

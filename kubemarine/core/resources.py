@@ -408,6 +408,8 @@ class DynamicResources:
             kubemarine.cri.enrich_upgrade_inventory,
             kubemarine.cri.containerd.enrich_migrate_cri_inventory,
             kubemarine.plugins.nginx_ingress.cert_renew_enrichment,
+            kubemarine.sysctl.enrich_reconfigure_inventory,
+            kubemarine.core.inventory.enrich_reconfigure_inventory,
             # Enrichment of procedure inventory should be finished at this step.
 
             # Convert formatted inventory to native python objects, and merge defaults.
@@ -432,10 +434,6 @@ class DynamicResources:
             kubemarine.core.defaults.calculate_nodegroups,
             kubemarine.core.defaults.remove_service_roles,
             # Enrichment of inventory for LIGHT stage should be finished at this step.
-
-            # Should be just after compilation, but currently not necessary for LIGHT stage.
-            # Sections with primitive values may be potentially split in the future if necessary for LIGHT.
-            kubemarine.core.defaults.manage_primitive_values,
 
             # Validation of procedure inventory enrichment after compilation
             kubemarine.kubernetes.verify_version,

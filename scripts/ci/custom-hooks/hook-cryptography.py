@@ -23,7 +23,7 @@ datas = copy_metadata('cryptography')
 # This script provides custom effectively equal implementation of the hook.
 
 # Use the following commented out script to regenerate `binaries` and `hiddenimports`,
-# being on the macOS arm64 platform, or other platform where the script is working.
+# being on the macOS arm64 platform.
 
 # import importlib.machinery
 # import os

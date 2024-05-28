@@ -130,30 +130,19 @@ def system_prepare_system_timesyncd(group: NodeGroup) -> None:
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_sysctl(group: NodeGroup) -> None:
-    cluster: KubernetesCluster = group.cluster
-
-    if sysctl.is_valid(group):
-        cluster.log.debug("Skipped - all necessary kernel parameters are presented")
-        return
-
-    group.call_batch([
-        sysctl.configure,
-        sysctl.reload,
-        system.verify_sysctl,
-    ])
-
-    cluster.schedule_cumulative_point(system.reboot_nodes)
-    cluster.schedule_cumulative_point(system.verify_system)
+    is_updated = system.configure_sensitive_service(group, sysctl.setup_sysctl)
+    if is_updated:
+        group.call(system.verify_sysctl)
 
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
-    group.call(selinux.setup_selinux)
+    system.configure_sensitive_service(group, selinux.setup_selinux)
 
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_apparmor(group: NodeGroup) -> None:
-    group.call(apparmor.setup_apparmor)
+    system.configure_sensitive_service(group, apparmor.setup_apparmor)
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -168,12 +157,7 @@ def system_prepare_system_disable_swap(group: NodeGroup) -> None:
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_modprobe(group: NodeGroup) -> None:
-    cluster: KubernetesCluster = group.cluster
-
-    is_updated = modprobe.setup_modprobe(group)
-    if is_updated:
-        cluster.schedule_cumulative_point(system.reboot_nodes)
-        cluster.schedule_cumulative_point(system.verify_system)
+    system.configure_sensitive_service(group, modprobe.setup_modprobe)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')

@@ -21,6 +21,7 @@ from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
+from ordered_set import OrderedSet
 
 from kubemarine import system, admission, etcd, packages, jinja, sysctl
 from kubemarine.core import utils, static, summary, log, errors
@@ -194,12 +195,14 @@ def enrich_kube_proxy(cluster: KubernetesCluster) -> None:
     # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max
     # since they define the same kernel variable
     kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
-    conntrack_max_values = {
+    conntrack_max_values = OrderedSet(
         sysctl.get_parameter(cluster, node, 'net.netfilter.nf_conntrack_max')
-        for node in kubernetes_nodes.get_ordered_members_list()}
+        for node in kubernetes_nodes.get_ordered_members_list()
+    )
 
     if len(conntrack_max_values) > 1:
-        raise Exception(ERROR_AMBIGUOUS_CONNTRACK_MAX.format(values=conntrack_max_values))
+        raise Exception(ERROR_AMBIGUOUS_CONNTRACK_MAX.format(
+            values='{' + ', '.join(map(repr, conntrack_max_values)) + '}'))
 
     conntrack_max = next(iter(conntrack_max_values), None)
     if components.kube_proxy_overwrites_higher_system_values(cluster) and conntrack_max is not None:
@@ -999,19 +1002,22 @@ def exclude_node_from_upgrade_list(first_control_plane: NodeGroup, node_name: st
 def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: str) -> List[str]:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     try:
-        nodes_list_result = first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] && '
-                                              'sudo kubectl get nodes -o custom-columns=\''
+        nodes_list_result = (first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] || '
+                                                     'sudo cat /etc/kubernetes/nodes-k8s-versions.txt')
+                                .get_simple_out())
+        if not nodes_list_result:
+            cluster.log.debug('Cluster status file /etc/kubernetes/nodes-k8s-versions.txt unexist or empty, '
+                              'the new file will be created.')
+            nodes_list_result = first_control_plane.sudo('sudo kubectl get nodes --no-headers -o custom-columns=\''
                                               'VERSION:.status.nodeInfo.kubeletVersion,'
                                               'NAME:.metadata.name,'
-                                              'STATUS:.status.conditions[-1].type\' '
-                                              '| sed -n \'1!p\' | tr -s \' \' '
-                                              '| sed \'1 i\\# This file contains a cached list of nodes and versions '
-                                              'required to continue the Kubernetes upgrade procedure if it fails. '
-                                              'If all the nodes are completely updated or you manually fixed the '
-                                              'problem that occurred during the upgrade, you can delete it.\' '
-                                              '| sudo tee /etc/kubernetes/nodes-k8s-versions.txt; '
-                                              'sudo cat /etc/kubernetes/nodes-k8s-versions.txt') \
-            .get_simple_out()
+                                              'STATUS:.status.conditions[-1].type\'').get_simple_result().stdout
+            nodes_list_result = (f'# This file contains a cached list of nodes and versions '
+                                   'required to continue the Kubernetes upgrade procedure if it fails. '
+                                   'If all the nodes are completely updated or you manually fixed the '
+                                   f'problem that occurred during the upgrade, you can delete it.\n{nodes_list_result}')
+            first_control_plane.put(io.StringIO(nodes_list_result), '/etc/kubernetes/nodes-k8s-versions.txt',
+                                    backup=False, sudo=True)
         cluster.log.verbose("Remote response with nodes description:\n%s" % nodes_list_result)
     except Exception as e:
         cluster.log.warning("Failed to detect cluster status before upgrade. All nodes will be scheduled for upgrade.")
@@ -1030,7 +1036,7 @@ def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: st
         # comes from nodes-k8s-versions.txt content as a comment symbol
         if line[0] == '#':
             continue
-        version, node_name, status = line.split(' ')
+        version, node_name, status = list(filter(len, line.split(' ')))
         if version != future_version:
             cluster.log.verbose("Node \"%s\" has version \"%s\" and scheduled for upgrade." % (node_name, version))
             upgrade_list.append(node_name)

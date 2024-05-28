@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
-from typing import List, OrderedDict, Any
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import List, OrderedDict, Any, Protocol, runtime_checkable
 
 NO_TASKS_PROCEDURES = ["do", "migrate_kubemarine", "config"]
 

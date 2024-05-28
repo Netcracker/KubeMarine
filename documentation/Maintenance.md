@@ -161,7 +161,7 @@ By default, it is not required to provide information about thirdparties.
 They are upgraded automatically as required.
 You can provide this information if you want to have better control over their versions.
 Also, you have to explicitly provide thirdparties `source` if you have specified this information in the `cluster.yaml`.
-It is because in this case, you take full control over the thirdparties' versions and the defaults do not apply.
+It is because in this case, you take a full control over the thirdparties' versions and the defaults do not apply.
 
 #### Packages Upgrade Patches
 
@@ -212,9 +212,9 @@ upgrade:
         image: 'calico/node:v3.25.1'
 ```
 
-After applying, this configuration is merged with the plugins' configuration contained in the current `cluster.yaml`.
+After applying, this configuration is merged with the plugins' configuration contained in the current **cluster.yaml**.
 
-**Note**: If you have changed images for any of the plugins in the `cluster.yaml`,
+**Note**: If you have changed images for any of the plugins in the **cluster.yaml**,
 it is required to explicitly specify new images in the procedure inventory for those plugins.
 The configuration format for the plugins is the same.
 
@@ -268,7 +268,7 @@ UPGRADING KUBERNETES v1.18.8 ⭢ v1.19.3
 ------------------------------------------
 ```
 
-The script upgrades Kubernetes versions one-by-one. After each upgrade, the `cluster.yaml` is regenerated to reflect the actual cluster state. Use the latest updated `cluster.yaml` configuration to further work with the cluster.
+The script upgrades Kubernetes versions one-by-one. After each upgrade, the **cluster.yaml** is regenerated to reflect the actual cluster state. Use the latest updated **cluster.yaml** configuration to further work with the cluster.
 
 Additionally, Kubemarine cleans up the `/etc/kubernetes/tmp` directory before the upgrade, where kubeadm stores the [backup files](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#recovering-from-a-failure-state)
 during the upgrade. For this reason, only the backups for the latest upgrade through Kubemarine are placed here after the upgrade procedure.
@@ -346,7 +346,7 @@ etcd:
 
 #### Thirdparties Upgrade Section and Task
 
-If the cluster is located in an isolated environment, it is possible to specify the custom paths to new thirdparties with the same syntax as in the `cluster.yaml` as shown in the following script:
+If the cluster is located in an isolated environment, it is possible to specify the custom paths to new thirdparties with the same syntax as in the **cluster.yaml** as shown in the following script:
 
 ```yaml
 v1.24.2:
@@ -361,7 +361,7 @@ v1.24.2:
         source: https://example.com/thirdparty.files/projectcalico/calico/v3.22.2/calicoctl-linux-amd64
 ```
 
-This configuration replaces the configuration contained in the current `cluster.yaml`.
+This configuration replaces the configuration contained in the current **cluster.yaml**.
 
 #### Kubernetes Upgrade Task
 
@@ -1011,7 +1011,7 @@ To change the operating system on an already running cluster:
 This procedure is aimed to reconfigure the cluster.
 
 It is supposed to reconfigure the cluster as a generalized concept described by the inventory file.
-Though, currently the procedure supports to reconfigure only Kubeadm-managed settings.
+Though, currently the procedure supports to reconfigure only Kubeadm-managed settings, and `services.sysctl`.
 If you are looking for how to reconfigure other settings, consider the following:
 
 - Probably some other [maintenance procedure](#provided-procedures) can do the task.
@@ -1029,6 +1029,17 @@ You can find description and examples of the accepted parameters in the next sec
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reconfigure.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+**Common Considerations**
+
+Each section from the procedure inventory is merged with the corresponding section in the main **cluster.yaml**,
+and the related services are reconfigured based on the resulting inventory.
+
+Additionally, it is possible to supply empty section describing a particular service for most services.
+This does not introduce new changes in the **cluster.yaml**, but still triggers the reconfiguring,
+and thus allows to make the cluster and the inventory consistent to each other.
+
+Also, Kubemarine detects effectively changed settings of the services, if ones depend on the others, and reconfigures the dependent services accordingly.
 
 #### Reconfigure Kubeadm
 
@@ -1123,14 +1134,14 @@ services:
 
 </details>
 
-The above configuration is merged with the corresponding sections in the main `cluster.yaml`,
+The above configuration is merged with the corresponding sections in the main **cluster.yaml**,
 and the related Kubernetes components are reconfigured based on the resulting inventory.
 
 In this way it is not possible to delete some property,
 allowing the corresponding Kubernetes component to fall back to the default behaviour.
 This can be worked around by manual changing of the `cluster.yaml`
 and running the `reconfigure` procedure with **empty** necessary section.
-For example, you can delete `services.kubeadm.etcd.local.extraArgs.election-timeout` from `cluster.yaml`
+For example, you can delete `services.kubeadm.etcd.local.extraArgs.election-timeout` from **cluster.yaml**
 and then run the procedure with the following procedure inventory:
 
 ```yaml
@@ -1165,10 +1176,43 @@ Control plane nodes are reconfigured first.
 Working `kube-apiserver` is not required to reconfigure control plane components (more specifically, to change their static manifests),
 but required to reconfigure kubelet and kube-proxy.
 
+### Reconfigure sysctl
+
+The `reconfigure` procedure allows to supply new kernel parameters or change the existing ones
+in the same format, and with the same caveats, as for the installation procedure.
+For more information, refer to [sysctl](Installation.md#sysctl).
+
+It is also possible to trigger reconfiguring using empty `services.sysctl` section:
+
+```yaml
+services:
+  sysctl: {}
+```
+
+**Note**: kernel parameters can also be reconfigured using [patches](#append-patches).
+
+**Warning**: Be careful with these settings, they directly affect the hosts operating system.
+
+**Warning**: In comparison to the installation procedure, the new parameters are validated, but reboot is not scheduled.
+To make sure that the new settings are preserved after reboot, perform the reboot using [Reboot Procedure](#reboot-procedure),
+and run PaaS check, namely [232 Kernel Parameters Configuration](Kubecheck.md#232-kernel-parameters-configuration).
+
+### Append Patches
+
+It is possible to **append** new [patches](Installation.md#patches) to the main **cluster.yaml**, and trigger reconfiguring of the corresponding services.
+
+The following sections are supported in the new patches:
+- `services.sysctl`
+
+Since the new patches are appended, the same settings have precedence in the last patch of the procedure inventory if overridden few times for the same node.
+
 ### Reconfigure Procedure Tasks Tree
 
 The `reconfigure` procedure executes the following sequence of tasks:
 
+- prepare
+  - system
+    - sysctl
 - deploy
   - kubernetes
     - reconfigure
@@ -1184,9 +1228,9 @@ Manage PSP procedure works as follows:
 1. During this procedure the custom policies specified for deletion are deleted.
    Then the custom policies specified for addition are added.
 2. If OOB policies are reconfigured or admission controller is reconfigured, then all OOB policies are recreated
-   as configured in the `cluster.yaml` and `procedure.yaml`. The values from `procedure.yaml` take precedence.
+   as configured in the **cluster.yaml** and **procedure.yaml**. The values from **procedure.yaml** take precedence.
    If admission controller is disabled, then all OOB policies are deleted without recreation.
-3. If the admission controller is reconfigured in `procedure.yaml`, then `kubeadm` configmap and `kube-apiserver` manifest is updated accordingly. 
+3. If the admission controller is reconfigured in **procedure.yaml**, then `kubeadm` configmap and `kube-apiserver` manifest is updated accordingly. 
 4. All Kubernetes nodes are `drain-uncordon`ed one-by-one and all daemon-sets are restarted to restart all pods (except system) in order to re-validate pods specifications.
 
 ### Configuring Manage PSP Procedure
@@ -1217,7 +1261,7 @@ psp:
 ```
 
 For example, if admission controller is disabled on existing cluster and you want to enable it, without enabling
-`host-network` OOB policy, you should specify the following in the `procedure.yaml` file:
+`host-network` OOB policy, you should specify the following in the **procedure.yaml** file:
 
 ```yaml
 psp:
@@ -1255,7 +1299,7 @@ The procedure accepts required positional argument with the path to the procedur
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
-To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
+To manage PSS on existing cluster one should configure the **procedure.yaml** file similar the following:
 
 ```yaml
 pss:
@@ -1757,10 +1801,12 @@ data:
 
 # Common Practice
 
+The common practice information is given below.
+
 ## Security Hardening Guide
 
-For more information, refer to [Security Hardening Guide](./internal/Hardening.md).
+For more information, refer to the [Security Hardening Guide](./internal/Hardening.md).
 
 ## Worker Nodes Should be Managed by Kubelet
 
-You should not run any containers on worker nodes that are not managed by `kubelet` so as not to break the `kube-scheduler` precision.
+You should not run any containers on worker nodes that are not managed by `kubelet` to avoid breaking the `kube-scheduler` precision.

@@ -27,8 +27,7 @@ import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
-from typing import List, Tuple, Union, Dict, Optional, Iterator
-from typing_extensions import Literal
+from typing import List, Tuple, Union, Dict, Optional, Iterator, Literal
 
 import yaml
 
@@ -395,7 +394,18 @@ class ExportKubernetesParser:
         items_by_resource: Dict[str, List[str]] = {}
 
         def append_item(api_version: str, kind: str, item: str) -> None:
-            resource_name = next(r['name'] for r in resources if r['apiVersion'] == api_version and r['kind'] == kind)
+            resource_name = next((
+                r['name'] for r in resources
+                if r['apiVersion'] == api_version
+                and (r['kind'] == kind
+                     # TODO remove this W/A for future releases having https://github.com/kubernetes/kubectl/issues/1593 resolved
+                     or kind in ('ValidatingAdmissionPolicyList', 'ValidatingAdmissionPolicyBindingList')
+                     and r['kind'] == kind[:-len('List')])
+            ), None)
+
+            if resource_name is None:
+                raise Exception(f"Failed to find resource name for apiVersion: {api_version}, kind: {kind}")
+
             items_by_resource.setdefault(resource_name, []).append(item)
 
         with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:

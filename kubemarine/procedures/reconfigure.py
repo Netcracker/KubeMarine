@@ -17,21 +17,61 @@ from typing import List, Union
 
 from ordered_set import OrderedSet
 
-from kubemarine import kubernetes
+from kubemarine import kubernetes, sysctl, system
 from kubemarine.core import flow
 from kubemarine.core.cluster import KubernetesCluster
+
+
+def system_prepare_system_sysctl(cluster: KubernetesCluster) -> None:
+    group = cluster.nodes['all']
+
+    # Even if services.sysctl is not supplied, the effective configuration may change
+    # because it may depend on other services (kubelet config and patches).
+    changes_detected = any(
+        cluster.previous_nodes_inventory[host]['services']['sysctl'] != cluster.nodes_inventory[host]['services']['sysctl']
+        for host in cluster.nodes['all'].get_hosts()
+    )
+
+    # Reconfigure kernel parameters even if empty section is supplied.
+    # This allows to reconfigure the parameters based on manual changes in the inventory.
+    # Take into account only `services.sysctl`, but not `patches`, because `patches` may reconfigure different services.
+    if (cluster.procedure_inventory.get('services', {}).get('sysctl') is not None
+            or changes_detected):
+        cluster.log.debug(f"Detected changes in kernel parameters")
+
+        # In comparison to installation, do not reboot & verify the parameters.
+        # The parameters are closely tied to the other services' settings, e.g. kube-proxy, and may be changed together.
+        # After reboot, if sysctl is reconfigured, but other services are not yet,
+        # verification may fail, but the final inventory may still be correct after all.
+        is_updated = group.call(sysctl.setup_sysctl)
+        if is_updated:
+            group.call(system.verify_sysctl)
+    else:
+        cluster.log.debug("No changes detected, skipping.")
 
 
 def deploy_kubernetes_reconfigure(cluster: KubernetesCluster) -> None:
     changed_components = OrderedSet[str]()
     for component, constants in kubernetes.components.COMPONENTS_CONSTANTS.items():
         for section_names in constants['sections']:
-            section: Union[dict, list, None] = cluster.procedure_inventory
+            procedure_section: Union[dict, list, None] = cluster.procedure_inventory
+            previous_section = cluster.previous_inventory
+            section = cluster.inventory
             for name in section_names:
-                if isinstance(section, dict):
-                    section = section.get(name)
+                if isinstance(procedure_section, dict):
+                    procedure_section = procedure_section.get(name)
 
-            if section is not None:
+                previous_section = previous_section[name]
+                section = section[name]
+
+            # Even if section is not supplied, the effective configuration may change
+            # because it may depend on other services (services.sysctl).
+            changed_detected = previous_section != section
+
+            # Consider component as changed even if empty section is supplied.
+            # This allows to reconfigure the component based on manual changes in the inventory.
+            if (procedure_section is not None
+                    or changed_detected):
                 changed_components.add(component)
 
     if changed_components:
@@ -43,6 +83,11 @@ def deploy_kubernetes_reconfigure(cluster: KubernetesCluster) -> None:
 
 
 tasks = OrderedDict({
+    "prepare": {
+        "system": {
+            "sysctl": system_prepare_system_sysctl,
+        },
+    },
     "deploy": {
         "kubernetes": {
             "reconfigure": deploy_kubernetes_reconfigure

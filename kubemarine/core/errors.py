@@ -89,7 +89,7 @@ def get_kme_dictionary() -> dict:
     }
 
 
-class _BaseKME(RuntimeError, ABC):
+class BaseKME(RuntimeError, ABC):
     def __init__(self, code: str):
         self.code = code
         if self.code not in get_kme_dictionary():
@@ -105,7 +105,7 @@ class _BaseKME(RuntimeError, ABC):
         return self.code + ": " + self.message
 
 
-class KME(_BaseKME):
+class KME(BaseKME):
     def __init__(self, code: str, **kwargs: object):
         self.kwargs = kwargs
         super().__init__(code)
@@ -118,7 +118,7 @@ class KME(_BaseKME):
         return name.format_map(self.kwargs)
 
 
-class KME0006(_BaseKME):
+class KME0006(BaseKME):
     def __init__(self, offline: List[str], inaccessible: List[str]):
         self.offline = offline
         self.inaccessible = inaccessible
@@ -179,7 +179,7 @@ def pretty_print_error(message: str = '', reason: Exception = None, log: klog.En
 
     reason = wrap_kme_exception(reason)
 
-    if isinstance(reason, _BaseKME):
+    if isinstance(reason, BaseKME):
         error_logger(reason)
         return
 

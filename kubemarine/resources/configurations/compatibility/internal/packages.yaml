@@ -60,6 +60,11 @@ docker:
     version_rhel8: 19.03*
     version_rhel9: 20.10*
     version_debian: 5:20.10.*
+  v1.27.13:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_rhel9: 20.10*
+    version_debian: 5:20.10.*
   v1.28.0:
     version_rhel: 19.03*
     version_rhel8: 19.03*
@@ -85,7 +90,22 @@ docker:
     version_rhel8: 19.03*
     version_rhel9: 20.10*
     version_debian: 5:20.10.*
+  v1.28.9:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_rhel9: 20.10*
+    version_debian: 5:20.10.*
   v1.29.1:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_rhel9: 20.10*
+    version_debian: 5:20.10.*
+  v1.29.4:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_rhel9: 20.10*
+    version_debian: 5:20.10.*
+  v1.30.1:
     version_rhel: 19.03*
     version_rhel8: 19.03*
     version_rhel9: 20.10*
@@ -113,6 +133,8 @@ containerd:
     version_debian: 1.6.*
   v1.27.8:
     version_debian: 1.6.*
+  v1.27.13:
+    version_debian: 1.6.*
   v1.28.0:
     version_debian: 1.6.*
   v1.28.3:
@@ -123,7 +145,13 @@ containerd:
     version_debian: 1.6.*
   v1.28.8:
     version_debian: 1.6.*
+  v1.28.9:
+    version_debian: 1.6.*
   v1.29.1:
+    version_debian: 1.6.*
+  v1.29.4:
+    version_debian: 1.6.*
+  v1.30.1:
     version_debian: 1.6.*
 containerdio:
   v1.24.2:
@@ -181,6 +209,11 @@ containerdio:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
     version_debian: 1.6.*
+  v1.27.13:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+    version_debian: 1.6.*
   v1.28.0:
     version_rhel: 1.6*
     version_rhel8: 1.6*
@@ -206,7 +239,22 @@ containerdio:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
     version_debian: 1.6.*
+  v1.28.9:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+    version_debian: 1.6.*
   v1.29.1:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+    version_debian: 1.6.*
+  v1.29.4:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+    version_debian: 1.6.*
+  v1.30.1:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*

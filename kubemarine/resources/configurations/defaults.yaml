@@ -85,6 +85,9 @@ services:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
       extraVolumes: []
+    etcd:
+      local:
+        extraArgs: {}
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []
@@ -438,14 +441,14 @@ services:
               zone: '{{ cluster_name }}'
               data:
                 match: '^(.*\.)?{{ cluster_name }}\.$'
-                answer: '{% raw %}{{ .Name }}{% endraw %} 3600 IN A {{ control_plain["internal"] }}'
+                answer: '{{ "{{ .Name }}" }} 3600 IN A {{ control_plain["internal"] }}'
             reject-aaaa:
               enabled: '{{ nodes[0]["internal_address"]|isipv4 }}'
               priority: 1
               class: IN
               type: AAAA
               data:
-                authority: '{% raw %}{{ .Name }}{% endraw %} 3600 IN SOA coredns.kube-system.svc.cluster.local. hostmaster.coredns.kube-system.svc.cluster.local. (3600 3600 3600 3600 3600)'
+                authority: '{{ "{{ .Name }}" }} 3600 IN SOA coredns.kube-system.svc.cluster.local. hostmaster.coredns.kube-system.svc.cluster.local. (3600 3600 3600 3600 3600)'
           forward:
             - .
             - /etc/resolv.conf
@@ -545,7 +548,7 @@ plugin_defaults:
 plugins:
 
   calico:
-    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
+    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion].version }}'
     install: true
     installation:
       priority: 0
@@ -561,12 +564,12 @@ plugins:
               - calico-node
             deployments:
               - calico-kube-controllers
-              - '{% if plugins.calico.typha.enabled | is_true %}calico-typha{% endif %}'
+              - '{% if plugins.calico.typha.enabled %}calico-typha{% endif %}'
             pods:
               - coredns
               - calico-kube-controllers
               - calico-node
-              - '{% if plugins.calico.typha.enabled | is_true %}calico-typha{% endif %}'
+              - '{% if plugins.calico.typha.enabled %}calico-typha{% endif %}'
         - thirdparty: /usr/bin/calicoctl
         - template:
             source: templates/plugins/calicoctl.cfg.j2
@@ -602,8 +605,14 @@ plugins:
     typha:
       # enabled by default for envs with nodes > 3
       enabled: '{% if (nodes | select("has_roles", ["control-plane", "worker"]) | list | length) < 4 %}false{% else %}true{% endif %}'
-      # let's start from 2 replicas and increment it every 50 nodes
-      replicas: '{{ (((nodes | select("has_roles", ["control-plane", "worker"]) | list | length) / 50) + 2) | round(0, "floor") | int }}'
+      # If Typha is disabled, set 0 replicas to avoid sudden configuration changes during add/remove nodes.
+      # If enabled, Let's start from 2 replicas and increment it every 50 nodes.
+      # In special case of 1 node, scale to 1 replica.
+      replicas: "\
+        {% if plugins.calico.typha.enabled | is_true %}\
+        {% set kubernetes_nodes = nodes | select('has_roles', ['control-plane', 'worker']) | list | length %}\
+        {{ (1 + ([kubernetes_nodes - 1, 1] | min) + kubernetes_nodes / 50) | round(0, 'floor') | int }}\
+        {% else %}0{% endif %}"
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
@@ -689,7 +698,7 @@ plugins:
           retries: 40
 
   nginx-ingress-controller:
-    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
+    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'
     install: true
     installation:
       registry: registry.k8s.io
@@ -717,7 +726,7 @@ plugins:
       # redefine default value for controller >= v1.9.0 because we need to use snippet annotations for dashboard
       allow-snippet-annotations: "true"
     webhook:
-      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|kubernetes_version]["webhook-version"] }}'
+      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
       # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598
       resources:
         requests:
@@ -757,7 +766,7 @@ plugins:
         protocol: TCP
 
   kubernetes-dashboard:
-    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
+    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
       priority: 2
@@ -794,7 +803,7 @@ plugins:
           cpu: 1
           memory: 200Mi
     metrics-scraper:
-      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|kubernetes_version]["metrics-scraper-version"] }}'
+      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion]["metrics-scraper-version"] }}'
       nodeSelector:
         kubernetes.io/os: linux
       resources:
@@ -834,7 +843,7 @@ plugins:
                         number: 443
 
   local-path-provisioner:
-    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
       priority: 2
@@ -852,7 +861,7 @@ plugins:
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
     image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
-    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|kubernetes_version]["busybox-version"] }}'
+    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["busybox-version"] }}'
     # resources values are based on https://github.com/rancher/local-path-provisioner/blob/v0.0.24/deploy/chart/local-path-provisioner/values.yaml#L69
     resources:
       requests:

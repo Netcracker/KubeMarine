@@ -33,17 +33,18 @@ import (
 var (
 	mode, msg, src, dstExt, dstInt string
 	srcIP, dstExtIP, dstIntIP net.IP
-	dport, timeout uint
+	sport, dport, timeout uint
 )
 
 func customUsage() {
 	fmt.Printf("Usage of %s:\n", os.Args[0])
-	fmt.Printf("%s -mode client -src 192.168.0.1 -ext 192.168.0.2 -int 240.0.0.1 -dport 54545 -msg Message -timeout 10\n",
+	fmt.Printf("%s -mode client -src 192.168.0.1 -ext 192.168.0.2 -int 240.0.0.1 -sport 45455 -dport 54545 -msg Message -timeout 10\n",
 	      os.Args[0])
-	fmt.Printf("%s -mode server -ext 192.168.0.2 -int 240.0.0.1 -dport 54545 -msg Message -timeout 3\n",
+	fmt.Printf("%s -mode server -ext 192.168.0.2 -int 240.0.0.1 -sport 45455 -dport 54545 -msg Message -timeout 3\n",
 	      os.Args[0])
 	fmt.Println("Where:")
 	flag.PrintDefaults()
+	fmt.Println("Note: Pay attention to the fact that some implementations of packet filters might includes rule that allows 'related' traffic (eg.: Security Groups implementation in OpenStack). That means the mode changing on the same host might lead to incorrect results of the check.")
 }
 
 func parseParam() error {
@@ -58,6 +59,7 @@ func parseParam() error {
 	flag.StringVar(&dstInt, "int", "", "Internal destination IP address")
 	// UDP port number (UDP Dst Port)
 	flag.UintVar(&dport, "dport", 65000, "Destination UDP port")
+	flag.UintVar(&sport, "sport", 53, "Source UDP port")
 	flag.UintVar(&timeout, "timeout", 0, "Operation timeout")
 	flag.StringVar(&msg, "msg", "", "Message as UDP payload")
 	flag.Parse()
@@ -76,6 +78,9 @@ func parseParam() error {
 	if dstIntIP == nil {
 		return errors.New("Internal destination address is invalid")
 	}
+	if sport > 65535 {
+		return errors.New("Source UDP port out of range")
+	}
 	if dport > 65535 {
 		return errors.New("Destination UDP port out of range")
 	}
@@ -90,6 +95,7 @@ func runSrv() {
 	dstExtIPaddr := net.IPAddr{
 		IP: dstExtIP,
 	}
+	srcUDPPort := layers.UDPPort(sport)
 	dstUDPPort := layers.UDPPort(dport)
 	// Listen on the external IP address. The payload protocol is IPIP
 	ipConn, err := net.ListenIP("ip4:4", &dstExtIPaddr)
@@ -131,7 +137,8 @@ func runSrv() {
 				if packet.Layers()[1].LayerType() == layers.LayerTypeUDP {
 					udpLayer := packet.Layers()[1]
 					udpPacket := udpLayer.(*layers.UDP)
-					if udpPacket.DstPort == dstUDPPort {
+					if udpPacket.DstPort == dstUDPPort &&
+					   udpPacket.SrcPort == srcUDPPort {
 						payload := fmt.Sprintf("%s", packet.Layers()[1].LayerPayload())
 						// Check UDP paylaod
 						if payload == msg {
@@ -162,7 +169,7 @@ func runClt() {
 	}
 	// Describe UDP packet
 	udpLayer := layers.UDP{
-		SrcPort: layers.UDPPort(53),
+		SrcPort: layers.UDPPort(uint16(sport)),
 		DstPort: layers.UDPPort(uint16(dport)),
 	}
 	udpLayer.SetNetworkLayerForChecksum(&ipLayer2)

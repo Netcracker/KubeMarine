@@ -247,7 +247,7 @@ class IngressNginxManifestProcessor(Processor):
             extra_args.append('--default-ssl-certificate' + '=' + 'kube-system/default-ingress-cert')
 
         self.enrich_deamonset_ingress_nginx_controller_container_args(
-            manifest, remove_args=['--publish-service'], extra_args=extra_args)
+            manifest, remove_args=['--publish-service','--enable-metrics'], extra_args=extra_args)
 
         container_pos, container = self.find_container_for_patch(
             manifest, key, container_name='controller', is_init_container=False)

@@ -12,9 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import re
 import unittest
+from unittest import mock
+from test.unit import utils as test_utils
 
-from kubemarine import demo
+from kubemarine import demo, kubernetes
 from kubemarine.core.cluster import EnrichmentStage
 from kubemarine.demo import FakeKubernetesCluster
 
@@ -108,7 +112,7 @@ class KubernetesClusterTest(unittest.TestCase):
                          msg="Unexpected package associations of remained node")
 
     def test_upgrade_get_redefined_package_associations(self):
-        before, after = 'v1.27.8', 'v1.28.8'
+        before, after = 'v1.27.13', 'v1.28.9'
         context = demo.create_silent_context(['fake.yaml'], procedure='upgrade')
         context['upgrade_step'] = 0
 
@@ -252,6 +256,54 @@ class LightClusterTest(unittest.TestCase):
 
         self.assertIn('control-plane', cluster.inventory['nodes'][0]['roles'])
         self.assertEqual('control-plane-1', cluster.nodes['control-plane'].get_node_name())
+
+    def test_recursive_compile_inventory(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['values'] = {
+            'var1': '{{ values.var2 }}',
+            'var2': '{{ "test-cluster" | upper }}',
+        }
+        inventory['cluster_name'] = '{{ values.var1 }}'
+
+        cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
+        self.assertEqual('TEST-CLUSTER', cluster.inventory['cluster_name'])
+
+    def test_compile_env_variables(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['values'] = {
+            'variable': '{{ env.ENV_NAME }}',
+        }
+
+        with mock.patch.dict(os.environ, {'ENV_NAME': 'value1'}):
+            cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
+
+        self.assertEqual('value1', cluster.inventory['values']['variable'])
+
+    def test_recursive_compile_invalid_inventory_reference(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        services_ref = '{{ services.kubeadm.kubernetesVersion }}'
+        inventory['values'] = {
+            'var1': '{{ values.var2 }}',
+            'var2': services_ref,
+        }
+
+        with test_utils.assert_raises_regex(self, ValueError, re.escape(
+                f"Failed to render {services_ref!r}\n"
+                "in section ['values']['var2']: 'services' is undefined")):
+            demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
+
+    def test_compile_invalid_globals_reference(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        kubernetes_version = kubernetes.get_kubernetes_version(inventory)
+        globals_ref = f'{{{{ globals.compatibility_map.software["calico"]["{kubernetes_version}"].version }}}}'
+        inventory['values'] = {
+            'var1': globals_ref,
+        }
+
+        with test_utils.assert_raises_regex(self, ValueError, re.escape(
+                f"Failed to render {globals_ref!r}\n"
+                "in section ['values']['var1']: 'globals' is undefined")):
+            demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
 
 
 if __name__ == '__main__':

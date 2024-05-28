@@ -16,10 +16,9 @@ import functools
 from copy import deepcopy
 from enum import Flag, auto, IntFlag
 from types import FunctionType
-from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, cast, Sequence
+from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, cast, Sequence, Protocol
 
 from ordered_set import OrderedSet
-from typing_extensions import Protocol
 
 from kubemarine.core import log  # pylint: disable=unused-import
 from kubemarine.core import utils, static
@@ -136,7 +135,12 @@ def enrichment(stages: EnrichmentStage, procedures: List[str] = None) -> Callabl
     :param stages: `EnrichmentStage` stages to run this function at.
     :param procedures: list of procedures for which the function is applicable.
     """
-    return lambda fn: functools.wraps(fn)(EnrichmentFunction(fn, stages, procedures))
+    def helper(fn: _Enrichment) -> EnrichmentFunction:
+        wrapper = EnrichmentFunction(fn, stages, procedures)
+        functools.update_wrapper(wrapper, fn)
+        return wrapper
+
+    return helper
 
 
 @dataclasses.dataclass(repr=False)
@@ -310,10 +314,24 @@ class KubernetesCluster(Environment):
         return self._products.inventory
 
     @property
+    def previous_nodes_inventory(self) -> Dict[str, dict]:
+        """
+        The previous resulting inventory describing specific nodes before procedure inventory is applied.
+        For `install` and some other procedures this equals to the resulting `KubernetesCluster.nodes_inventory`.
+
+        The inventory can be derived from the `KubernetesCluster.previous_inventory` only,
+        and should not depend on other sources of information.
+
+        The property should be read only, and should be examined primarily at PROCEDURE stage or inside the flow.
+        """
+        return self._previous_products.nodes_inventory
+
+    @property
     def nodes_inventory(self) -> Dict[str, dict]:
         """
         The resulting inventory describing specific nodes.
-        The inventory can be derived from the main `inventory` only,
+
+        The inventory can be derived from the main `KubernetesCluster.inventory` only,
         and should not depend on other sources of information.
 
         Should be changed only during the enrichment.
