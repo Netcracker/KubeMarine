@@ -54,9 +54,6 @@ def get_kme_dictionary() -> dict:
                 """.rstrip()
             )
         },
-        "KME0007": {
-            "name": "Docker CRI can not be used with endpoints registry definition."
-        },
         "KME0008": {
             "name": "Specified Kubernetes version '{version}' - cannot be used! "
                     "Allowed versions are: {allowed_versions}."

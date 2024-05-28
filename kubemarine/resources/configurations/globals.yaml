@@ -158,11 +158,6 @@ thirdparties:
 
 packages:
   debian:
-    docker:
-      package_name:
-        - docker-ce: docker
-        - docker-ce-cli: docker
-        - containerd.io: containerdio
     containerd:
       package_name:
         - containerd: containerd
@@ -173,11 +168,6 @@ packages:
       package_name:
         - keepalived: keepalived
   rhel:
-    docker:
-      package_name:
-        - docker-ce: docker
-        - docker-ce-cli: docker
-        - containerd.io: containerdio
     containerd:
       package_name:
         - containerd.io: containerdio
@@ -188,11 +178,6 @@ packages:
       package_name:
         - keepalived: keepalived
   rhel8:
-    docker:
-      package_name:
-        - docker-ce: docker
-        - docker-ce-cli: docker
-        - containerd.io: containerdio
     containerd:
       package_name:
         - containerd.io: containerdio
@@ -203,11 +188,6 @@ packages:
       package_name:
         - keepalived: keepalived
   rhel9:
-    docker:
-      package_name:
-        - docker-ce: docker
-        - docker-ce-cli: docker
-        - containerd.io: containerdio
     containerd:
       package_name:
         - containerd.io: containerdio
@@ -218,13 +198,6 @@ packages:
       package_name:
         - keepalived: keepalived
   common_associations:
-    docker:
-      executable_name: 'docker'
-      service_name: 'docker'
-      config_location: '/etc/docker/daemon.json'
-      groups:
-        - control-plane
-        - worker
     containerd:
       executable_name: 'containerd'
       service_name: 'containerd'

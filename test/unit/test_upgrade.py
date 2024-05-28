@@ -121,10 +121,6 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
                 for _, versions in itertools.groupby(self.k8s_versions(), key=kutils.minor_version)]
 
 
-def set_cri(inventory: dict, cri: str):
-    inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = cri
-
-
 class _AbstractUpgradeEnrichmentTest(unittest.TestCase):
     def setUpVersions(self, old: str, _new: List[str]):
         # pylint: disable=attribute-defined-outside-init
@@ -249,14 +245,13 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
         self.setUpNodesContext('ubuntu', '20.04')
-        set_cri(self.inventory, 'containerd')
 
     def setUpNodesContext(self, os_name: str, os_version: str):
         # pylint: disable-next=attribute-defined-outside-init
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
 
         associations = {}
-        for sample_package in ('docker', 'containerd'):
+        for sample_package in ('containerd',):
             associations[sample_package] = {}
 
         for new in self.upgrade_plan:
@@ -283,25 +278,24 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
             package_compatibility[self.new][f"version_{os_family}"] = f'{package}-new'
 
     def test_enrich_packages_propagate_associations(self):
-        set_cri(self.inventory, 'docker')
-        self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
+        self.upgrade[self.new]['packages']['associations']['containerd']['package_name'] = 'containerd'
         self.upgrade[self.new]['packages']['install'] = ['curl']
         cluster = self.new_cluster()
         self.assertEqual(['curl'], cluster.inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
-        actual_package = cluster.inventory['services']['packages']['associations']['debian']['docker']['package_name']
-        self.assertEqual('docker-ce', actual_package,
+        actual_package = cluster.inventory['services']['packages']['associations']['debian']['containerd']['package_name']
+        self.assertEqual('containerd', actual_package,
                          "Associations packages are enriched incorrectly")
 
     def test_final_inventory_enrich_global(self):
-        set_cri(self.inventory, 'docker')
-        self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
+        self.upgrade[self.new]['packages']['associations']['containerd']['package_name'] = 'containerd'
         self.upgrade[self.new]['packages']['install'] = ['curl']
         cluster = self.new_cluster()
         final_inventory = cluster.formatted_inventory
         self.assertEqual(['curl'], final_inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
-        self.assertEqual('docker-ce', final_inventory['services']['packages']['associations']['docker']['package_name'],
+        self.assertEqual('containerd',
+                         final_inventory['services']['packages']['associations']['containerd']['package_name'],
                          "Associations packages are enriched incorrectly")
 
     def test_require_package_redefinition(self):
@@ -377,31 +371,26 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
         ):
-            for cri in ('docker', 'containerd'):
-                for package_vary in ('docker', 'containerd', 'containerdio'):
-                    expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
+            for package_vary in ('containerd', 'containerdio'):
+                expected_upgrade_required = package_vary in self._packages_for_cri_os_family(os_family)
 
-                    with self.subTest(f"{os_family}, {cri}, {package_vary}"), utils.backup_globals():
-                        self._patch_globals(package_vary, os_family, equal=False)
+                with self.subTest(f"{os_family}, {package_vary}"), utils.backup_globals():
+                    self._patch_globals(package_vary, os_family, equal=False)
 
-                        self.setUp()
-                        self.setUpNodesContext(os_name, os_version)
-                        set_cri(self.inventory, cri)
+                    self.setUp()
+                    self.setUpNodesContext(os_name, os_version)
 
-                        cluster = self.new_cluster()
-                        self.assertEqual(
-                            expected_upgrade_required,
-                            cri in cluster.context["upgrade"]["required"]['packages'],
-                            f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
+                    cluster = self.new_cluster()
+                    self.assertEqual(
+                        expected_upgrade_required,
+                        'containerd' in cluster.context["upgrade"]["required"]['packages'],
+                        f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
-    def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
-        if cri == 'containerd':
-            if os_family in ('rhel', 'rhel8', 'rhel9'):
-                package_names = ['containerdio']
-            else:
-                package_names = ['containerd']
+    def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
+        if os_family in ('rhel', 'rhel8', 'rhel9'):
+            package_names = ['containerdio']
         else:
-            package_names = ['docker', 'containerdio']
+            package_names = ['containerd']
 
         return package_names
 
@@ -789,7 +778,6 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
         self.assertEqual('custom3-initial', thirdparties_section['/custom3'])
 
     def test_enrich_upgrade_unpack(self):
-        set_cri(self.inventory, 'containerd')
         self.upgrade[self.new]['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-new'
 
         cluster = self.new_cluster()
@@ -798,7 +786,6 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
         self.assertEqual('/usr/bin/', thirdparties_section['/usr/bin/crictl.tar.gz']['unpack'])
 
     def test_require_source_redefinition_defaults_changed(self):
-        set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
         with utils.backup_globals(), \
                 utils.assert_raises_kme(self, "KME0011",
@@ -808,7 +795,6 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_dont_require_source_redefinition_defaults_unchanged(self):
-        set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
         with utils.backup_globals():
             self._patch_globals('crictl', equal=True)
@@ -816,7 +802,6 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_dont_require_redefinition_source_templates(self):
-        set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/kubelet'] = 'kubelet-{{ services.kubeadm.kubernetesVersion }}'
         self.inventory['services']['thirdparties']['/usr/bin/calicoctl'] = 'calicoctl-{{ plugins.calico.version }}'
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
@@ -840,7 +825,6 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def test_dont_require_redefinition_source_template_defaults_changed_second_step(self):
         self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.13'])
-        set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
 
@@ -914,7 +898,6 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.inventory['services']['cri'].setdefault('containerdConfig', {})\
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})
-        set_cri(self.inventory, 'containerd')
         for new in _new:
             self.upgrade[new]['cri'] = {
                 'containerdConfig': {
@@ -1074,7 +1057,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "Custom property was not redefined in recreated inventory.")
 
     def test_packages_iterative_package_names_redefinition(self):
-        set_cri(self.inventory, 'containerd')
         self.package_names(self.upgrade[self.upgrade_plan[1]], 'containerd', 'A')
         self.package_names(self.upgrade[self.upgrade_plan[2]], 'containerd', 'B')
 
@@ -1085,7 +1067,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "Containerd packages associations were not redefined in recreated inventory.")
 
     def test_thirdparties_iterative_source_redefinition(self):
-        set_cri(self.inventory, 'containerd')
         self.upgrade[self.upgrade_plan[1]].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = 'A'
         self.upgrade[self.upgrade_plan[2]].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = {
             'source': 'B',
@@ -1101,7 +1082,6 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
                          "sha1 of /usr/bin/calicoctl was not redefined in recreated inventory.")
 
     def test_iterative_sandbox_image_redefinition(self):
-        set_cri(self.inventory, 'containerd')
         self.sandbox_image(self.upgrade[self.upgrade_plan[1]], 'A')
         self.sandbox_image(self.upgrade[self.upgrade_plan[2]], 'B')
 

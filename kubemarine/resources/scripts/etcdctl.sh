@@ -5,12 +5,9 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if systemctl is-active --quiet docker; then
-  CONT_RUNTIME="docker"
-elif ctr --version &> /dev/null; then
-  CONT_RUNTIME="ctr"
-else
-  echo "Neither ctr nor docker are available to run container, exiting with error..."
+if ! ctr --version &> /dev/null; then
+  echo "ctr is not available to run container, exiting with error..."
+  exit 1
 fi
 
 # Try to read pod yaml from kubernetes
@@ -44,11 +41,7 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
     ETCD_MOUNTS_RAW=$(echo "${ETCD_POD_CONFIG}" | grep ' mountPath: ')
     while IFS= read -r line; do
         volume=$(echo "${line}" | awk '{print $3; exit}')
-        if [ "$CONT_RUNTIME" == "ctr" ]; then
-          ETCD_MOUNTS="${ETCD_MOUNTS} -mount type=bind,src=${volume},dst=${volume},options=rbind:rw"
-        else
-          ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
-        fi
+        ETCD_MOUNTS="${ETCD_MOUNTS} -mount type=bind,src=${volume},dst=${volume},options=rbind:rw"
     done <<< "${ETCD_MOUNTS_RAW}"
   fi
 
@@ -100,17 +93,12 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
     USER_ARGS+=("--endpoints=$ETCD_ENDPOINTS")
   fi
 
-  if [ "$CONT_RUNTIME" == "ctr" ]; then
-    ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
-    ctr_default_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^*=" | sed "s/^*=//;")
-    ctr_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^${ETCD_REGISTRY}=" | sed "s/^${ETCD_REGISTRY}=//;")
-    container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
-    ctr image pull ${ctr_default_pull_opts} ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
-    ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
-	    etcdctl "${USER_ARGS[@]}"
-  else
-    docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
-	    etcdctl "${USER_ARGS[@]}"
-  fi
+  ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
+  ctr_default_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^*=" | sed "s/^*=//;")
+  ctr_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^${ETCD_REGISTRY}=" | sed "s/^${ETCD_REGISTRY}=//;")
+  container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
+  ctr image pull ${ctr_default_pull_opts} ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
+  ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
+	  etcdctl "${USER_ARGS[@]}"
   exit $?
 fi

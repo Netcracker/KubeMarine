@@ -47,7 +47,6 @@
             "type": "object",
             "description": "Configure associations of package objects to be used during upgrade",
             "properties": {
-              "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
               "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"}
             },
             "additionalProperties": false

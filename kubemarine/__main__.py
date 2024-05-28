@@ -125,10 +125,6 @@ procedures = OrderedDict({
         'description': "Test internal imports and resources presence",
         'group': 'other'
     },
-    'migrate_cri': {
-        'description': "Migrate from Docker to Containerd",
-        'group': 'maintenance'
-    },
 })
 
 

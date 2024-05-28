@@ -632,8 +632,6 @@ def generate_procedure_inventory(procedure: str) -> dict:
     # set some commonly required properties
     if procedure == 'manage_pss':
         procedure_inventory['pss'] = {'pod-security': 'enabled'}
-    if procedure == 'migrate_cri':
-        procedure_inventory['cri'] = {'containerRuntime': 'containerd'}
 
     return procedure_inventory
 

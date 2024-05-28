@@ -13,9 +13,8 @@
 # limitations under the License.
 import re
 import unittest
-from test.unit import utils as test_utils
 
-from kubemarine import demo, cri
+from kubemarine import demo
 from kubemarine.core import errors
 from kubemarine.core.cluster import KubernetesCluster
 
@@ -235,54 +234,14 @@ class TestContainerdCriEnrichment(unittest.TestCase):
         containerd_config = cluster.inventory['services']['cri']['containerdConfig']
         self.assertNotIn('config_path', containerd_config.get('plugins."io.containerd.grpc.v1.cri".registry', {}))
 
-    def test_containerd_remove_docker_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = 'containerd'
-        cluster = demo.new_cluster(inventory)
-        self.assertNotIn('dockerConfig', cluster.inventory['services']['cri'])
-        self.assertNotIn('dockerConfig', test_utils.make_finalized_inventory(cluster)['services']['cri'])
-
-    def test_docker_remove_containerd_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = 'docker'
-        cluster = demo.new_cluster(inventory)
-        self.assertNotIn('containerdConfig', cluster.inventory['services']['cri'])
-        self.assertNotIn('containerdConfig', test_utils.make_finalized_inventory(cluster)['services']['cri'])
-
     def test_containerd_forbidden_docker_config(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory.setdefault('services', {})['cri'] = {
             'containerRuntime': 'containerd',
             'dockerConfig': {'registry-mirrors': ['http://example.registry']}
         }
-        with self.assertRaisesRegex(Exception, re.escape(cri.ERROR_FORBIDDEN_CRI_SECTION.format(
-                key='docker', value='dockerConfig'))):
-            demo.new_cluster(inventory)
-
-    def test_docker_forbidden_container_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory.setdefault('services', {})['cri'] = {
-            'containerRuntime': 'docker',
-            'containerdConfig': {'plugins."io.containerd.grpc.v1.cri".registry': {
-                'config_path': '/changed/path'
-            }}
-        }
-        with self.assertRaisesRegex(Exception, re.escape(cri.ERROR_FORBIDDEN_CRI_SECTION.format(
-                key='containerd', value='containerdConfig'))):
-            demo.new_cluster(inventory)
-
-    def test_docker_forbidden_container_registries_config(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory.setdefault('services', {})['cri'] = {
-            'containerRuntime': 'docker',
-            'containerdRegistriesConfig': {'some-registry:8080': {
-                'host."https://some-registry:8080"': {
-                    'skip_verify': True
-                }
-            }}
-        }
-        with self.assertRaisesRegex(Exception, re.escape(cri.ERROR_FORBIDDEN_CRI_SECTION.format(
-                key='containerd', value='containerdRegistriesConfig'))):
+        with self.assertRaisesRegex(Exception, re.escape(
+                "Additional properties are not allowed ('dockerConfig' was unexpected)")):
             demo.new_cluster(inventory)
 
 

@@ -23,9 +23,11 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_calico_typha_schedule_control_planes import CalicoTyphaScheduleControlPlane
+from kubemarine.patches.p2_reinstall_etcdctl_thirdparty import ReinstallEtcdctl
 
 patches: List[Patch] = [
     CalicoTyphaScheduleControlPlane(),
+    ReinstallEtcdctl(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

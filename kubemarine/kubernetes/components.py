@@ -282,15 +282,14 @@ def get_kubeadm_config(cluster: KubernetesCluster, init_config: dict) -> str:
 
 
 def _configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict) -> None:
-    if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
-        kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', {})
+    kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', {})
 
-        kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
+    kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
 
-        if not is_container_runtime_not_configurable(cluster):
-            kubelet_extra_args['container-runtime'] = 'remote'
+    if not is_container_runtime_not_configurable(cluster):
+        kubelet_extra_args['container-runtime'] = 'remote'
 
-        kubelet_extra_args['container-runtime-endpoint'] = 'unix:///run/containerd/containerd.sock'
+    kubelet_extra_args['container-runtime-endpoint'] = 'unix:///run/containerd/containerd.sock'
 
 
 def reconfigure_components(group: NodeGroup, components: List[str],
@@ -994,26 +993,15 @@ def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components:
 
     commands = []
 
-    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     # Take into account probably missed container because kubelet may be restarting them at this moment.
     # Though still ensure the command to delete the container successfully if it is present.
-    if cri_impl == 'containerd':
-        restart_container = ("(set -o pipefail && sudo crictl ps --name {component} -q "
-                             "| xargs -I CONTAINER sudo crictl rm -f CONTAINER)")
-    else:
-        restart_container = ("(set -o pipefail && sudo docker ps -q -f 'name=k8s_{component}' "
-                             "| xargs -I CONTAINER sudo docker rm -f CONTAINER)")
+    restart_container = ("(set -o pipefail && sudo crictl ps --name {component} -q "
+                         "| xargs -I CONTAINER sudo crictl rm -f CONTAINER)")
 
     for component in components:
         commands.append(restart_container.format(component=component))
 
-    if cri_impl == 'containerd':
-        get_container_from_cri = "sudo crictl ps --name {component} -q"
-    else:
-        get_container_from_cri = (
-            "sudo docker ps --no-trunc -f 'name=k8s_{component}' "
-            "| grep k8s_{component} | awk '{{{{ print $1 }}}}'")
-
+    get_container_from_cri = "sudo crictl ps --name {component} -q"
     get_container_from_pod = (
         "sudo kubectl get pods -n kube-system {component}-{node} "
         "-o 'jsonpath={{.status.containerStatuses[0].containerID}}{{\"\\n\"}}' "

@@ -11,18 +11,12 @@ thirdparties:
   calicoctl: []
   crictl: []
 packages:
-  docker:
-    version_rhel: []
-    version_rhel8: []
-    version_rhel9: []
-    version_debian: []
   containerd:
     version_debian: []
   containerdio:
     version_rhel: []
     version_rhel8: []
     version_rhel9: []
-    version_debian: []
   haproxy:
     version_rhel: false
     version_rhel8: false

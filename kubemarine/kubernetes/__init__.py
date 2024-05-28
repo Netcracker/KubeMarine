@@ -821,26 +821,22 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
     # currently it is invoked only for single node
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
-    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
 
-    if cri_impl in cluster.context["upgrade"]["required"]['packages']:
-        cri_packages = cluster.get_package_association_for_node(group.get_host(), cri_impl, 'package_name')
+    if 'containerd' in cluster.context["upgrade"]["required"]['packages']:
+        cri_packages = cluster.get_package_association_for_node(group.get_host(), 'containerd', 'package_name')
 
         log.debug(f"Installing {cri_packages} on node: {group.get_node_name()}")
         packages.install(group, include=cri_packages)
         log.debug(f"Restarting all containers on node: {group.get_node_name()}")
-        if cri_impl == "docker":
-            group.sudo("docker container rm -f $(sudo docker container ls -q)", warn=True)
-        else:
-            group.sudo("crictl rm -fa", warn=True)
+        group.sudo("crictl rm -fa", warn=True)
     else:
-        log.debug(f"{cri_impl!r} package upgrade is not required")
+        log.debug("'containerd' package upgrade is not required")
 
     # upgrade of sandbox_image is currently not supported for migrate_kubemarine
-    if cri_impl == 'containerd' and cluster.context["upgrade"]["required"].get('containerdConfig', False):
+    if cluster.context["upgrade"]["required"].get('containerdConfig', False):
         containerd.configure_containerd(group)
     else:
-        log.debug(f"{cri_impl!r} configuration upgrade is not required")
+        log.debug("'containerd' configuration upgrade is not required")
 
 
 def verify_upgrade_versions(cluster: KubernetesCluster) -> None:

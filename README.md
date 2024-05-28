@@ -22,7 +22,6 @@ Kubemarine is an open source, lightweight and powerful management tool built for
   - [migrate_kubemarine](documentation/Maintenance.md#kubemarine-migration-procedure)
   - [manage_pss](documentation/Maintenance.md#manage-pss-procedure)
   - [cert_renew](documentation/Maintenance.md#certificate-renew-procedure)
-  - [migrate_cri](documentation/Maintenance.md#cri-migration-procedure)
 - [Single cluster inventory](documentation/Installation.md#configuration) for all operations, highly customizable
 - Default values of all parameters in configurations with a minimum of required parameters
 - [Control planes balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP

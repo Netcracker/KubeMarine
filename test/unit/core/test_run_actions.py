@@ -653,7 +653,6 @@ class ClusterEnrichOptimization(unittest.TestCase):
             ('check_paas', 2),
             ('install', 2),
             ('manage_pss', 3),
-            ('migrate_cri', 3),
             ('migrate_kubemarine', 3),
             ('reboot', 2),
             ('remove_node', 3),
@@ -664,8 +663,6 @@ class ClusterEnrichOptimization(unittest.TestCase):
                 inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
                 kubernetes_version = 'v1.27.13'
                 inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
-                cri = 'docker' if procedure == 'migrate_cri' else 'containerd'
-                inventory['services'].setdefault('cri', {})['containerRuntime'] = cri
 
                 args = [] if procedure in ('check_iaas', 'install') else ['fake.yaml']
                 context = demo.create_silent_context(args, procedure=procedure)

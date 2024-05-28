@@ -1,6 +1,5 @@
 # This section can be changed manually, but it is also synchronized automatically with the 'compatibility_map' section below.
 kubernetes_versions:
-# To remove docker shim support once 1.23 is removed. https://kubernetes.io/blog/2020/12/02/dockershim-faq/#when-will-dockershim-be-removed
   v1.25:
     supported: true
   v1.26:

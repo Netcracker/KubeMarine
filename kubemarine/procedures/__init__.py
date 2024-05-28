@@ -53,8 +53,6 @@ def _import_tasks_procedure(name: str) -> TasksProcedure:
         from kubemarine.procedures import install as procedure
     elif name == "manage_pss":
         from kubemarine.procedures import manage_pss as procedure
-    elif name == "migrate_cri":
-        from kubemarine.procedures import migrate_cri as procedure
     elif name == "reboot":
         from kubemarine.procedures import reboot as procedure
     elif name == "reconfigure":
