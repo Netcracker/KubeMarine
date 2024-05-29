@@ -100,10 +100,6 @@ def generate_environment(kubernetes_version: str, scheme: dict = None) -> Tuple[
     return inventory, context
 
 
-def set_cri(inventory: dict, cri: str):
-    inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = cri
-
-
 @contextmanager
 def mock_cluster_enrich_max_stage() -> Iterator[List[EnrichmentStage]]:
     cluster_enrich_orig = KubernetesCluster.enrich
@@ -147,7 +143,7 @@ class PatchesResolvingTest(unittest.TestCase):
 
 
 class UpgradeCRI(unittest.TestCase):
-    def prepare_environment(self, cri: str, os_name: str, os_version: str):
+    def prepare_environment(self, os_name: str, os_version: str):
         # pylint: disable=attribute-defined-outside-init
 
         self.kubernetes_version = get_kubernetes_versions()[-1]
@@ -156,7 +152,7 @@ class UpgradeCRI(unittest.TestCase):
         self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
 
         associations = {}
-        for sample_package in ('docker', 'containerd', 'haproxy', 'keepalived'):
+        for sample_package in ('containerd', 'haproxy', 'keepalived'):
             associations[sample_package] = {}
 
         self.migrate_kubemarine['upgrade'] = {'packages': {
@@ -173,15 +169,14 @@ class UpgradeCRI(unittest.TestCase):
             'associations': deepcopy(associations),
         }
 
-        set_cri(self.inventory, cri)
         self.changed_config = {
             'packages': {
-                'docker': {}, 'containerdio': {}, 'containerd': {}
+                'containerdio': {}, 'containerd': {}
             }
         }
 
     def test_enrich_and_finalize_inventory(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = 'containerd-new'
         res = self._run_and_check(True, EnrichmentStage.PROCEDURE)
@@ -199,7 +194,7 @@ class UpgradeCRI(unittest.TestCase):
                          "Package associations are enriched incorrectly")
 
     def test_run_other_patch_not_enrich_inventory(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = 'containerd-new'
 
@@ -220,7 +215,7 @@ class UpgradeCRI(unittest.TestCase):
                             "Package associations should not be enriched")
 
     def test_simple_upgrade_required(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
@@ -231,24 +226,20 @@ class UpgradeCRI(unittest.TestCase):
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
         ):
-            for cri in ('docker', 'containerd'):
-                for package_vary in ('docker', 'containerd', 'containerdio'):
-                    expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
+            for package_vary in ('containerd', 'containerdio'):
+                expected_upgrade_required = package_vary in self._packages_for_cri_os_family(os_family)
 
-                    with self.subTest(f"{os_family}, {cri}, {package_vary}"):
-                        self.prepare_environment(cri, os_name, os_version)
-                        self.changed_config['packages'][package_vary][f"version_{os_family}"] = [self.kubernetes_version]
-                        self._run_and_check(expected_upgrade_required,
-                                            EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
+                with self.subTest(f"{os_family}, {package_vary}"):
+                    self.prepare_environment(os_name, os_version)
+                    self.changed_config['packages'][package_vary][f"version_{os_family}"] = [self.kubernetes_version]
+                    self._run_and_check(expected_upgrade_required,
+                                        EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
-    def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
-        if cri == 'containerd':
-            if os_family in ('rhel', 'rhel8', 'rhel9'):
-                package_names = ['containerdio']
-            else:
-                package_names = ['containerd']
+    def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
+        if os_family in ('rhel', 'rhel8', 'rhel9'):
+            package_names = ['containerdio']
         else:
-            package_names = ['docker', 'containerdio']
+            package_names = ['containerd']
 
         return package_names
 
@@ -259,7 +250,7 @@ class UpgradeCRI(unittest.TestCase):
                     ('containerd-redefined', True)
             ):
                 with self.subTest(f"global: {global_section}, upgrade: {expected_upgrade_required}"):
-                    self.prepare_environment('containerd', 'ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '20.04')
                     self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                     associations = self.inventory['services']['packages']['associations']
@@ -274,7 +265,7 @@ class UpgradeCRI(unittest.TestCase):
     def test_package_template_upgrade_required(self):
         for template in (False, True):
             with self.subTest(f"template: {template}"):
-                self.prepare_environment('containerd', 'ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '20.04')
 
                 redefined_package, expected_package = 'containerd-inventory', 'containerd-inventory'
                 if template:
@@ -310,18 +301,13 @@ class UpgradeCRI(unittest.TestCase):
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [get_kubernetes_versions()[-2]]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_changed_other_os_family_upgrade_not_required(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_rhel'] = [self.kubernetes_version]
-        self._run_and_check(False, EnrichmentStage.DEFAULT)
-
-    def test_changed_not_associated_package_upgrade_not_required(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
-        self.changed_config['packages']['docker']['version_debian'] = [self.kubernetes_version]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
@@ -329,7 +315,7 @@ class UpgradeCRI(unittest.TestCase):
             with self.subTest(f"global: {global_section}"), \
                     test_utils.assert_raises_kme(self, "KME0010", package='containerd',
                                                  previous_version_spec='', next_version_spec=''):
-                self.prepare_environment('containerd', 'ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '20.04')
                 self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                 associations = self.inventory['services']['packages']['associations']
@@ -343,7 +329,7 @@ class UpgradeCRI(unittest.TestCase):
         for package in ('haproxy', 'keepalived', 'audit', 'conntrack'):
             for global_section in (False, True):
                 with self.subTest(f"package: {package}, global: {global_section}"):
-                    self.prepare_environment('containerd', 'ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '20.04')
                     self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                     associations = self.inventory['services']['packages']['associations']
@@ -355,7 +341,7 @@ class UpgradeCRI(unittest.TestCase):
                     self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_package_redefinition(self):
-        self.prepare_environment('containerd', 'ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
 
@@ -506,7 +492,6 @@ class UpgradeThirdparties(unittest.TestCase):
         self.changed_config = {'thirdparties': {}}
 
     def test_enrich_and_finalize_inventory(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = {'source': 'crictl-new', 'sha1': 'fake-sha1'}
@@ -532,7 +517,6 @@ class UpgradeThirdparties(unittest.TestCase):
                          "sha1 was not enriched from procedure inventory")
 
     def test_run_other_patch_not_enrich_inventory(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = {'source': 'crictl-new'}
@@ -554,7 +538,6 @@ class UpgradeThirdparties(unittest.TestCase):
                             "Source should not be enriched")
 
     def test_enrich_and_finalize_source_template(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         template = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = template
@@ -579,24 +562,16 @@ class UpgradeThirdparties(unittest.TestCase):
                          "Source was not enriched from procedure inventory")
 
     def test_simple_upgrade_required(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self._run_and_check('upgrade_crictl', True, EnrichmentStage.PROCEDURE)
 
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [get_kubernetes_versions()[-2]]
         self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
 
-    def test_docker_cri_upgrade_crictl_not_required(self):
-        set_cri(self.inventory, 'docker')
-        self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
-        self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
-
     def test_require_source_redefinition(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
         with test_utils.assert_raises_kme(self, "KME0011",
@@ -605,7 +580,6 @@ class UpgradeThirdparties(unittest.TestCase):
             self._run_and_check('upgrade_crictl', False, EnrichmentStage.PROCEDURE)
 
     def test_require_sha1_redefinition(self):
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = {
             'source': 'crictl-redefined',
@@ -619,7 +593,6 @@ class UpgradeThirdparties(unittest.TestCase):
 
     def test_run_other_patch_not_require_source_redefinition(self):
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
-        set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
 
@@ -842,18 +815,17 @@ class RunPatchesSequenceTest(unittest.TestCase):
     def setUp(self):
         self.prepare_environment()
 
-    def prepare_environment(self, cri: str = 'containerd', os_name: str = 'ubuntu', os_version: str = '22.04'):
+    def prepare_environment(self, os_name: str = 'ubuntu', os_version: str = '22.04'):
         self.kubernetes_version = get_kubernetes_versions()[-1]
         self.inventory, self.context = generate_environment(self.kubernetes_version, scheme=demo.ALLINONE)
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
         self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
         self.migrate_kubemarine['upgrade'] = {}
 
-        set_cri(self.inventory, cri)
         self.changed_config = {
             'thirdparties': {},
             'packages': {
-                'docker': {}, 'containerdio': {}, 'containerd': {}, 'haproxy': {}, 'keepalived': {},
+                'containerdio': {}, 'containerd': {}, 'haproxy': {}, 'keepalived': {},
             },
             'plugins': {},
         }
@@ -866,20 +838,14 @@ class RunPatchesSequenceTest(unittest.TestCase):
         for first_result in ('skipped', 'run'):
             for second_result in ('skipped', 'run', 'failed'):
                 for first, second in (
-                        ('crictl', 'cri'),
+                        ('crictl', 'containerd'),
                         ('crictl', 'keepalived'),
                         ('crictl', 'nginx-ingress-controller'),
                         ('containerd', 'haproxy'),
-                        ('docker', 'calico'),
+                        ('containerd', 'calico'),
                         ('keepalived', 'calico'),
                         ('calico', 'nginx-ingress-controller'),
                 ):
-                    if (first, second) == ('crictl', 'cri'):
-                        if first_result == 'skipped':
-                            second = 'docker'
-                        else:
-                            second = 'containerd'
-
                     with self.subTest(f"{first}: {first_result}, {second}: {second_result}"):
                         self._test_run_upgrade_two_patches((first, first_result), (second, second_result))
 
@@ -895,7 +861,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
             if result == 'failed':
                 self.inventory['services'].setdefault('thirdparties', {})['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
 
-        elif service in ('docker', 'containerd', 'keepalived', 'haproxy'):
+        elif service in ('containerd', 'keepalived', 'haproxy'):
             if result in ('run', 'failed', 'skipped'):
                 # For Debian, one of keys in compatibility map for CRI matches the CRI name.
                 # Keys in compatibility map for haproxy and keepalived always match the service name
@@ -926,19 +892,9 @@ class RunPatchesSequenceTest(unittest.TestCase):
                     .setdefault(plugin_section, {})['image'] = 'image-redefined'
 
     def _test_run_upgrade_two_patches(self, first: Tuple[str, str], second: Tuple[str, str]):
-        cri = 'containerd'
-        for service, _ in (first, second):
-            if service in ('docker', 'containerd'):
-                cri = service
-
-        self.prepare_environment(cri, 'ubuntu', '22.04')
+        self.prepare_environment('ubuntu', '22.04')
 
         service, result = first
-
-        if service == 'crictl' and result == 'skipped' and cri == 'docker':
-            # Let's prepare inventory as the patch should run. It should not be run actually for docker CRI.
-            result = 'run'
-
         self._prepare_environment_for_service_upgrade(service, result)
         service, result = second
         self._prepare_environment_for_service_upgrade(service, result)
@@ -955,7 +911,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
                 if result == 'failed':
                     stack.enter_context(self._assert_raises_kme())
 
-                if service in ('docker', 'containerd'):
+                if service == 'containerd':
                     service = 'cri'
 
                 patch_ids.append(f"upgrade_{re.sub(r'-', '_', service)}")
@@ -972,7 +928,7 @@ class RunPatchesSequenceTest(unittest.TestCase):
             if service == 'crictl':
                 type_ = 'thirdparty'
                 mock_context = mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__)
-            elif service in ('docker', 'containerd'):
+            elif service == 'containerd':
                 type_ = 'cri'
                 mock_context = mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__)
             elif service in ('keepalived', 'haproxy'):

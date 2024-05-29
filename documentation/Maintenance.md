@@ -16,7 +16,6 @@ This section describes the features and steps for performing maintenance procedu
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
-    - [Cri Migration Procedure](#cri-migration-procedure)
     - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution From CLI](#procedure-execution-from-cli)
@@ -121,7 +120,7 @@ For more information, refer to [Packages Upgrade Patches](#packages-upgrade-patc
 
 The upgrade is performed node-by-node. The process for each node is as follows:
 1. All the pods are drained from the node.
-2. The docker or containerd is upgraded.
+2. Containerd is upgraded.
 3. All containers on the node are deleted.
 4. The node is returned to the cluster for scheduling.
 
@@ -172,17 +171,16 @@ Patches that upgrade system packages have the following identifiers:
 * `upgrade_haproxy` - It upgrades the Haproxy service on all balancers.
 * `upgrade_keepalived` - It upgrades the Keepalived service on all balancers.
 
-System packages such as docker, containerd, haproxy, and keepalived are upgraded automatically as required.
+System packages such as containerd, haproxy, and keepalived are upgraded automatically as required.
 You can influence the system packages' upgrade using the `packages` section as follows:
 
 ```yaml
 upgrade:
   packages:
     associations:
-      docker:
+      containerd:
         package_name:
-          - docker-ce-cli-19.03*
-          - docker-ce-19.03*
+          - 'containerd.io-1.6*'
 ```
 
 The configuration from the procedure inventory is merged with the configuration in the `cluster.yaml`.
@@ -366,14 +364,17 @@ This configuration replaces the configuration contained in the current **cluster
 
 #### Kubernetes Upgrade Task
 
-This task is required to actually upgrade the Kubernetes cluster to the next version. The upgrade is performed node-by-node. On each node, the docker or containerd is upgraded, if required. After all the pods are drained from the node, the node is upgraded and finally returned to the cluster for scheduling.
+This task is required to actually upgrade the Kubernetes cluster to the next version.
+The upgrade is performed node-by-node.
+On each node, containerd is upgraded, if required.
+After all the pods are drained from the node, the node is upgraded and finally returned to the cluster for scheduling.
 
 By default, node drain is performed using `disable-eviction=True` to ignore the PodDisruptionBudget (PDB) rules. If you want to enforce PDB rules during the upgrade, set `disable-eviction` to False. However, in this case, the upgrade may fail if you are unable to drain the node due of PDB rules. `disable-eviction` works only for upgrades on Kubernetes versions >= 1.18. 
 An example configuration to enforce PDB rules is as follows:
 
 ```yaml
 upgrade_plan:
-  - v1.18.8
+  - v1.30.1
 
 disable-eviction: False # default is True
 ```
@@ -391,10 +392,12 @@ This task is executed to restore the required CoreDNS configuration.
 
 #### Packages Upgrade Section and Task
 
-This inventory section contains the configuration to upgrade custom and system packages, such as docker and containerd. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
+This inventory section contains the configuration to upgrade custom and system packages, such as containerd.
+The system packages are upgraded by default, if necessary.
+You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
 
 ```yaml
-v1.18.8:
+v1.30.1:
   packages:
     remove:
       - curl
@@ -404,17 +407,21 @@ v1.18.8:
     upgrade:
       - openssl
     associations:
-      docker:
+      containerd:
         package_name:
-          - docker-ce-cli-19.03*
-          - docker-ce-19.03*
+          - 'containerd.io-1.6*'
 ```
 
 The requested actions for custom packages are performed in the `packages` task. The configuration from the procedure inventory replaces the configuration specified in the `cluster.yaml`. If you do not want to lose the packages specified in the `cluster.yaml`, then it is necessary to copy them to the procedure inventory.
 
-By default, it is not required to provide information about system packages through associations. They are upgraded automatically as required. You can provide this information if you want to have better control over system packages' versions, such as docker. Also, you have to explicitly provide system packages' information if you have specified this information in the `cluster.yaml`. It is because in this case, you take full control over the system packages and the defaults do not apply. The provided configuration for system packages is merged with configuration in the `cluster.yaml`.
+By default, it is not required to provide information about system packages through associations.
+They are upgraded automatically as required.
+You can provide this information if you want to have better control over system packages' versions, such as containerd.
+Also, you have to explicitly provide system packages' information if you have specified this information in the `cluster.yaml`.
+It is because in this case, you take full control over the system packages and the defaults do not apply.
+The provided configuration for system packages is merged with configuration in the `cluster.yaml`.
 
-**Note**: The system packages are updated in separate tasks. For example, the container runtime (docker/containerd) is upgraded during the Kubernetes upgrade.
+**Note**: The system packages are updated in separate tasks. For example, the container runtime (containerd) is upgraded during the Kubernetes upgrade.
 
 **Note**: During the container runtime upgrade, the containers may be broken, so all containers on the node are deleted after the upgrade.
 Kubernetes re-creates all the pod containers. However, your custom containers may be deleted, and you need to start them manually.
@@ -432,7 +439,7 @@ For example, they may depend on Kubernetes version using [Dynamic Variables](Ins
 You can also configure your own plugins for the upgrade as follows:
 
 ```yaml
-v1.28.4:
+v1.30.1:
   plugins:
     example-plugin:
       installation:
@@ -452,7 +459,7 @@ v1.28.4:
 You can also re-install custom or OOB plugins even without changes in the inventory configuration.
 
 ```yaml
-v1.28.4:
+v1.30.1:
   plugins:
     calico: {}
     example-plugin: {}
@@ -587,7 +594,6 @@ By default, the following files are backed up from all nodes in the cluster:
 * /etc/chrony.conf
 * /etc/selinux/config
 * /etc/systemd/system/kubelet.service
-* /etc/docker/daemon.json
 * /etc/containerd/config.toml
 * /etc/containerd/certs.d
 * /etc/crictl.yaml
@@ -1498,98 +1504,6 @@ The `cert_renew` procedure executes the following sequence of tasks:
 2. nginx_ingress_controller
 3. calico
 4. certs_overview
-
-## Cri Migration Procedure
-
-The `migrate_cri` procedure allows you to migrate from Docker to Containerd.
-
-**Note**: This procedure consults `/etc/fstab` to see if separate disk is used for docker directory `/var/lib/docker`.
-If there is such disk, it will be **cleared** and re-mounted to `/var/lib/containerd`.
-
-**Warning**: This procedure works only in one direction.
-
-**Warning**: If for some reason, the migration to Containerd has been executed on an environment where Containerd was already used as Cri, Kubernetes dashboard may be unavailable. To resolve this issue, restart the pods of the ingress-nginx-controller service.
-
-**Warning**: The migration procedure removes the docker daemon from all nodes in the cluster.
-
-### Procedure Execution Steps
-
-This procedure includes the following steps:
-1. Verify and merge all the specified parameters into the inventory.
-2. Install and configure containerd.
-3. Install crictl.
-4. Implement the following steps on each control-plane and worker node by node:
-    1. Drain the node.
-    2. Update configurations on the node for migration to containerd.
-    3. Move the pods on the node from the docker's containers to those of containerd.
-    4. Uncordon the node.
-
-**Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
-
-### migrate_cri Parameters
-
-The procedure accepts required positional argument with the path to the procedure inventory file.
-You can find description and examples of the accepted parameters in the next sections.
-
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
-
-The following sections describe the `migrate_cri` parameters.
-
-#### cri Parameter
-
-In this parameter, you should specify the `containerRuntime: containerd` parameter.
-
-**Note**: This parameter is mandatory. An exception is raised if the parameter is absent.
-
-You can also optionally specify the configuration for the containerd.
-For more information, refer to [CRI](Installation.md#cri).
-
-Example for CLI:
-
-```yaml
-cri:
-  containerRuntime: containerd
-  containerdConfig:
-    plugins."io.containerd.grpc.v1.cri":
-      sandbox_image: registry.k8s.io/pause:3.2
-  containerdRegistriesConfig:
-    artifactory.example.com:5443:
-      host."https://artifactory.example.com:5443":
-        capabilities: [ "pull", "resolve" ]
-```
-
-#### packages-associations Parameter
-
-This parameter allows you to specify an association for containerd, thus you could set a concrete version which should be installed from the allowed repositories.
-
-**Note**: This parameter is optional.
-
-Example:
-
-```yaml
-packages:
-  associations:
-    containerd:
-      executable_name: 'containerd'
-      package_name: 'containerd.io-1.4.*'
-      service_name: 'containerd'
-      config_location: '/etc/containerd/config.toml'
-```
-
-#### thirdparties Parameter
-
-This parameter allows you to specify the link to a concrete version of a crictl third-party. In the absence of this parameter, crictl is downloaded from Github/registry in case you ran the procedure from CLI. 
-
-**Note**: This parameter is optional.
-
-Example:
-
-```yaml
-thirdparties:
-  /usr/bin/crictl.tar.gz:
-    source: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.20.0/crictl-v1.20.0-linux-amd64.tar.gz
-```
 
 ## Admission Migration Procedure
 

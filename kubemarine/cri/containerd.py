@@ -131,29 +131,10 @@ def verify_upgrade_inventory(cluster: KubernetesCluster) -> None:
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
 def calculate_sandbox_image_upgrade_required(cluster: KubernetesCluster) -> None:
-    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
-    if cri_impl != "containerd":
-        return
-
     upgrade_required = (get_sandbox_image(cluster.previous_inventory['services']['cri'])
                         != get_sandbox_image(cluster.inventory['services']['cri']))
 
     cluster.context.setdefault("upgrade", {}).setdefault('required', {})['containerdConfig'] = upgrade_required
-
-
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['migrate_cri'])
-def enrich_migrate_cri_inventory(cluster: KubernetesCluster) -> None:
-    if (cluster.previous_inventory["services"]["cri"]["containerRuntime"]
-            == cluster.procedure_inventory["cri"]["containerRuntime"]):
-        raise Exception("You already have such cri "
-                        "or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
-
-    cri_section = cluster.inventory.setdefault("services", {}).setdefault("cri", {})
-
-    if cri_section.get("dockerConfig", {}):
-        del cri_section["dockerConfig"]
-
-    default_merger.merge(cri_section, utils.deepcopy_yaml(cluster.procedure_inventory["cri"]))
 
 
 def fetch_containerd_config(group: NodeGroup) -> Tuple[Dict[str, dict], Dict[str, dict]]:

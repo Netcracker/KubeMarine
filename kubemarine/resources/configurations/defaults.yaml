@@ -127,7 +127,6 @@ services:
       group: control-plane
     /usr/bin/calicoctl:
       group: control-plane
-    # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       unpack: /usr/bin/
 
@@ -140,17 +139,6 @@ services:
         runtime_type: "io.containerd.runc.v2"
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
         SystemdCgroup: '{% if services.kubeadm_kubelet.cgroupDriver == "systemd" %}true{% else %}false{% endif %}'
-    dockerConfig:
-      ipv6: False
-      log-driver: json-file
-      log-opts:
-        max-size: 64m
-        max-file: "3"
-      exec-opts:
-        - native.cgroupdriver=systemd
-      icc: False
-      live-restore: True
-      userland-proxy: False
 
   modprobe:
     rhel:
@@ -371,14 +359,6 @@ services:
               - networksets
 
     rules:
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.service -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.socket -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/default/docker -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker/daemon.json -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/sbin/runc -k docker{% endif %}'
-      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/bin/dockerd -k docker{% endif %}'
       - '-w /usr/bin/containerd -k docker'
 
   coredns:
@@ -498,11 +478,10 @@ services:
     package_manager:
       replace-repositories: false
     # Associations for each OS family are merged with 'package.common_associations' section of globals.yaml.
-    # Packages for docker, containerd, haproxy, and keepalived are calculated based on
+    # Packages for containerd, haproxy, and keepalived are calculated based on
     # 'package.<OS family>' sections of globals.yaml, target Kubernetes version, and the compatibility map.
     associations:
       debian:
-        docker: {}
         containerd: {}
         haproxy:
           executable_name: 'haproxy'
@@ -513,7 +492,6 @@ services:
         conntrack:
           package_name: 'conntrack'
       rhel:
-        docker: {}
         containerd: {}
         haproxy:
           executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
@@ -526,7 +504,6 @@ services:
         semanage:
           package_name: 'policycoreutils-python'
       rhel8:
-        docker: {}
         containerd: {}
         haproxy:
           executable_name: '/usr/sbin/haproxy'
@@ -539,7 +516,6 @@ services:
         semanage:
           package_name: 'policycoreutils-python-utils'
       rhel9:
-        docker: {}
         containerd: {}
         haproxy:
           executable_name: '/usr/sbin/haproxy'

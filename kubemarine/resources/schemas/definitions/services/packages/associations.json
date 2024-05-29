@@ -92,7 +92,6 @@
     },
     "Associations": {
       "properties": {
-        "docker": {"$ref": "#/definitions/ServicePackageAssociations"},
         "containerd": {"$ref": "#/definitions/ServicePackageAssociations"},
         "haproxy": {"$ref": "#/definitions/ServicePackageAssociations"},
         "keepalived": {"$ref": "#/definitions/ServicePackageAssociations"},
@@ -108,7 +107,7 @@
     },
     "AssociationsNames": {
       "enum": [
-        "docker", "containerd", "haproxy", "keepalived", "audit",
+        "containerd", "haproxy", "keepalived", "audit",
         "conntrack", "iptables", "openssl", "curl", "unzip", "semanage", "kmod"
       ]
     }

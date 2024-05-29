@@ -51,7 +51,6 @@
           "type": "object",
           "description": "Configure associations of package objects to be used during upgrade",
           "properties": {
-            "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
             "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
             "haproxy": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
             "keepalived": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"}

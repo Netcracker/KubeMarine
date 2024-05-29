@@ -336,8 +336,8 @@ def _filter_flow_internal(tasks: dict, tasks_filter: List[List[str]], excluded_t
         # if task_filter is not empty - smb specified filter argument
         if tasks_filter:
             allowed = False
-            # Check if the iterable subpath is in allowed paths. For example we have to check if
-            # system_prepare.cri in allowed path system_prepare.cri.docker
+            # Check if the iterable subpath is in allowed paths. For example, we have to check if
+            # ['prepare'] is in allowed path ['prepare', 'cri']
             for task_path in tasks_filter:
                 # one of task_path, __task_path is a sublist of another
                 # check if current '__task_path' is a sublist only if 'task' is not a final task.

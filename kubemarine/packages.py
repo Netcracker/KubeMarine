@@ -118,9 +118,6 @@ def _get_associations_procedure_plan(cluster: KubernetesCluster) -> List[Tuple[s
         procedure_associations = utils.subdict_yaml(procedure_associations,
                                                     _get_system_packages_support_upgrade(cluster))
         upgrade_plan = [("", procedure_associations)]
-    elif procedure == "migrate_cri":
-        procedure_associations = procedure_inventory.get("packages", {}).get("associations", {})
-        upgrade_plan = [("", procedure_associations)]
 
     return upgrade_plan
 
@@ -135,7 +132,7 @@ def _get_redefined_package_name(cluster: KubernetesCluster, associations: dict, 
     return [package_name] if isinstance(package_name, str) else package_name
 
 
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
 def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
     procedure_plan = _get_associations_procedure_plan(cluster)
     procedure_associations = {} if not procedure_plan else procedure_plan[0][1]
@@ -150,7 +147,7 @@ def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
         upgrade_inventory_packages(cluster)
 
 
-@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine',])
 def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
     context = cluster.context
     procedure = context["initial_procedure"]
@@ -158,9 +155,6 @@ def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
     os_family = cluster.get_os_family()
     if os_family not in get_associations_os_family_keys():
         raise errors.KME("KME0012", procedure=procedure)
-
-    if procedure == 'migrate_cri':
-        return
 
     upgrade_plan = _get_associations_procedure_plan(cluster)
     if not upgrade_plan:
@@ -262,7 +256,7 @@ def _get_system_packages_support_upgrade(cluster: KubernetesCluster) -> List[str
     context = cluster.context
     procedure = context["initial_procedure"]
     if procedure == 'upgrade':
-        return [cluster.previous_inventory['services']['cri']['containerRuntime']]
+        return ['containerd']
     elif procedure == "migrate_kubemarine" and "upgrading_package" in context:
         return [context['upgrading_package']]
 
@@ -370,10 +364,6 @@ def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory
         groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
         relevant_group = cluster.make_group_from_roles(groups)
 
-    if association_name in ('docker', 'containerd') \
-            and association_name != inventory['services']['cri']['containerRuntime']:
-        relevant_group = cluster.make_group([])
-
     relevant_group = relevant_group.intersection_group(group)
 
     for node in relevant_group.get_ordered_members_list():
@@ -429,8 +419,7 @@ def _cache_package_associations(group: NodeGroup, inventory: dict,
             final_packages_list.append(final_package)
 
         # if non-multiple value, then convert to simple string
-        # packages can contain multiple package values, like docker package
-        # (it has docker-ce, docker-cli and containerd.io packages for installation)
+        # packages can contain multiple package values
         if len(final_packages_list) == 1:
             associated_params['package_name'] = final_packages_list[0]
         else:

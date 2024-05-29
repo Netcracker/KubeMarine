@@ -814,8 +814,6 @@ The `registry` parameter automatically completes the following parameters:
 | Path                                                         |Registry Type| Format                                                                                                         |Example|Description|
 |--------------------------------------------------------------|---|----------------------------------------------------------------------------------------------------------------|---|---|
 | `services.kubeadm.imageRepository`                           |Docker| Address without protocol, where Kubernetes images are stored. It should be the full path to the repository.    |```example.com:5443/registry.k8s.io```|Kubernetes Image Repository. The system container's images such as `kubeapi` or `etcd` is loaded from this registry.|
-| `services.cri.dockerConfig.insecure-registries`              |Docker| List with addresses without a protocol.                                                                        |```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it.|
-| `services.cri.dockerConfig.registry-mirrors`                 |Docker| List with addresses. Each address should contain a protocol.                                                   |```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for the container's images pull.|
 | `services.cri.containerdConfig.{{containerd-specific name}}` |Docker| Toml-like section with endpoints according to the containerd docs.                                             |```https://example.com:5443```||
 | `services.cri.containerdRegistriesConfig.{{registry}}`       |Docker| Toml-like section with hosts.toml content for specific registry according to the containerd docs. |```https://example.com:5443```||
 | `services.thirdparties.{{ thirdparty }}.source`              |Plain| Address with protocol or absolute path on deploy node. It should be the full path to the file.                 |```https://example.com/kubeadm/v1.22.2/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
@@ -823,8 +821,8 @@ The `registry` parameter automatically completes the following parameters:
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
 
-Registry section support 2 formats - new endpoints definition without docker support and old-style
-address-port with docker support. We recommend to use new endpoints format as in the future we will 
+Registry section support 2 formats - new endpoints definition and old-style
+address-port format. We recommend to use new endpoints format as in the future we will 
 abandon the old format. Only one format can be used.
 
 
@@ -886,20 +884,21 @@ services:
   kubeadm:
     imageRepository: example.com:5443/registry.k8s.io
   cri:
-    dockerConfig:
-      insecure-registries:
-      - example.com:5443
-      registry-mirrors:
-      - http://example.com:5443
+    containerdRegistriesConfig:
+      example.com:5443:
+        host."http://example.com:5443":
+          capabilities: [pull, resolve]
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/webserver/repository/raw/projectcalico/calico/v3.20.1/calicoctl-linux-amd64
+      source: http://example.com/projectcalico/calico/v3.27.3/calicoctl-linux-amd64
+    /usr/bin/crictl.tar.gz:
+      source: http://example.com/kubernetes-sigs/cri-tools/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
     /usr/bin/kubeadm:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.22.2/bin/linux/amd64/kubeadm
+      source: http://example.com/kubernetes/kubeadm/v1.30.1/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubectl/v1.22.2/bin/linux/amd64/kubectl
+      source: http://example.com/kubernetes/kubectl/v1.30.1/bin/linux/amd64/kubectl
     /usr/bin/kubelet:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubelet/v1.22.2/bin/linux/amd64/kubelet
+      source: http://example.com/kubernetes/kubelet/v1.30.1/bin/linux/amd64/kubelet
 plugin_defaults:
   installation:
     registry: example.com:5443
@@ -925,11 +924,10 @@ services:
   kubeadm:
     imageRepository: 1.1.1.1:8080/test
   cri:
-    dockerConfig:
-      insecure-registries:
-      - example.com:5443
-      registry-mirrors:
-      - http://example.com:5443
+    containerdRegistriesConfig:
+      example.com:5443:
+        host."http://example.com:5443":
+          capabilities: [pull, resolve]
 ...
 ```
 
@@ -1960,23 +1958,6 @@ The following associations are used by default:
     <th>Association value</th>
   </tr>
   <tr>
-    <td rowspan="4">docker</td>
-    <td>executable_name</td>
-    <td>docker</td>
-  </tr>
-  <tr>
-    <td>package_name</td>
-    <td>docker-ce-{{k8s-version-specific}}<br/>docker-ce-cli-{{k8s-version-specific}}<br/>containerd.io-{{k8s-version-specific}}</td>
-  </tr>
-  <tr>
-    <td>service_name</td>
-    <td>docker</td>
-  </tr>
-  <tr>
-    <td>config_location</td>
-    <td>/etc/docker/daemon.json</td>
-  </tr>
-  <tr>
     <td rowspan="4">containerd</td>
     <td>executable_name</td>
     <td>containerd</td>
@@ -2089,23 +2070,6 @@ The following associations are used by default:
     <th>Subject</th>
     <th>Association key</th>
     <th>Association value</th>
-  </tr>
-  <tr>
-    <td rowspan="4">docker</td>
-    <td>executable_name</td>
-    <td>docker</td>
-  </tr>
-  <tr>
-    <td>package_name</td>
-    <td>docker-ce={{k8s-version-specific}}<br/>docker-ce-cli={{k8s-version-specific}}<br/>containerd.io={{k8s-version-specific}}</td>
-  </tr>
-  <tr>
-    <td>service_name</td>
-    <td>docker</td>
-  </tr>
-  <tr>
-    <td>config_location</td>
-    <td>/etc/docker/daemon.json</td>
   </tr>
   <tr>
     <td rowspan="4">containerd</td>
@@ -2222,22 +2186,20 @@ The following associations are used by default:
   * semanage;
 * Kubemarine disables `unattended_upgrades` for packages on Ubuntu/Debian nodes with "true" `cache_versions` option.
 
-The following is an example of overriding docker associations:
+The following is an example of overriding containerd associations:
 
 ```yaml
 services:
   packages:
     cache_versions: true
     associations:
-      docker:
+      containerd:
         cache_versions: false
-        executable_name: 'docker'
+        executable_name: 'containerd'
         package_name:
-          - docker-ce-19*
-          - docker-ce-cli-19*
-          - containerd.io-1.4.3-3.1*
-        service_name: 'docker'
-        config_location: '/etc/docker/daemon.json'
+          - 'containerd.io-1.6*'
+        service_name: 'containerd'
+        config_location: '/etc/containerd/config.toml'
 ```
 
 In case when you should redefine associations for multiple OS families at once, you should define their names in the root of `associations` in the following way:
@@ -2257,7 +2219,7 @@ services:
           package_name: rh-haproxy18-haproxy-1.8*
 ```
 
-**Note**: There are only 3 supported OS families: Debian, RHEL, and RHEL8 (for RHEL based version 8).
+**Note**: There are only 4 supported OS families: **debian**, **rhel**, **rhel8** (for RHEL based version 8), and **rhel9** (for RHEL based version 8).
 
 #### thirdparties
 
@@ -2314,7 +2276,6 @@ services:
     /usr/bin/calicoctl:
       source: 'https://github.com/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
       group: control-plane
-    # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
       group: control-plane
@@ -2386,9 +2347,9 @@ services:
 
 *Can cause reboot*: No
 
-*Can restart service*: Always yes, `docker` or `containerd`
+*Can restart service*: Always yes, `containerd`
 
-*Overwrite files*: Yes, by default `/etc/docker/daemon.json` or `/etc/containerd/config.toml`, `/etc/crictl.yaml` and `/etc/containers/registries.conf`, backup is created. 
+*Overwrite files*: Yes, by default `/etc/containerd/config.toml`, `/etc/crictl.yaml` and `/etc/ctr/kubemarine_ctr_flags.conf`, backup is created. 
 Additionally, if  `plugins."io.containerd.grpc.v1.cri".registry.config_path` is defined in `services.cri.containerdConfig` specified directory will be created and filled according `services.cri.containerdRegistriesConfig`.
 
 *OS specific*: No
@@ -2408,25 +2369,14 @@ services:
       # This parameter is added, if no registry.mirrors and registry.configs.tls specified:
       plugins."io.containerd.grpc.v1.cri".registry:
         config_path: "/etc/containerd/certs.d"
-    dockerConfig:
-      ipv6: False
-      log-driver: json-file
-      log-opts:
-        max-size: 64m
-        max-file: "3"
-      exec-opts:
-        - native.cgroupdriver=systemd
-      icc: False
-      live-restore: True
-      userland-proxy: False
 ```
 
 **Note**: default value of `SystemdCgroup` = `true` only in case, when `cgroupDriver` from [kubelet config](#kubeadm_kubelet) is equal to `systemd`.
 
 The `containerRuntime` parameter configures a particular container runtime implementation used for kubernetes.
-The available values are `docker` and `containerd`. By default `containerd` is used.
+Currently, only `containerd` is available and used by default.
 
-When containerd is used as a container runtime, it is possible to additionally define the `containerdConfig` section,
+It is possible to additionally define the `containerdConfig` section,
 which contains the parameters passed to `config.toml`, for example:
 
 ```yaml
@@ -2435,7 +2385,7 @@ services:
     containerRuntime: containerd
     containerdConfig:
       plugins."io.containerd.grpc.v1.cri":
-        sandbox_image: registry.k8s.io/pause:3.2
+        sandbox_image: registry.k8s.io/pause:3.9
 ```
 
 Also, it is possible to specify registries configuration in registries hosts format using `containerdRegistriesConfig` section:
@@ -2445,7 +2395,7 @@ services:
     containerRuntime: containerd
     containerdRegistriesConfig:
       artifactory.example.com:5443:
-        host."https://artifactory.example.com:544":
+        host."https://artifactory.example.com:5443":
           capabilities: [ "pull", "resolve" ]
 ```
 
@@ -2460,7 +2410,7 @@ services:
         config_path: "/etc/containerd/registries"
     containerdRegistriesConfig:
       artifactory.example.com:5443:
-        host."https://artifactory.example.com:544":
+        host."https://artifactory.example.com:5443":
           capabilities: [ "pull", "resolve" ]
 ```
 
@@ -2550,29 +2500,9 @@ services:
         config_path: "/etc/containerd/certs.d"
 ```
 
-**Note**: When containerd is used, `crictl` binary is also installed and configured as required.
+**Note**: `crictl` binary is also installed and configured as required.
 
-Alternatively, it is possible to use docker as a container runtime for kubernetes by setting `docker` value for `containerRuntime` parameter.
-When docker is used as a container runtime, it is possible to additionally define the `dockerConfig` section,
-which contains the parameters passed to `daemon.json`, for example:
-
-```yaml
-services:
-  cri:
-    containerRuntime: docker
-    dockerConfig:
-      insecure-registries:
-        - artifactory.example.com:5443
-      registry-mirrors:
-        - https://artifactory.example.com:5443
-```
-
-For detailed description of the parameters, see [Installation without Internet Resources](#installation-without-internet-resources).
-For more information about Docker daemon parameters, refer to the official docker configuration file documentation at [https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file).
-
-**Note**: After applying the parameters, the docker is restarted on all nodes in the cluster.
-
-**Note**: Do not omit the `containerRuntime` parameter in cluster.yaml if you include `dockerConfig` or `containerdConfig` in `cri` section
+**Note**: After applying the parameters, containerd is restarted on all nodes in the cluster.
 
 #### modprobe
 
@@ -2985,18 +2915,8 @@ services:
 services:
   audit:
     rules:
-      - -w /var/lib/docker -k docker
-      - -w /etc/docker -k docker
-      - -w /usr/lib/systemd/system/docker.service -k docker
-      - -w /usr/lib/systemd/system/docker.socket -k docker
-      - -w /etc/default/docker -k docker
-      - -w /etc/docker/daemon.json -k docker
       - -w /usr/bin/containerd -k docker
-      - -w /usr/sbin/runc -k docker
-      - -w /usr/bin/dockerd -k docker
 ```
-
-Except `-w /usr/bin/containerd -k docker`, all the other rules are applied only when the `docker` container runtime is used.
 
 #### ntp
 
@@ -6000,8 +5920,6 @@ Be careful with the following parameters:
 |Path|Registry Type|Format|Example|Description|
 |---|---|---|---|---|
 |`services.kubeadm.imageRepository`|Docker|Address without protocol, where Kubernetes images are stored. It should be the full path to the repository.|```example.com:5443/registry.k8s.io```|Kubernetes Image Repository. The system container's images such as `kubeapi` or `etcd` is loaded from this registry.|
-|`services.docker.insecure-registries`|Docker|List with addresses without protocol.|```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow connection to addresses unknown to it.|
-|`services.docker.registry-mirrors`|Docker|List with addresses. Each address should contain a protocol.|```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for container's images pull.|
 |`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.16.3/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
 |`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
@@ -6217,14 +6135,12 @@ For example, consider the following package's origin configuration:
 services:
   packages:
     associations:
-      docker:
-        executable_name: 'docker'
+      containerd:
+        executable_name: 'containerd'
         package_name:
-          - docker-ce-19.03*
-          - docker-ce-cli-19.03*
-          - containerd.io-1.4.6*
-        service_name: 'docker'
-        config_location: '/etc/docker/daemon.json'
+          - containerd.io-1.6*
+        service_name: 'containerd'
+        config_location: '/etc/containerd/config.toml'
       conntrack:
         package_name: conntrack-tools
     install:
@@ -6240,14 +6156,12 @@ services:
   packages:
     associations:
       rhel:
-        docker:
-          executable_name: 'docker'
+        containerd:
+          executable_name: 'containerd'
           package_name:
-            - docker-ce-19.03.15-3.el7.x86_64
-            - docker-ce-cli-19.03.15-3.el7.x86_64
-            - containerd.io-1.4.6-3.1.el7.x86_64
-          service_name: 'docker'
-          config_location: '/etc/docker/daemon.json'
+            - containerd.io-1.6.32-3.1.el7.x86_64
+          service_name: 'containerd'
+          config_location: '/etc/containerd/config.toml'
         conntrack:
           package_name: conntrack-tools-1.4.4-7.el7.x86_64
     install:
@@ -6424,7 +6338,6 @@ kubeadm_controlPlaneEndpoint=k8s.example.com:6443
 
 # services.cri
 cri_containerRuntime=containerd
-cri_dockerConfig={"ipv6": false, "log-driver": "json-file", "log-opts": {"max-size": "64m", "max-file": "3"}, "exec-opts": ["native.cgroupdriver=systemd"], "icc": false, "live-restore": true, "userland-proxy": false}
 cri_containerdConfig={"version": 2, "plugins.\"io.containerd.grpc.v1.cri\"": {"sandbox_image": "registry.k8s.io/pause:3.2"}, "plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"artifactory.example.com:5443\"": {"endpoint": ["https://artifactory.example.com:5443"]}, "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc": {"runtime_type": "io.containerd.runc.v2"}, "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc.options": {"SystemdCgroup": true}}
 ```
 
@@ -6457,37 +6370,6 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 
 The tables below shows the correspondence of versions that are supported and is used during the installation:
 
-## Default Dependent Components Versions for Kubernetes Versions v1.23.17
-
-| Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
-|----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                            |
-| binaries | kubeadm                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  | SHA1: 0e805ff79d4099747bdf67d71d8acdc690e07e14                                                             |
-|          | kubelet                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  | SHA1: 42bce3cef79c9bf2c787e2bcb923ef2528834e96                                                             |
-|          | kubectl                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  | SHA1: 7377f28047c9c468978199cf5b9e4e7cae0c4e78                                                             |
-|          | calicoctl                                                      | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6  Required only if calico is installed.                      |
-|          | crictl                                                         | v1.23.0          | v1.23.0                      | v1.23.0      | v1.23.0      | v1.23.0           | v1.23.0   | v1.23.0   | SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2 Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.5.*        | 1.5.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
-|          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
-| images   | registry.k8s.io/kube-apiserver                                      | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  |                                                                                                            |
-|          | registry.k8s.io/kube-controller-manager                             | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  |                                                                                                            |
-|          | registry.k8s.io/kube-proxy                                          | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  |                                                                                                            |
-|          | registry.k8s.io/kube-scheduler                                      | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  |                                                                                                            |
-|          | registry.k8s.io/coredns                                             | 1.8.6            | 1.8.6                        | 1.8.6        | 1.8.6        | 1.8.6             | 1.8.6     | 1.8.6     |                                                                                                            |
-|          | registry.k8s.io/pause                                               | 3.6              | 3.6                          | 3.6          | 3.6          | 3.6               | 3.6       | 3.6       |                                                                                                            |
-|          | registry.k8s.io/etcd                                                | 3.5.6-0          | 3.5.6-0                      | 3.5.6-0      | 3.5.6-0      | 3.5.6-0           | 3.5.6-0   | 3.5.6-0   |                                                                                                            |
-|          | calico/typha                                                   | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | Required only if Typha is enabled in Calico config.                                                        |
-|          | calico/cni                                                     | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/node                                                    | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/kube-controllers                                        | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/apiserver                                               | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | Required only if API server is enabled in Calico config.                                                   |
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.2.0           | v1.2.0                       | v1.2.0       | v1.2.0       | v1.2.0            | v1.2.0    | v1.2.0    |                                                                                                            |
-|          | kubernetesui/dashboard                                         | v2.5.1           | v2.5.1                       | v2.5.1       | v2.5.1       | v2.5.1            | v2.5.1    | v2.5.1    | Required only if Kubernetes Dashboard plugin is set to be installed.                                       |
-|          | kubernetesui/metrics-scraper                                   | v1.0.7           | v1.0.7                       | v1.0.7       | v1.0.7       | v1.0.7            | v1.0.7    | v1.0.7    | Required only if Kubernetes Dashboard plugin is set to be installed.                                       |
-|          | rancher/local-path-provisioner                                 | v0.0.22          | v0.0.22                      | v0.0.22      | v0.0.22      | v0.0.22           | v0.0.22   | v0.0.22   | Required only if local-path provisioner plugin is set to be installed.                                     |
-
 ## Default Dependent Components Versions for Kubernetes Versions v1.24.11
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
@@ -6496,9 +6378,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  | SHA1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d                                                             |
 |          | kubectl                                                        | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  | SHA1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655                                                             |
 |          | calicoctl                                                      | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                      | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
@@ -6526,9 +6407,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.25.7          | v1.25.7                      | v1.25.7      | v1.25.7      | v1.25.7           | v1.25.7   | v1.25.7   | SHA1: ace8ce244896aca5d38c8184c44226660a09269a                                                             |
 |          | kubectl                                                        | v1.25.7          | v1.25.7                      | v1.25.7      | v1.25.7      | v1.25.7           | v1.25.7   | v1.25.7   | SHA1: a5b32c173670ee6fa7710d7158ea4a0d198c8af5                                                             |
 |          | calicoctl                                                      | v3.24.2          | v3.24.2                       | v3.24.2       | v3.24.2       | v3.24.2            | v3.24.2    | v3.24.2    | SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                      | v1.25.7          | v1.25.7                      | v1.25.7      | v1.25.7      | v1.25.7           | v1.25.7   | v1.25.7   |                                                                                                            |
@@ -6557,9 +6437,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.26.11          | v1.26.11                      | v1.26.11      | v1.26.11      | v1.26.11           | v1.26.11   | v1.26.11   | SHA1: 497d7785658f4b247404580a821c22958f7a4b93                                                             |
 |          | kubectl                                                        | v1.26.11          | v1.26.11                      | v1.26.11      | v1.26.11      | v1.26.11           | v1.26.11   | v1.26.11   | SHA1: df1fa17ce624c2a3e6a05b26157f93719b640bfa                                                            |
 |          | calicoctl                                                      | v3.26.4          | v3.26.4                      | v3.26.4      | v3.26.4      | v3.26.4           | v3.26.4   | v3.26.4   | SHA1: 46875b3d28318553fe382db0766a0916f2556217 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.28.0          | v1.28.0                      | v1.28.0      | v1.28.0      | v1.28.0           | v1.28.0   | v1.28.0   | SHA1: 1199411456ab5a1e0dd9524724f15e92aa3f9da7 Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.28.0          | v1.28.0                      | v1.28.0      | v1.28.0      | v1.28.0           | v1.28.0   | v1.28.0   | SHA1: 1199411456ab5a1e0dd9524724f15e92aa3f9da7                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                      | v1.26.11          | v1.26.11                      | v1.26.11      | v1.26.11      | v1.26.11           | v1.26.11   | v1.26.11   |                                                                                                            |
@@ -6588,9 +6467,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.27.13          | v1.27.13                      | v1.27.13      | v1.27.13      | v1.27.13           | v1.27.13   | v1.27.13   | SHA1: 2a69d84c97133c44b3159f7ca9fd09d7e43f6b0f                                                             |
 |          | kubectl                                                        | v1.27.13          | v1.27.13                      | v1.27.13      | v1.27.13      | v1.27.13           | v1.27.13   | v1.27.13   | SHA1: fa0da5539a2b186ff276d1552700825b7fe49acd                                                             |
 |          | calicoctl                                                      | v3.26.4          | v3.26.4                      | v3.26.4      | v3.26.4      | v3.26.4           | v3.26.4   | v3.26.4   | SHA1: 46875b3d28318553fe382db0766a0916f2556217 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.27.13          | v1.27.13                      | v1.27.13      | v1.27.13      | v1.27.13           | v1.27.13   | v1.27.13   |                                                                                                            |
@@ -6620,9 +6498,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.28.9          | v1.28.9                      | v1.28.9      | v1.28.9      | v1.28.9           | v1.28.9   | v1.28.9   | SHA1: eedd93a82cc8f1b25d1967dc370adc613078ea44                                                            |
 |          | kubectl                                                        | v1.28.9          | v1.28.9                      | v1.28.9      | v1.28.9      | v1.28.9           | v1.28.9   | v1.28.9   | SHA1: 14cc3e83721caaafc8bcd092f870c8a266da59cc                                                             |
 |          | calicoctl                                                      | v3.27.3          | v3.27.3                      | v3.27.3      | v3.27.3      | v3.27.3           | v3.27.3   | v3.27.3   | SHA1: 24468ab467fd59727d278dfdc3a5c6eec51cdff1 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.28.9          | v1.28.9                      | v1.28.9      | v1.28.9      | v1.28.9           | v1.28.9   | v1.28.9   |                                                                                                            |
@@ -6651,9 +6528,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.29.4          | v1.29.4                      | v1.29.4      | v1.29.4      | v1.29.4           | v1.29.4   | v1.29.4   | SHA1: f019ec5abe443bf20ef711ebbc971f51b7a1a34d                                                             |
 |          | kubectl                                                        | v1.29.4          | v1.29.4                      | v1.29.4      | v1.29.4      | v1.29.4           | v1.29.4   | v1.29.4   | SHA1: ea298117fbf1d3f4b85f491ccec622e0599c9248                                                             |
 |          | calicoctl                                                      | v3.27.3         | v3.27.3                     | v3.27.3     | v3.27.3     | v3.27.3          | v3.27.3  | v3.27.3  | SHA1: 24468ab467fd59727d278dfdc3a5c6eec51cdff1 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b Required only if containerd is used as a container runtime. |
-| rpms     | docker-ce                                                      | 19.03            | 19.03                        | 20.10        | 20.10        | 19.03             | 19.03     | 19.03     |                                                                                                            |
-|          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
+|          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b                                                             |
+| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.29.4          | v1.29.4                      | v1.29.4      | v1.29.4      | v1.29.4           | v1.29.4   | v1.29.4   |                                                                                                            |
@@ -6682,7 +6558,10 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.30.1             | v1.30.1                      | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | SHA1: c62da6ab918b8e56d7c9b77e642ffc73ffdbffac                                                             |
 |          | kubectl                                                        | v1.30.1             | v1.30.1                      | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | SHA1: bced94239f1dbdb04d3a661a067bf9587865b6e8                                                             |
 |          | calicoctl                                                      | v3.27.3             | v3.27.3                      | v3.27.3             | v3.27.3             | v3.27.3             | v3.27.3             | v3.27.3             | SHA1: 24468ab467fd59727d278dfdc3a5c6eec51cdff1 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.30.0             | v1.30.0                      | v1.30.0             | v1.30.0             | v1.30.0             | v1.30.0             | v1.30.0             | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b Required only if containerd is used as a container runtime. |
+|          | crictl                                                         | v1.30.0             | v1.30.0                      | v1.30.0             | v1.30.0             | v1.30.0             | v1.30.0             | v1.30.0             | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b                                                             |
+| rpms     | containerd.io                                                  | 1.6.*               | 1.6.*                        | 1.6.*               | 1.6.*               | 1.6.*               | 1.6.*               | 1.6.*               |                                                                                                            |
+|          | haproxy/rh-haproxy                                             | 1.8                 | 1.8                          | 2.*                 | 2.*                 | 1.8                 | 1.8                 | 1.8                 | Required only if balancers are presented in the deployment scheme.                                         |
+|          | keepalived                                                     | 1.3                 | 2.1                          | 2.*                 | 2.*                 | 1.3                 | 2.1                 | 2.1                 | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.30.1             | v1.30.1                      | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             |                                                                                                            |
 |          | registry.k8s.io/kube-controller-manager                        | v1.30.1             | v1.30.1                      | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             |                                                                                                            |
 |          | registry.k8s.io/kube-proxy                                     | v1.30.1             | v1.30.1                      | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             | v1.30.1             |                                                                                                            |

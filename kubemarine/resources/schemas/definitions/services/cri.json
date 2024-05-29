@@ -4,7 +4,7 @@
   "description": "Configure container runtime used for Kubernetes",
   "properties": {
     "containerRuntime": {
-      "enum": ["containerd", "docker"],
+      "enum": ["containerd"],
       "default": "containerd",
       "description": "A particular container runtime implementation used for Kubernetes"
     },
@@ -13,9 +13,6 @@
     },
     "containerdRegistriesConfig": {
       "$ref": "#/definitions/ContainerdRegistriesConfig"
-    },
-    "dockerConfig": {
-      "$ref": "#/definitions/DockerConfig"
     }
   },
   "additionalProperties": false,
@@ -51,33 +48,6 @@
       "additionalProperties": {
         "type": "object",
         "description": "Parameters for containerd passed to hosts.toml for specific registry"
-      }
-    },
-    "DockerConfig": {
-      "type": "object",
-      "description": "Parameters for docker passed to daemon.json",
-      "properties": {
-        "insecure-registries": {
-          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
-          "description": "Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it."
-        },
-        "registry-mirrors": {
-          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
-          "description": "Docker Registry Mirrors. Additional image sources for the container's images pull."
-        },
-        "ipv6": {"type": "boolean", "default": false},
-        "log-driver": {"type": "string", "default": "json-file"},
-        "log-opts": {
-          "type": "object",
-          "properties": {
-            "max-size": {"type": "string", "default": "64m"},
-            "max-file": {"type": "string", "default": "'3'"}
-          }
-        },
-        "exec-opts": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
-        "icc": {"type": "boolean", "default": false},
-        "live-restore": {"type": "boolean", "default": true},
-        "userland-proxy": {"type": "boolean", "default": false}
       }
     }
   }

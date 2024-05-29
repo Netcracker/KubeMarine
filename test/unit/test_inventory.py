@@ -164,7 +164,7 @@ class TestInventoryValidation(unittest.TestCase):
         inventory['services']['cri'] = {
             'containerRuntime': 'unexpected'
         }
-        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['containerd', 'docker']"):
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['containerd']"):
             demo.new_cluster(inventory)
 
     def test_account_name_not_defined(self):

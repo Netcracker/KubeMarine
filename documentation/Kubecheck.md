@@ -467,7 +467,7 @@ This test checks the status of the Keepalived service on all hosts in the cluste
 
 *Task*: `services.container_runtime.status`
 
-This test checks the status of the Container Runtime (docker/containerd) service on all hosts in the cluster where this service is expected.
+This test checks the status of the Container Runtime (containerd) service on all hosts in the cluster where this service is expected.
 
 ###### 201 Kubelet Status
 

@@ -18,7 +18,6 @@ from typing import Optional, Dict, Any, Tuple, List, Callable, Union, Sequence, 
 import yaml
 
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine.core.errors import KME
 from kubemarine import jinja, keepalived, haproxy, controlplane, kubernetes, thirdparties
 from kubemarine.core import utils, static, log, os
 from kubemarine.core.proxytypes import Primitive, Index, Node
@@ -192,48 +191,26 @@ def apply_registry(cluster: KubernetesCluster) -> None:
         inventory['services']['kubeadm']["imageRepository"] = registry_mirror_address
     inventory['plugin_defaults']['installation'].setdefault('registry', registry_mirror_address)
 
-    cri_impl = inventory['services']['cri']['containerRuntime']
+    if not containerd_endpoints:
+        containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
 
-    if cri_impl == "docker" and inventory['registry'].get('endpoints'):
-        raise KME('KME0007')
-
-    if cri_impl == "docker":
-
-        if protocol == 'http':
-            if inventory['services']['cri']['dockerConfig'].get("insecure-registries") is None:
-                inventory['services']['cri']['dockerConfig']["insecure-registries"] = []
-            insecure_registries = inventory['services']['cri']['dockerConfig']["insecure-registries"]
-            insecure_registries.append(registry_mirror_address)
-            inventory['services']['cri']['dockerConfig']["insecure-registries"] = list(set(insecure_registries))
-
-        if inventory['services']['cri']['dockerConfig'].get("registry-mirrors") is None:
-            inventory['services']['cri']['dockerConfig']["registry-mirrors"] = []
-
-        registry_mirrors = inventory['services']['cri']['dockerConfig']["registry-mirrors"]
-        registry_mirrors.append(f"{protocol}://{registry_mirror_address}")
-        inventory['services']['cri']['dockerConfig']["registry-mirrors"] = list(set(registry_mirrors))
-
-    elif cri_impl == "containerd":
-        if not containerd_endpoints:
-            containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
-
-        old_format_result, _ = contains_old_format_properties(inventory)
-        if old_format_result:
-            # Add registry info in old format
-            registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
-            containerd_config = inventory['services']['cri']['containerdConfig']
-            if not containerd_config.get(registry_section):
-                containerd_config[registry_section] = {
-                    'endpoint': containerd_endpoints
-                }
-        else:
-            # Add registry info in new format
-            old_registry_config = inventory['services']['cri'].get('containerdRegistriesConfig', {})
-            inventory['services']['cri']['containerdRegistriesConfig'] = {registry_mirror_address: {
-                                     f'host."{endpoint}"': {'capabilities': ['pull', 'resolve']}
-                                     for endpoint in containerd_endpoints
-                                 }}
-            default_merger.merge(inventory['services']['cri']['containerdRegistriesConfig'], old_registry_config)
+    old_format_result, _ = contains_old_format_properties(inventory)
+    if old_format_result:
+        # Add registry info in old format
+        registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
+        containerd_config = inventory['services']['cri']['containerdConfig']
+        if not containerd_config.get(registry_section):
+            containerd_config[registry_section] = {
+                'endpoint': containerd_endpoints
+            }
+    else:
+        # Add registry info in new format
+        old_registry_config = inventory['services']['cri'].get('containerdRegistriesConfig', {})
+        inventory['services']['cri']['containerdRegistriesConfig'] = {registry_mirror_address: {
+            f'host."{endpoint}"': {'capabilities': ['pull', 'resolve']}
+            for endpoint in containerd_endpoints
+        }}
+        default_merger.merge(inventory['services']['cri']['containerdRegistriesConfig'], old_registry_config)
 
     if thirdparties_address:
         for destination, config in inventory['services']['thirdparties'].items():
