@@ -69,6 +69,13 @@ class TestInventoryValidation(unittest.TestCase):
                                     re.escape("Value should be one of ['worker', 'control-plane', 'master', 'balancer']")):
             demo.new_cluster(inventory)
 
+    def test_not_supported_master_role(self):
+        inventory = demo.generate_inventory(control_plane=2, worker=0, balancer=0)
+        inventory['nodes'][0]['roles'] = ['master']
+        with self.assertRaisesRegex(errors.FailException,
+                                    re.escape("Value should be one of ['worker', 'control-plane', 'balancer']")):
+            demo.new_cluster(inventory)
+
     def test_explicitly_added_service_role(self):
         error_regex = r"Value should be one of \['worker', 'control-plane', 'master', 'balancer']"
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)

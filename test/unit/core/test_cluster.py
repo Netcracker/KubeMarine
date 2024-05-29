@@ -246,17 +246,6 @@ class LightClusterTest(unittest.TestCase):
         host = cluster.nodes['all'].get_host()
         self.assertEqual('10.101.1.100', cluster.connection_pool.get_connection(host).gateway.host)
 
-    def test_legacy_role(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        del inventory['nodes'][0]['name']
-        # pylint: disable-next=implicit-str-concat
-        inventory['nodes'][0]['roles'] = ['balancer', 'm''a''s''t''e''r', 'worker']
-
-        cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)
-
-        self.assertIn('master', cluster.inventory['nodes'][0]['roles'])
-        self.assertEqual('control-plane-1', cluster.nodes['master'].get_node_name())
-
     def test_recursive_compile_inventory(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['values'] = {

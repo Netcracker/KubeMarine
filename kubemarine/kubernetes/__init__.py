@@ -108,7 +108,11 @@ def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
 
 @enrichment(EnrichmentStage.ALL)
 def verify_roles(cluster: KubernetesCluster) -> None:
-    if cluster.make_group_from_roles(['control-plane']).is_empty():
+    control_plane_roles = ['control-plane']
+    if cluster.context['initial_procedure'] == 'do':
+        control_plane_roles = ['control-plane', 'master']
+
+    if cluster.make_group_from_roles(control_plane_roles).is_empty():
         raise KME("KME0004")
 
 
