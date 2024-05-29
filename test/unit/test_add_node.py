@@ -111,7 +111,7 @@ class RunTasks(unittest.TestCase):
         return resources
 
     def test_kubernetes_init_write_new_certificates(self):
-        for new_role, expected_called in (('worker', False), ('master', True), ('balancer', True)):
+        for new_role, expected_called in (('worker', False), ('control-plane', True), ('balancer', True)):
             with self.subTest(f"Add: {new_role}"), \
                     test_utils.mock_call(kubernetes.join_new_control_plane), \
                     test_utils.mock_call(kubernetes.init_workers), \
@@ -121,7 +121,7 @@ class RunTasks(unittest.TestCase):
                     test_utils.mock_call(kubernetes.schedule_running_nodes_report), \
                     test_utils.mock_call(components.reconfigure_components) as run:
 
-                self.inventory = demo.generate_inventory(balancer=2, master=2, worker=2)
+                self.inventory = demo.generate_inventory(balancer=2, control_plane=2, worker=2)
 
                 new_node_name = f'{new_role}-2'
                 res = self._run_tasks('deploy.kubernetes.init', new_node_name)
@@ -132,7 +132,7 @@ class RunTasks(unittest.TestCase):
                                  f"New certificate was {'not' if expected_called else 'unexpectedly'} written")
 
                 if expected_called:
-                    self.assertEqual(['master-1', 'master-2'], run.call_args[0][0].get_nodes_names())
+                    self.assertEqual(['control-plane-1', 'control-plane-2'], run.call_args[0][0].get_nodes_names())
 
                 certsans = res.working_inventory['services']['kubeadm']['apiServer']['certSANs']
                 self.assertEqual(expected_called, new_node_name in certsans,

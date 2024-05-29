@@ -24,8 +24,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.commonSetUp(Identity('kubernetes-dashboard'))
         # Requires kubernetes-dashboard v2.7.x
         self.k8s_latest = self.get_latest_k8s()
-        # Requires kubernetes-dashboard v2.5.x
-        self.k8s_1_24_x = self.get_latest_k8s("v1.24")
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -74,6 +72,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                            "effect": "NoSchedule"}],
                          template_spec.get('tolerations'),
                          "Unexpected metrics-scraper tolerations")
+        self.assertTrue('securityContext' in template_spec, "Unexpected securityContext spec")
 
     def test_pss_labels(self):
         default_pss_labels = {
@@ -87,25 +86,12 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertNotIn), ('restricted', self.assertIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_kubernetes-dashboard")['metadata'].get('labels', {})
                 for pss_label in default_pss_labels.items():
                     default_label_checker(pss_label, target_yaml.items(), "PPS labels validation failed")
-
-    def test_dashboard_metrics_scraper_difference(self):
-        for k8s_version, presence_checker in (
-            (self.k8s_1_24_x, self.assertFalse),
-            (self.k8s_latest, self.assertTrue)
-        ):
-            with self.subTest(k8s_version):
-                cluster = demo.new_cluster(self.inventory(k8s_version))
-                manifest = self.enrich_yaml(cluster)
-                template_spec: dict = self.get_obj(manifest, "Deployment_dashboard-metrics-scraper")['spec']['template']['spec']
-                presence_checker('securityContext' in template_spec, "Unexpected securityContext spec")
 
     def test_all_images_contain_registry(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():

@@ -2,10 +2,6 @@
 # This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 
 kubeadm:
-  v1.24.2:
-    sha1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726
-  v1.24.11:
-    sha1: 7d44b41e36ff71f5f00671d518f2e59b4540653a
   v1.25.2:
     sha1: 72b87eedc9701c1143126f4aa7375b91fc9d46fc
   v1.25.7:
@@ -45,10 +41,6 @@ kubeadm:
   v1.30.1:
     sha1: 85385f4b78b79bd1cd4d1ad5244422d372d5f758
 kubelet:
-  v1.24.2:
-    sha1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308
-  v1.24.11:
-    sha1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d
   v1.25.2:
     sha1: afdc009cd59759626ecce007667f42bf42e7c1be
   v1.25.7:
@@ -88,10 +80,6 @@ kubelet:
   v1.30.1:
     sha1: c62da6ab918b8e56d7c9b77e642ffc73ffdbffac
 kubectl:
-  v1.24.2:
-    sha1: d2a8e78bcdc992addd6faccb27b0af5d533443fa
-  v1.24.11:
-    sha1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655
   v1.25.2:
     sha1: b12c0e102df89cd0579c8a3c769988aaf5dbe4ba
   v1.25.7:
@@ -133,12 +121,6 @@ kubectl:
 calicoctl:
 # calicoctl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # It also corresponds to the plugin version in kubemarine/resources/configurations/compatibility/internal/plugins.yaml
-  v1.24.2:
-    version: v3.24.2
-    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
-  v1.24.11:
-    version: v3.24.2
-    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
   v1.25.2:
     version: v3.24.2
     sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
@@ -199,12 +181,6 @@ calicoctl:
 crictl:
 # crictl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # for backward compatibility with clusters in a private environment.
-  v1.24.2:
-    version: v1.25.0
-    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
-  v1.24.11:
-    version: v1.25.0
-    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
   v1.25.2:
     version: v1.25.0
     sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3

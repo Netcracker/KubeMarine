@@ -294,9 +294,6 @@ services:
             resources:
             - cronjobs
             - jobs
-          - group: "policy"
-            resources:
-            - podsecuritypolicies
           - group: "rbac.authorization.k8s.io"
             resources:
             - clusterrolebindings
@@ -881,16 +878,7 @@ rbac:
           annotations: {}
         type: kubernetes.io/service-account-token
 
-  psp:
-    pod-security: enabled
-    oob-policies:
-      default: enabled
-      host-network: enabled
-      anyuid: enabled
-    custom-policies:
-      psp-list: []
-      roles-list: []
-      bindings-list: []
+  admission: pss
   pss:
     pod-security: enabled
     defaults:

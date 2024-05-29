@@ -122,7 +122,8 @@ def get_executors_group(cluster: KubernetesCluster, arguments: dict) -> NodeGrou
                     executor_lists.append(executors_str.strip())
         return cluster.create_group_from_groups_nodes_names(executors['group'], executors['node'])
     else:
-        return cluster.nodes['control-plane'].get_any_member()
+        # 'master' role is not deleted due to longer inventory compatibility contract for `do`.
+        return cluster.make_group_from_roles(['control-plane', 'master']).get_any_member()
 
 
 def main(cli_arguments: List[str] = None) -> None:

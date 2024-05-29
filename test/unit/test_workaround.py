@@ -36,14 +36,15 @@ class TestUnexpectedErrors(unittest.TestCase):
 
         command = ['kubectl describe nodes']
 
-        bad_results = demo.create_nodegroup_result(cluster.nodes['master'], code=-1, stderr=ETCD_LEADER_CHANGED_MESSAGE)
-        good_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='Kubernetes master is running at %s'
-                                                                                    % cluster.inventory['cluster_name'])
+        bad_results = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=-1, stderr=ETCD_LEADER_CHANGED_MESSAGE)
+        good_results = demo.create_nodegroup_result(cluster.nodes['control-plane'],
+                                                    stdout='Kubernetes control plane is running at %s'
+                                                           % cluster.inventory['cluster_name'])
 
         cluster.fake_shell.add(bad_results, 'sudo', command, usage_limit=1)
         cluster.fake_shell.add(good_results, 'sudo', command)
 
-        results = cluster.nodes['master'].get_any_member().sudo('kubectl describe nodes')
+        results = cluster.nodes['control-plane'].get_any_member().sudo('kubectl describe nodes')
 
         for result in results.values():
             self.assertIn('is running', result.stdout, msg="After an unsuccessful attempt, the workaround mechanism "
@@ -58,7 +59,7 @@ class TestUnexpectedErrors(unittest.TestCase):
         cluster.fake_shell.add(results, 'sudo', ['echo "foo"'])
 
         command = 'kubectl describe nodes'
-        good_result = 'Kubernetes master is running at %s' % cluster.inventory['cluster_name']
+        good_result = 'Kubernetes control plane is running at %s' % cluster.inventory['cluster_name']
         results = demo.create_hosts_result(group.get_first_member().get_hosts(),
                                            code=-1, stderr=ETCD_LEADER_CHANGED_MESSAGE)
         cluster.fake_shell.add(results, 'sudo', [command], usage_limit=1)
@@ -92,17 +93,18 @@ class TestUnexpectedErrors(unittest.TestCase):
 
         command = ['kubectl describe nodes']
 
-        bad_results = demo.create_exception_result(cluster.nodes['master'],
+        bad_results = demo.create_exception_result(cluster.nodes['control-plane'],
                                                    exception=SSHException('encountered RSA key, expected OPENSSH key'))
-        good_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='Kubernetes master is running at %s'
-                                                                                    % cluster.inventory['cluster_name'])
+        good_results = demo.create_nodegroup_result(cluster.nodes['control-plane'],
+                                                    stdout='Kubernetes control plane is running at %s'
+                                                           % cluster.inventory['cluster_name'])
 
         cluster.fake_shell.add(bad_results, 'sudo', command, usage_limit=1)
         cluster.fake_shell.add(good_results, 'sudo', command)
         cluster.fake_shell.add(demo.create_nodegroup_result(cluster.nodes['all'], stdout='example result'),
                                'run', ["sudo -S -p '[sudo] password: ' last reboot"])
 
-        results = cluster.nodes['master'].get_any_member().sudo('kubectl describe nodes')
+        results = cluster.nodes['control-plane'].get_any_member().sudo('kubectl describe nodes')
 
         for result in results.values():
             self.assertIn('is running', result.stdout, msg="After an unsuccessful attempt, the workaround mechanism "
@@ -114,7 +116,7 @@ class TestUnexpectedErrors(unittest.TestCase):
         group = cluster.nodes["control-plane"].new_defer()
 
         command = 'kubectl describe nodes'
-        good_result = 'Kubernetes master is running at %s' % cluster.inventory['cluster_name']
+        good_result = 'Kubernetes control plane is running at %s' % cluster.inventory['cluster_name']
         results = demo.create_hosts_exception_result(group.get_first_member().get_hosts(),
                                                      exception=SSHException('encountered RSA key, expected OPENSSH key'))
         cluster.fake_shell.add(results, 'sudo', [command], usage_limit=1)

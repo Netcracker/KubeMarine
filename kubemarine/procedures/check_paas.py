@@ -313,12 +313,11 @@ def kubelet_config(cluster: KubernetesCluster) -> None:
             messages.append(f"/var/lib/kubelet/config.yaml is not consistent with kubelet-config ConfigMap "
                             f"on nodes {', '.join(failed_nodes)}")
 
-        if components.kubelet_supports_patches(cluster):
-            cluster.log.debug("Checking configuration consistency with patches from inventory")
-            failed_nodes = _compare_kubelet_config(cluster, with_inventory=True)
-            if failed_nodes:
-                messages.append(f"/var/lib/kubelet/config.yaml is not consistent with patches from inventory "
-                                f"on nodes {', '.join(failed_nodes)}")
+        cluster.log.debug("Checking configuration consistency with patches from inventory")
+        failed_nodes = _compare_kubelet_config(cluster, with_inventory=True)
+        if failed_nodes:
+            messages.append(f"/var/lib/kubelet/config.yaml is not consistent with patches from inventory "
+                            f"on nodes {', '.join(failed_nodes)}")
 
         cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section")
         diff = components.compare_configmap(cluster, 'kubelet-config')
@@ -1498,9 +1497,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         control_planes = cluster.nodes['control-plane']
         first_control_plane = control_planes.get_first_member()
 
-        expected_state = "disabled"
-        if cluster.inventory["rbac"]["admission"] == "pss":
-            expected_state = cluster.inventory["rbac"]["pss"]["pod-security"]
+        expected_state = cluster.inventory["rbac"]["pss"]["pod-security"]
 
         kubeadm_config = components.KubeadmConfig(cluster)
         cluster_config = kubeadm_config.load('kubeadm-config', first_control_plane)

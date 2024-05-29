@@ -57,12 +57,7 @@ This section provides information about the inventory, features, and steps for i
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
     - [patches](#patches)
-    - [RBAC Admission](#rbac-admission)
-    - [Admission psp](#admission-psp)
-      - [Configuring Admission Controller](#configuring-admission-controller)
-      - [Configuring OOB Policies](#configuring-oob-policies)
-      - [Configuring Custom Policies](#configuring-custom-policies)
-    - [Admission pss](#admission-pss)
+    - [RBAC pss](#rbac-pss)
       - [Configuring Default Profiles](#configuring-default-profiles)
       - [Configuring Exemptions](#configuring-exemptions)
       - [Application Prerequisites](#application-prerequisites)
@@ -1104,9 +1099,9 @@ By default, the installer uses the following parameters:
 |networking.podSubnet                                   | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                                  |
 |networking.serviceSubnet                               | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                                  |
 |apiServer.certSANs                                     | List with all nodes internal IPs, external IPs and names | Custom SANs are only appended to, but do not override the default list                           |
-|apiServer.extraArgs.enable-admission-plugins           | `NodeRestriction`                                        | `PodSecurityPolicy` plugin is added if [Admission psp](#admission-psp) is enabled                |
-|apiServer.extraArgs.feature-gates                      |                                                          | `PodSecurity=true` is added for Kubernetes < v1.28 if [Admission pss](#admission-pss) is enabled |
-|apiServer.extraArgs.admission-control-config-file      | `/etc/kubernetes/pki/admission.yaml`                     | Provided default value **overrides** custom value if [Admission pss](#admission-pss) is enabled. |
+|apiServer.extraArgs.enable-admission-plugins           | `NodeRestriction`                                        |                                                                                                  |
+|apiServer.extraArgs.feature-gates                      |                                                          | `PodSecurity=true` is added for Kubernetes < v1.28 if [RBAC pss](#rbac-pss) is enabled           |
+|apiServer.extraArgs.admission-control-config-file      | `/etc/kubernetes/pki/admission.yaml`                     | Provided default value **overrides** custom value if [RBAC pss](#rbac-pss) is enabled.           |
 |apiServer.extraArgs.profiling                          | `false`                                                  |                                                                                                  |
 |apiServer.extraArgs.audit-log-path                     | `/var/log/kubernetes/audit/audit.log`                    |                                                                                                  |
 |apiServer.extraArgs.audit-policy-file                  | `/etc/kubernetes/audit-policy.yaml`                      |                                                                                                  |
@@ -1557,8 +1552,6 @@ For more information about these settings, refer to the official Kubernetes docu
 
 In `services.kubeadm_patches` section, you can override control-plane pod settings as well as kubelet settings on per node basis.
 This feature is implemented by using of [kubeadm patches](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/control-plane-flags/#patches).
-
-**Note**: `patches` feature is available for control-plane pods (etcd, kube-apiserver, kube-controller-manager, kube-scheduler) since Kubernetes **v1.22.0** and for kubelet since Kubernetes **v1.25.0**.
 
 The following is an example of control-plane settings override:
 ```
@@ -2810,9 +2803,6 @@ services:
             resources:
             - cronjobs
             - jobs
-          - group: "policy"
-            resources:
-            - podsecuritypolicies
           - group: "rbac.authorization.k8s.io"
             resources:
             - clusterrolebindings
@@ -3770,218 +3760,19 @@ The following settings are supported:
 
 **Note**: New patches can be appended after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
-### RBAC Admission
+### RBAC pss
 
-*Installation task*: `deploy.admission`
+*Installation task*: `deploy.kubernetes.init`
 
-There are two options for admissions, `psp` and `pss`. PodSecurityPolicy (PSP) is being deprecated in Kubernetes 1.21 and will be removed in Kubernetes 1.25. Kubernetes 1.23 supports Pod Security Standards (PSS) that are implemented as a feature gate of `kube-apiserver`. Since Kubernetes v1.25 does not support PSP, the installation and maintenance procedures assume that the `cluster.yaml` file includes `admission: pss` explicitly.  
-By default, Kubemarine uses `psp` rbac admission value for Kubernetes version 1.24 or lower and `pss` value for version 1.25+.
-
-```yaml
-rbac:
-  admission: psp
-```
-
-### Admission psp
-
-Pod security policies enable fine-grained authorization of pod creation and updates.
-Pod security policies are enforced by enabling the admission controller. By default, admission controller is enabled during installation.
-
-To configure pod security policies, it is required to provide cluster-level `policy/v1beta1/podsecuritypolicy` resource 
-that controls security sensitive aspects of the pod specification. 
-If controller is enabled and no policies are provided, then the system does not allow deployment of new pods.
-Several OOB policies are provided and by default they are enabled during installation. 
-It is also possible to specify custom policies to be applied during installation. 
-
-Configuration format for `psp` section is as follows:
+There is currently one supported Pod Security implementation. Pod Security Standards (PSS) are implemented as a feature gate of `kube-apiserver`.
+This is reflected in the **cluster.yaml** as follows:
 
 ```yaml
 rbac:
-  admission: psp
-  psp:
-    pod-security: enabled
-    oob-policies:
-      default: enabled
-      host-network: enabled
-      anyuid: enabled
-    custom-policies:
-      psp-list: []
-      roles-list: []
-      bindings-list: []
+  admission: pss
 ```
 
-#### Configuring Admission Controller
-
-Admission controller is enabled by default during installation.
-It is possible to disable admission controller installation to fully disable pod security policy enforcement.
-In this case no OOB or custom policies are installed. To disable admission controller:
-
-```yaml
-rbac:
-  admission: psp
-  psp:
-    pod-security: disabled
-```
-
-**Note**: 
-
-* Disabling admission controller is not recommended.
-* On existing cluster it is possible to enable/disable admission controller using the `manage_psp` maintenance procedure.
-
-#### Configuring OOB Policies
-
-The following policies are provided and enabled out of the box:
-
-<table>
-    <tr><th>Policy name</th><th>PSP, CR, CRB names</th><th>Use case</th></tr>
-    <tr>
-        <td>privileged</td>
-        <td><ul>
-            <li><code>oob-privileged-psp</code></li>
-            <li><code>oob-privileged-psp-cr</code></li>
-            <li><code>oob-privileged-psp-crb</code></li>
-        </ul></td>
-        <td>Used for pods which require full privileges, for example kube-system pods</td>
-    </tr>
-    <tr>
-        <td>default</td>
-        <td><ul>
-            <li><code>oob-default-psp</code></li>
-            <li><code>oob-default-psp-cr</code></li>
-            <li><code>oob-default-psp-crb</code></li>
-        </ul></td>
-        <td>Used for <code>authenticated</code> group, enforces unauthorized users to deploy pods with severe restrictions</td>
-    </tr>
-    <tr>
-        <td>anyuid</td>
-        <td><ul>
-            <li><code>oob-anyuid-psp</code></li>
-            <li><code>oob-anyuid-psp-cr</code></li>
-        </ul></td>
-        <td>Used for pods which require root privileges</td>
-    </tr>
-    <tr>
-        <td>host-network</td>
-        <td><ul>
-            <li><code>oob-host-network-psp</code></li>
-            <li><code>oob-host-network-psp-cr</code></li>
-        </ul></td>
-        <td>Used for pods which require host network access</td>
-    </tr>
-</table>
-
-
-The OOB policies are not installed if admission controller is disabled. 
-You can manually disable a particular OOB policy during installation, except `privileged` policy.
-
-For example, to disable `host-network` OOB policy:
-
-```yaml
-rbac:
-  admission: psp
-  psp:
-    oob-policies:
-      host-network: disabled
-```
-
-**Note**: 
-
-* Disabling OOB policies is not recommended. 
-* `PodSecurityPolicy` (PSP) resources included in different OOB policies are used by different OOB plugins, so disabling any OOB policy may lead to **issues with some OOB plugins**. 
-  If you are using OOB plugins then you should provide custom PSPs in place of disabled OOB PSPs and bind them using `ClusterRoleBinding` to particular plugin `ServiceAccout`.
-* It is possible to reconfigure OOB policies on an existing cluster using the `manage_psp` maintenance procedure.
-
-#### Configuring Custom Policies
-
-You can install custom policies during cluster installation. For example, to install custom "most restricted" policy for `authenticated` group:
-
-```yaml
-rbac:
-  admission: psp
-  psp:
-    custom-policies:
-      psp-list:
-      - apiVersion: policy/v1beta1
-        kind: PodSecurityPolicy
-        metadata:
-          name: most-restricted-psp
-          annotations:
-            seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
-            seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
-        spec:
-          privileged: false
-          # Allow core volume types.
-          hostPID: false
-          hostIPC: false
-          hostNetwork: false
-          volumes:
-            - 'configMap'
-            - 'emptyDir'
-            - 'projected'
-            - 'secret'
-            - 'downwardAPI'
-            - 'persistentVolumeClaim'
-          fsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          readOnlyRootFilesystem: true
-          runAsUser:
-            rule: 'MustRunAsNonRoot'
-          supplementalGroups:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          runAsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          allowPrivilegeEscalation: false
-          seLinux:
-            rule: 'RunAsAny'
-          requiredDropCapabilities:
-            - ALL
-      roles-list:
-      - apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: most-restricted-psp-cr
-        rules:
-          - apiGroups: ['policy']
-            resources: ['podsecuritypolicies']
-            verbs:     ['use']
-            resourceNames:
-              - most-restricted-psp
-      bindings-list:
-      - kind: ClusterRoleBinding
-        apiVersion: rbac.authorization.k8s.io/v1
-        metadata:
-          name: most-restricted-psp-crb
-        roleRef:
-          kind: ClusterRole
-          name: most-restricted-psp-cr
-          apiGroup: rbac.authorization.k8s.io
-        subjects:
-          - kind: ServiceAccount
-            # it is possible to bind to non-existing SA in non-existing namespace
-            name: sa-name
-            namespace: sa-namespace
-```
-
-**Note**:
-
-* Any of these lists can be empty.
-* If the list is not empty, then all the resources should align with list type. For example, the `psp-list` can only have resources with `kind: PodSecurityPolicy`.
-* The custom policies should not have 'oob-' prefix.
-* To manage custom policies on an existing cluster use the `manage_psp` maintenance procedure. 
-
-### Admission pss
-
-Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
-(or profiles) of policies. The profiles are the following:
+Originally PSS assumes only three levels (or profiles) of policies. The profiles are the following:
 * `Privileged` - Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
 escalations.
 * `Baseline` - Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
@@ -3990,16 +3781,6 @@ Pod configuration.
 
 There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to 
 [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
-
-**Note**:
-
-* PSS are supported for Kubernetes versions higher than 1.23.
-* To enable PSS, define `admission: pss` explicitly in cluster.yaml:
-
-```yaml
-rbac:
-  admission: pss
-```
 
 #### Configuring Default Profiles
 
@@ -4046,9 +3827,9 @@ metadata:
 In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
 
 **Warnings**: 
-Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
-`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
-Therefor PSS labels on namespaces shouldn't be set even if you Kubernetes cluster is deployed without PSS enabled.
+Pay attention to the fact that PSS is implicitly enabled by default (that is reflected in 
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) prior to Kubernetes v1.28).
+PSS labels on namespaces shouldn't be set if your Kubernetes cluster is deployed without PSS enabled.
 
 #### Configuring Exemptions
 
@@ -4127,8 +3908,6 @@ rbac:
 ```
 
 The yaml file that is created from the above template is applied to the cluster during the installation procedure.
-
-**Note**: The `Secret` section works only for Kubernetes v1.24. It is excluded for Kubernetes v1.23 and lower versions.
 
 ### Plugins
 
@@ -5976,9 +5755,8 @@ The following is the installation tasks tree:
     * **reset** - Resets an existing or previous Kubernetes cluster. All the data related to the Kubernetes is removed, including the container runtime being cleaned up.
     * **install** - Configures Kubernetes service in the file `/etc/systemd/system/kubelet.service`
     * **prepull_images** - Prepulls Kubernetes images on all nodes using parameters from the inventory.
-    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm). Also apply PSS if it is enabled. For more information about PPS, see [Admission pss](#admission-pss).
+    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm). Also apply PSS if it is enabled. For more information about PSS, see [RBAC pss](#rbac-pss).
     * **audit** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy).
-  * **admission** - Applies OOB and custom pod security policies. For more information about the parameters for this task, see [Admission psp](#admission-psp).
   * **coredns** - Configures CoreDNS service with [coredns](#coredns) inventory settings.
   * **plugins** - Applies plugin installation procedures. For more information about parameters for this task, see [Plugins](#plugins).
   * **accounts** - Creates new users in cluster. For more information about parameters for this task, see [RBAC accounts](#rbac-accounts).
@@ -6369,35 +6147,6 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 **Note**: If you need to upgrade an existing Kubernetes cluster to new version, please use the [Upgrade Procedure](Maintenance.md#upgrade-procedure).
 
 The tables below shows the correspondence of versions that are supported and is used during the installation:
-
-## Default Dependent Components Versions for Kubernetes Versions v1.24.11
-| Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
-|----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                            |
-| binaries | kubeadm                                                        | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  | SHA1: 7d44b41e36ff71f5f00671d518f2e59b4540653a                                                             |
-|          | kubelet                                                        | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  | SHA1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d                                                             |
-|          | kubectl                                                        | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  | SHA1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655                                                             |
-|          | calicoctl                                                      | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 Required only if calico is installed.                       |
-|          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3                                                             |
-| rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
-|          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
-| images   | registry.k8s.io/kube-apiserver                                      | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
-|          | registry.k8s.io/kube-controller-manager                             | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
-|          | registry.k8s.io/kube-proxy                                          | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
-|          | registry.k8s.io/kube-scheduler                                      | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
-|          | registry.k8s.io/coredns                                             | 1.8.6            | 1.8.6                        | 1.8.6        | 1.8.6        | 1.8.6             | 1.8.6     | 1.8.6     |                                                                                                            |
-|          | registry.k8s.io/pause                                               | 3.7              | 3.7                          | 3.7          | 3.7          | 3.7               | 3.7       | 3.7       |                                                                                                            |
-|          | registry.k8s.io/etcd                                                | 3.5.6-0          | 3.5.6-0                      | 3.5.6-0      | 3.5.6-0      | 3.5.6-0           | 3.5.6-0   | 3.5.6-0   |                                                                                                            |
-|          | calico/typha                                                   | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | Required only if Typha is enabled in Calico config.                                                        |
-|          | calico/cni                                                     | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/node                                                    | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/kube-controllers                                        | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   |                                                                                                            |
-|          | calico/apiserver                                               | v3.24.2          | v3.24.2                      | v3.24.2      | v3.24.2      | v3.24.2           | v3.24.2   | v3.24.2   | Required only if API server is enabled in Calico config.                                                   |
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.2.0           | v1.2.0                       | v1.2.0       | v1.2.0       | v1.2.0            | v1.2.0    | v1.2.0    |                                                                                                            |
-|          | kubernetesui/dashboard                                         | v2.5.1           | v2.5.1                       | v2.5.1       | v2.5.1       | v2.5.1            | v2.5.1    | v2.5.1    | Required only if Kubernetes Dashboard plugin is set to be installed.                                       |
-|          | kubernetesui/metrics-scraper                                   | v1.0.7           | v1.0.7                       | v1.0.7       | v1.0.7       | v1.0.7            | v1.0.7    | v1.0.7    | Required only if Kubernetes Dashboard plugin is set to be installed.                                       |
-|          | rancher/local-path-provisioner                                 | v0.0.22          | v0.0.22                      | v0.0.22      | v0.0.22      | v0.0.22           | v0.0.22   | v0.0.22   | Required only if local-path provisioner plugin is set to be installed.                                     |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.25.7
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |

@@ -332,10 +332,10 @@ class CacheVersions(unittest.TestCase):
         self.context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.hosts = [node['address'] for node in self.inventory['nodes']]
-        first_master_idx = next(i for i, node in enumerate(self.inventory['nodes']) if 'master' in node['roles'])
-        self.new_host = self.inventory['nodes'][first_master_idx]['address']
+        first_control_plane_idx = next(i for i, node in enumerate(self.inventory['nodes']) if 'control-plane' in node['roles'])
+        self.new_host = self.inventory['nodes'][first_control_plane_idx]['address']
         self.procedure_inventory = demo.generate_procedure_inventory('add_node')
-        self.procedure_inventory['nodes'] = [self.inventory['nodes'].pop(first_master_idx)]
+        self.procedure_inventory['nodes'] = [self.inventory['nodes'].pop(first_control_plane_idx)]
         self.initial_hosts = [node['address'] for node in self.inventory['nodes']]
 
     def _new_cluster(self):
@@ -498,7 +498,7 @@ class CacheVersions(unittest.TestCase):
         containerd_hosts_stub = {}
         last_k8s_host = ''
         for node in self.inventory['nodes']:
-            if 'master' in node['roles'] or 'worker' in node['roles']:
+            if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 last_k8s_host = node['address']
                 containerd_hosts_stub[last_k8s_host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
         containerd_hosts_stub[last_k8s_host] = 'containerd=2'
@@ -513,7 +513,7 @@ class CacheVersions(unittest.TestCase):
         conntrack_hosts_stub = {}
         last_k8s_host = ''
         for node in self.inventory['nodes']:
-            if 'master' in node['roles'] or 'worker' in node['roles']:
+            if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 last_k8s_host = node['address']
                 conntrack_hosts_stub[last_k8s_host] = 'conntrack=1:1.4.5-2'
         conntrack_hosts_stub[last_k8s_host] = 'conntrack=2'
@@ -528,7 +528,7 @@ class CacheVersions(unittest.TestCase):
         packages_hosts_stub = {'containerd': {}, 'conntrack': {}}
         for node in self.inventory['nodes']:
             host = node['address']
-            if 'master' in node['roles'] or 'worker' in node['roles']:
+            if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
                 packages_hosts_stub['conntrack'][host] = 'conntrack=1:1.4.5-2'
 
@@ -550,7 +550,7 @@ class CacheVersions(unittest.TestCase):
         packages_hosts_stub = {'containerd': {}, 'conntrack': {}}
         for node in self.inventory['nodes']:
             host = node['address']
-            if 'master' in node['roles'] or 'worker' in node['roles']:
+            if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
                 packages_hosts_stub['conntrack'][host] = 'conntrack=1:1.4.5-2'
             else:
@@ -656,7 +656,7 @@ class CacheVersions(unittest.TestCase):
     def test_unattended_upgrades(self):
         cluster = self._new_cluster()
         balancers_config = 'Unattended-Upgrade::Package-Blacklist { "haproxy"; "keepalived"; };\n'
-        master_worker_config = 'Unattended-Upgrade::Package-Blacklist { "containerd"; "auditd"; "conntrack"; "iptables"; };\n'
+        kubernetes_config = 'Unattended-Upgrade::Package-Blacklist { "containerd"; "auditd"; "conntrack"; "iptables"; };\n'
         packages.disable_unattended_upgrade(cluster.nodes['all'])
 
         for node in cluster.make_group_from_roles(['balancer']).get_ordered_members_list():
@@ -665,11 +665,12 @@ class CacheVersions(unittest.TestCase):
             self.assertIsNotNone(unattended_upgrades_config)
             self.assertEqual(balancers_config, unattended_upgrades_config,
                              'Wrong unattended-upgrade config on balancer')
-        for node in cluster.make_group_from_roles(['master', 'worker']).get_ordered_members_list():
+        for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
             unattended_upgrades_config = cluster.fake_fs.read(node.get_host(),
                                                               '/etc/apt/apt.conf.d/51unattended-upgrades-kubemarine')
             self.assertIsNotNone(unattended_upgrades_config)
-            self.assertEqual(master_worker_config, unattended_upgrades_config, 'Wrong unattended-upgrade config on master/worker')
+            self.assertEqual(kubernetes_config, unattended_upgrades_config,
+                             'Wrong unattended-upgrade config on control-plane/worker')
 
 
 if __name__ == '__main__':

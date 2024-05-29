@@ -44,21 +44,21 @@ class TestAuditInstallation(unittest.TestCase):
         service_name = package_associations['service_name']
 
         # simulate package detection command
-        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=1,
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=1,
                                                     stderr='package %s is not installed' % package_name)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
 
         # simulate package installation command
         installation_command = [yum.get_install_cmd(package_name)]
-        exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
+        exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
 
         # simulate enable package command
-        exp_results3 = demo.create_nodegroup_result(cluster.nodes['master'], stdout='ok')
+        exp_results3 = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='ok')
         cluster.fake_shell.add(exp_results3, 'sudo', ['systemctl enable %s --now' % service_name])
 
-        audit.install(cluster.nodes['master'])
+        audit.install(cluster.nodes['control-plane'])
 
     def test_audit_installation_for_debian(self):
         cluster = self.new_debian_cluster()
@@ -68,22 +68,22 @@ class TestAuditInstallation(unittest.TestCase):
         service_name = package_associations['service_name']
 
         # simulate package detection command
-        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=1,
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=1,
                                                     stderr='dpkg-query: no packages found matching %s' % package_name)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
         installation_command = [apt.get_install_cmd(package_name)]
-        exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
+        exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
 
         # simulate enable package command
-        exp_results3 = demo.create_nodegroup_result(cluster.nodes['master'], stdout='ok')
+        exp_results3 = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='ok')
         cluster.fake_shell.add(exp_results3, 'sudo', ['systemctl enable %s --now' % service_name])
 
         # run task
-        audit.install(cluster.nodes['master'])
+        audit.install(cluster.nodes['control-plane'])
 
     def test_audit_installation_when_already_installed_for_debian(self):
         cluster = self.new_debian_cluster()
@@ -92,11 +92,12 @@ class TestAuditInstallation(unittest.TestCase):
         package_name = package_associations['package_name']
 
         # simulate package detection command
-        exp_results = demo.create_nodegroup_result(cluster.nodes['master'], code=0, stdout='%s=1:2.8.5-2ubuntu6' % package_name)
+        exp_results = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=0,
+                                                   stdout='%s=1:2.8.5-2ubuntu6' % package_name)
         cluster.fake_shell.add(exp_results, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # run task
-        audit.install(cluster.nodes['master'])
+        audit.install(cluster.nodes['control-plane'])
 
     def test_audit_installation_when_partly_installed_for_debian(self):
         cluster = self.new_debian_cluster()
@@ -119,19 +120,19 @@ class TestAuditInstallation(unittest.TestCase):
 
         # simulate package installation command
         installation_command = [apt.get_install_cmd(package_name)]
-        exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
+        exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
 
         # simulate enable package command
         enable_command = ['systemctl enable %s --now' % service_name]
-        exp_results3 = demo.create_nodegroup_result(cluster.nodes['master'], stdout='ok')
+        exp_results3 = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='ok')
         cluster.fake_shell.add(exp_results3, 'sudo', enable_command)
 
         # run task
-        audit.install(cluster.nodes['master'])
+        audit.install(cluster.nodes['control-plane'])
 
-        for host in cluster.nodes['master'].get_hosts():
+        for host in cluster.nodes['control-plane'].get_hosts():
             expected_is_called = host == '10.101.1.3'
             self.assertEqual(expected_is_called, cluster.fake_shell.is_called(host, 'sudo', enable_command),
                              msg="Installation task did not finished with audit enable command")
@@ -147,21 +148,21 @@ class TestAuditInstallation(unittest.TestCase):
 
         expected_data = " \n".join(cluster.inventory['services']['audit']['rules'])
 
-        results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='No rules\n', code=0)
+        results = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='No rules\n', code=0)
         cluster.fake_shell.add(results, 'sudo', [f'{executable_name} -l'], usage_limit=1)
 
-        expected_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout=expected_data, code=0)
+        expected_results = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout=expected_data, code=0)
         cluster.fake_shell.add(expected_results, 'sudo', [f'{executable_name} -l'])
 
-        results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='restarted', code=0)
+        results = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='restarted', code=0)
         cluster.fake_shell.add(results, 'sudo', ['service %s restart' % package_name])
 
-        actual_results = audit.apply_audit_rules(cluster.nodes['master'])
+        actual_results = audit.apply_audit_rules(cluster.nodes['control-plane'])
 
         self.assertEqual(expected_results, actual_results,
                          msg='Configuration task did not did not finished with restart result')
 
-        node_hostname = cluster.nodes['master'].get_hosts()[0]
+        node_hostname = cluster.nodes['control-plane'].get_hosts()[0]
         actual_data = cluster.fake_fs.read(node_hostname, config_location)
 
         self.assertEqual(expected_data, actual_data,

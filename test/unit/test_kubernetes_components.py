@@ -30,7 +30,7 @@ from kubemarine.kubernetes import components
 
 class KubeadmConfigTest(unittest.TestCase):
     def test_get_init_config_control_plane(self):
-        inventory = demo.generate_inventory(master=1, worker=1, balancer=0)
+        inventory = demo.generate_inventory(control_plane=1, worker=1, balancer=0)
         cluster = demo.new_cluster(inventory)
         control_plane = cluster.nodes['control-plane'].get_first_member()
         init_config = components.get_init_config(cluster, control_plane, init=True)
@@ -56,7 +56,7 @@ class KubeadmConfigTest(unittest.TestCase):
         self.assertNotIn('discovery', init_config)
 
     def test_get_join_config_control_plane(self):
-        inventory = demo.generate_inventory(master=1, worker=1, balancer=0)
+        inventory = demo.generate_inventory(control_plane=1, worker=1, balancer=0)
         cluster = demo.new_cluster(inventory)
         control_plane = cluster.nodes['control-plane'].get_first_member()
         join_config = components.get_init_config(cluster, control_plane, init=False, join_dict={
@@ -74,7 +74,7 @@ class KubeadmConfigTest(unittest.TestCase):
         self.assertIn('bootstrapToken', join_config.get('discovery', {}))
 
     def test_get_init_config_worker_group(self):
-        inventory = demo.generate_inventory(master=1, worker=2, balancer=0)
+        inventory = demo.generate_inventory(control_plane=1, worker=2, balancer=0)
         cluster = demo.new_cluster(inventory)
         workers = cluster.nodes['worker']
         init_config = components.get_init_config(cluster, workers, init=True)
@@ -161,7 +161,7 @@ class WaitForPodsTest(unittest.TestCase):
 
     def test_wait_workers_successful(self):
         cluster = self._new_cluster()
-        first_control_plane = next(node for node in self.inventory['nodes'] if 'master' in node['roles'])['address']
+        first_control_plane = next(node for node in self.inventory['nodes'] if 'control-plane' in node['roles'])['address']
         for node in self.inventory['nodes']:
             if 'worker' in node['roles']:
                 self._stub_get_pods(cluster, [first_control_plane], ['calico-node-abc12', 'kube-proxy-34xyz'], node['name'])
@@ -170,7 +170,7 @@ class WaitForPodsTest(unittest.TestCase):
 
     def test_wait_worker_failed(self):
         cluster = self._new_cluster()
-        first_control_plane = next(node for node in self.inventory['nodes'] if 'master' in node['roles'])['address']
+        first_control_plane = next(node for node in self.inventory['nodes'] if 'control-plane' in node['roles'])['address']
         for node in self.inventory['nodes']:
             if 'worker' in node['roles']:
                 self._stub_get_pods(cluster, [first_control_plane], ['calico-node-abc12', 'kube-proxy-34xyz'],
@@ -182,7 +182,7 @@ class WaitForPodsTest(unittest.TestCase):
     def test_wait_control_planes_successful(self):
         cluster = self._new_cluster()
         for node in self.inventory['nodes']:
-            if 'master' in node['roles']:
+            if 'control-plane' in node['roles']:
                 self._stub_get_pods(cluster, [node['address']], [
                     "calico-node-abc12", f"etcd-{node['name']}",
                     f"kube-apiserver-{node['name']}", f"kube-controller-manager-{node['name']}",
@@ -194,7 +194,7 @@ class WaitForPodsTest(unittest.TestCase):
     def test_wait_control_plane_failed(self):
         cluster = self._new_cluster()
         for node in self.inventory['nodes']:
-            if 'master' in node['roles']:
+            if 'control-plane' in node['roles']:
                 self._stub_get_pods(cluster, [node['address']], [
                     "calico-node-abc12",  # f"etcd-{node['name']}",
                     f"kube-apiserver-{node['name']}", f"kube-controller-manager-{node['name']}",
@@ -207,7 +207,7 @@ class WaitForPodsTest(unittest.TestCase):
     def test_wait_specific(self):
         cluster = self._new_cluster()
         for node in self.inventory['nodes']:
-            if 'master' in node['roles']:
+            if 'control-plane' in node['roles']:
                 self._stub_get_pods(cluster, [node['address']], [
                     "calico-node-abc12", f"etcd-{node['name']}",
                     f"kube-apiserver-{node['name']}", f"kube-controller-manager-{node['name']}",
@@ -217,12 +217,13 @@ class WaitForPodsTest(unittest.TestCase):
         with test_utils.mock_call(plugins.expect_pods) as run:
             components.wait_for_pods(cluster.nodes['all'], ['kube-apiserver'])
             node_names = {call[1]['node_name'] for call in run.call_args_list}
-            self.assertEqual({'master-1', 'master-2', 'master-3'}, node_names)
+            self.assertEqual({'control-plane-1', 'control-plane-2', 'control-plane-3'}, node_names)
 
         with test_utils.mock_call(plugins.expect_pods) as run:
             components.wait_for_pods(cluster.nodes['all'], ['kube-proxy'])
             node_names = {call[1]['node_name'] for call in run.call_args_list}
-            self.assertEqual({'master-1', 'master-2', 'master-3', 'worker-1', 'worker-2', 'worker-3'}, node_names)
+            self.assertEqual({'control-plane-1', 'control-plane-2', 'control-plane-3', 'worker-1', 'worker-2', 'worker-3'},
+                             node_names)
 
 
 class RestartComponentsTest(unittest.TestCase):
@@ -255,7 +256,7 @@ class RestartComponentsTest(unittest.TestCase):
             components.restart_components(cluster.nodes['all'], all_components)
 
             control_plane_components = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd']
-            expected_control_planes = [node['name'] for node in self.inventory['nodes'] if 'master' in node['roles']]
+            expected_control_planes = [node['name'] for node in self.inventory['nodes'] if 'control-plane' in node['roles']]
 
             restart_containers_expected_calls = [(node, control_plane_components) for node in expected_control_planes]
             restart_containers_actual_calls = [(call[0][1].get_node_name(), list(call[0][2]))
@@ -278,7 +279,7 @@ class RestartComponentsTest(unittest.TestCase):
                 'kube-apiserver'
             ])
 
-            first_control_plane = next(node for node in self.inventory['nodes'] if 'master' in node['roles'])
+            first_control_plane = next(node for node in self.inventory['nodes'] if 'control-plane' in node['roles'])
 
             self.assertEqual(1, restart_containers.call_count)
             self.assertEqual(first_control_plane['name'], restart_containers.call_args[0][1].get_node_name())
@@ -295,7 +296,7 @@ class ReconfigureComponentsTest(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA)
         random.shuffle(self.inventory['nodes'])
-        self.control_planes = [node['name'] for node in self.inventory['nodes'] if 'master' in node['roles']]
+        self.control_planes = [node['name'] for node in self.inventory['nodes'] if 'control-plane' in node['roles']]
         self.workers = [node['name'] for node in self.inventory['nodes'] if 'worker' in node['roles']]
 
         self.control_plane_components = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd']

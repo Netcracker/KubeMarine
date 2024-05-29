@@ -22,7 +22,6 @@ import ruamel.yaml
 
 import kubemarine.admission
 import kubemarine.audit
-import kubemarine.controlplane
 import kubemarine.core.cluster
 import kubemarine.core.defaults
 import kubemarine.core.inventory
@@ -418,7 +417,6 @@ class DynamicResources:
             kubemarine.core.defaults.merge_defaults,
 
             # Pre-compilation
-            kubemarine.controlplane.controlplane_node_enrichment,
             kubemarine.core.defaults.append_controlplain,
 
             # Jinja2 compilation
@@ -499,7 +497,6 @@ class DynamicResources:
         return [
             kubemarine.packages.cache_package_versions,
             kubemarine.core.defaults.escape_jinja_characters_for_inventory,
-            kubemarine.controlplane.controlplane_finalize_inventory,
         ]
 
     def _choose_enrichment_functions(self, stage: c.EnrichmentStage) -> List[c.EnrichmentFunction]:

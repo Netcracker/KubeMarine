@@ -42,7 +42,7 @@ class NodeGroupResultsTest(unittest.TestCase):
                                 ).replace("""\
             """, ""
                                           )
-        results: NodeGroupResult = demo.create_nodegroup_result(self.cluster.nodes['master'], code=1,
+        results: NodeGroupResult = demo.create_nodegroup_result(self.cluster.nodes['control-plane'], code=1,
                                                                 stderr='sudo: kubectl: command not found\n')
         actual_results_str = str(results)
         self.assertEqual(expected_results_str, actual_results_str, msg="NodeGroupResult string generated with invalid "
@@ -69,11 +69,11 @@ class NodeGroupResultsTest(unittest.TestCase):
         self.assertNotEqual(results1, results2, msg="Different nodegroup results are equal")
 
     def test_get_nodegroup_from_results(self):
-        # Manually create new group object to verify with existing masters group
-        masters_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3', '10.101.1.4'])
-        results: NodeGroupResult = demo.create_nodegroup_result(masters_group, code=0, stdout='foo bar')
+        # Manually create new group object to verify with existing control_planes group
+        control_planes_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3', '10.101.1.4'])
+        results: NodeGroupResult = demo.create_nodegroup_result(control_planes_group, code=0, stdout='foo bar')
         group_from_results: NodeGroup = results.get_group()
-        self.assertEqual(masters_group.nodes, group_from_results.nodes,
+        self.assertEqual(control_planes_group.nodes, group_from_results.nodes,
                          msg="Group from nodegroup is not the same as manual group")
 
     def test_any_failed_via_bad_code(self):

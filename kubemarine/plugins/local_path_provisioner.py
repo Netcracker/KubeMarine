@@ -55,7 +55,6 @@ class LocalPathProvisionerManifestProcessor(Processor):
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
             self.enrich_namespace_local_path_storage,
-            self.add_clusterrolebinding_local_path_provisioner_privileged_psp,
             self.enrich_service_account,
             self.enrich_service_account_secret,
             self.enrich_deployment_local_path_provisioner,
@@ -77,15 +76,6 @@ class LocalPathProvisionerManifestProcessor(Processor):
             if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
-
-    def add_clusterrolebinding_local_path_provisioner_privileged_psp(self, manifest: Manifest) -> None:
-        # TODO add only if psp is enabled?
-        new_yaml = yaml.safe_load(clusterrolebinding_local_path_provisioner_privileged_psp)
-        # Insert new ClusterRoleBinding after all existing resources of this kind
-        max_crb_idx = max(i for i, key in enumerate(manifest.all_obj_keys())
-                          if key.startswith("ClusterRoleBinding_"))
-        self.include(manifest, max_crb_idx + 1, new_yaml)
-
 
     def enrich_service_account(self, manifest: Manifest) -> None:
         key = "ServiceAccount_local-path-provisioner-service-account"
@@ -141,21 +131,6 @@ class LocalPathProvisionerManifestProcessor(Processor):
         helperpod_yaml_str_oneline = helperpod_yaml_str.replace('\n', ' ')
         self.log.verbose(f"The {key} has been patched in 'data.helperPod.yaml' with {helperpod_yaml_str_oneline!r}")
 
-
-clusterrolebinding_local_path_provisioner_privileged_psp = dedent("""\
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
-    metadata:
-      name: local-path-provisioner-privileged-psp
-    roleRef:
-      kind: ClusterRole
-      name: oob-privileged-psp-cr
-      apiGroup: rbac.authorization.k8s.io
-    subjects:
-    - kind: ServiceAccount
-      name: local-path-provisioner-service-account
-      namespace: local-path-storage
-""")
 
 service_account_secret = dedent("""\
     apiVersion: v1

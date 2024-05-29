@@ -41,7 +41,6 @@ ERROR_NOT_LATEST_PATCH='New version \"%s\" is not the latest supported patch ver
 
 ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE = "%s patch can be uploaded only to control-plane or worker nodes"
 ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded only to control-plane nodes"
-ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET = "Patches for kubelet are not supported in Kubernetes {version}"
 
 ERROR_UPGRADE_UNEXPECTED_PROPERTY='Unexpected %s properties in the procedure inventory for upgrade.'
 
@@ -164,9 +163,6 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     # validate nodes in kubeadm_patches (groups are validated with JSON schema)
     for control_plane_item, patches in inventory["services"]["kubeadm_patches"].items():
         for patch in patches:
-            if control_plane_item == 'kubelet' and not components.kubelet_supports_patches(cluster):
-                raise Exception(ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(version=kubeadm['kubernetesVersion']))
-
             if 'nodes' not in patch:
                 continue
 
@@ -519,9 +515,6 @@ def init_first_control_plane(group: NodeGroup) -> None:
 
     # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
     first_control_plane.call(components.patch_kubelet_configmap)
-
-    # Invoke method from admission module for applying the privileged PSP if it is enabled
-    first_control_plane.call(admission.apply_admission)
 
     # Preparing join_dict to init other nodes
     control_plane_lines = list(result.values())[0].stdout. \
@@ -1173,8 +1166,7 @@ def get_actual_roles(nodes_description: dict) -> Dict[str, List[str]]:
         node_name = node_description['metadata']['name']
         labels = node_description['metadata']['labels']
         result[node_name] = []
-        # TODO check label accordingly to Kubernetes version
-        if 'node-role.kubernetes.io/master' in labels or 'node-role.kubernetes.io/control-plane' in labels:
+        if 'node-role.kubernetes.io/control-plane' in labels:
             result[node_name].append('control-plane')
         if 'node-role.kubernetes.io/worker' in labels:
             result[node_name].append('worker')

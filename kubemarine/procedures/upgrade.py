@@ -57,7 +57,7 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
             and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
 
         # Extra args of API server have changed, need to reconfigure the API server.
-        # See admission.enrich_inventory_pss()
+        # See admission.enrich_inventory()
         # Still, should not reconfigure using generated ConfigMaps from inventory,
         # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
         # Instead, change only necessary apiServer args.

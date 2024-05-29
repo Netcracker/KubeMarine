@@ -272,38 +272,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
             self.assertEqual(expected_value, name_to_value.get(expected_name),
                              f"Unexpected value for {expected_name!r} env variable")
 
-    def test_clusterrole_calico_kube_controllers(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-kube-controllers")['rules']
-                presence_checker(any(("resourceNames", ["oob-anyuid-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
-
-    def test_clusterrole_calico_node(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-node")['rules']
-                presence_checker(any(("resourceNames", ["oob-privileged-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
-
     def test_all_images_contain_registry(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
             for typha_enabled, expected_num_images in (
@@ -382,30 +350,12 @@ class APIServerManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertNotIn), ('restricted', self.assertIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_calico-apiserver")['metadata'].get('labels', {})
                 for pss_label in default_pss_labels.items():
                     default_label_checker(pss_label, target_yaml.items(), "PPS labels validation failed")
-
-    def test_clusterrole_calico_crds(self):
-        k8s_1_24_x = self.get_latest_k8s("v1.24")
-        for k8s_version, admission, presence_checker in (
-            (k8s_1_24_x, 'psp', self.assertTrue),
-            (k8s_1_24_x, 'pss', self.assertFalse),
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "ClusterRole_calico-crds")['rules']
-                presence_checker(any(("resourceNames", ["oob-anyuid-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
 
     def test_redefine_resources(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -480,10 +430,10 @@ class EnrichmentTest(unittest.TestCase):
 
     @staticmethod
     def _inventory(nodes: int) -> dict:
-        scheme = {'master': [], 'worker': []}
+        scheme = {'control_plane': [], 'worker': []}
         for i in range(nodes):
-            scheme['master'].append(f'master-{i + 1}')
-            scheme['worker'].append(f'master-{i + 1}')
+            scheme['control_plane'].append(f'control-plane-{i + 1}')
+            scheme['worker'].append(f'control-plane-{i + 1}')
 
         inventory = demo.generate_inventory(**scheme)
         inventory.setdefault('plugins', {})['calico'] = {
@@ -534,13 +484,13 @@ class RedeployIfNeeded(unittest.TestCase):
         return [step[procedure] for step in steps if procedure in step]
 
     def test_add_fourth_kubernetes_node_redeploy_needed(self):
-        for role in ('master', 'worker'):
+        for role in ('control-plane', 'worker'):
             for typha_disabled_redefined in (False, True):
                 with self.subTest(f'Role: {role}, Typha disabled: {typha_disabled_redefined}'):
                     scheme = {'balancer': ['balancer-1'],
-                              'master': ['master-1', 'master-2'],
+                              'control_plane': ['control-plane-1', 'control-plane-2'],
                               'worker': ['worker-1', 'worker-2']}
-                    add_node_name = 'master-2' if role == 'master' else 'worker-2'
+                    add_node_name = 'control-plane-2' if role == 'control-plane' else 'worker-2'
                     self.prepare_context('add_node')
                     self.prepare_inventory(scheme, 'add_node', add_node_name)
                     if typha_disabled_redefined:
@@ -570,13 +520,13 @@ class RedeployIfNeeded(unittest.TestCase):
                                      "Typha is not enabled in enriched inventory")
 
     def test_remove_fourth_kubernetes_node_redeploy_not_needed(self):
-        for role in ('master', 'worker'):
+        for role in ('control-plane', 'worker'):
             for typha_enabled_redefined in (False, True):
                 with self.subTest(f'Role: {role}, Typha enabled: {typha_enabled_redefined}'):
                     scheme = {'balancer': ['balancer-1'],
-                              'master': ['master-1', 'master-2'],
+                              'control_plane': ['control-plane-1', 'control-plane-2'],
                               'worker': ['worker-1', 'worker-2']}
-                    remove_node_name = 'master-2' if role == 'master' else 'worker-2'
+                    remove_node_name = 'control-plane-2' if role == 'control-plane' else 'worker-2'
                     self.prepare_context('remove_node')
                     self.prepare_inventory(scheme, 'remove_node', remove_node_name)
                     if typha_enabled_redefined:
@@ -608,7 +558,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # pylint: disable=attribute-defined-outside-init
 
         scheme = {'balancer': ['balancer-1', 'balancer-2'],
-                  'master': ['master-1', 'master-2'],
+                  'control_plane': ['control-plane-1', 'control-plane-2'],
                   'worker': ['worker-1']}
         self.prepare_context('add_node')
         self.prepare_inventory(scheme, 'add_node', 'balancer-2')
@@ -623,12 +573,12 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_remove_second_kubernetes_node_redeploy_not_needed(self):
         # pylint: disable=attribute-defined-outside-init
 
-        for role in ('master', 'worker'):
+        for role in ('control-plane', 'worker'):
             with self.subTest(f'Role: {role}'):
-                scheme = {'balancer': 1, 'master': ['master-1'], 'worker': ['master-1']}
+                scheme = {'balancer': 1, 'control_plane': ['control-plane-1'], 'worker': ['control-plane-1']}
                 add_node_name = 'node-1'
-                if role == 'master':
-                    scheme['master'].append(add_node_name)
+                if role == 'control-plane':
+                    scheme['control_plane'].append(add_node_name)
                 else:
                     scheme['worker'].append(add_node_name)
 
@@ -645,13 +595,13 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_remove_second_kubernetes_node_typha_enabled_redeploy_needed(self):
         # pylint: disable=attribute-defined-outside-init
 
-        for role in ('master', 'worker'):
+        for role in ('control-plane', 'worker'):
             for typha_replicas_redefined in (False, True):
                 with self.subTest(f'Role: {role}, Typha replicas redefined: {typha_replicas_redefined}'):
-                    scheme = {'balancer': 1, 'master': ['master-1'], 'worker': ['master-1']}
+                    scheme = {'balancer': 1, 'control_plane': ['control-plane-1'], 'worker': ['control-plane-1']}
                     add_node_name = 'node-1'
-                    if role == 'master':
-                        scheme['master'].append(add_node_name)
+                    if role == 'control-plane':
+                        scheme['control_plane'].append(add_node_name)
                     else:
                         scheme['worker'].append(add_node_name)
 
@@ -671,11 +621,11 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_remove_50th_kubernetes_node_redeploy_needed(self):
         # pylint: disable=attribute-defined-outside-init
 
-        for role in ('master', 'worker'):
+        for role in ('control-plane', 'worker'):
             for typha_replicas_redefined in (False, True):
                 with self.subTest(f'Role: {role}, Typha replicas redefined: {typha_replicas_redefined}'):
-                    scheme = {'balancer': 1, 'master': 25, 'worker': 25}
-                    add_node_name = 'master-25' if role == 'master' else 'worker-25'
+                    scheme = {'balancer': 1, 'control_plane': 25, 'worker': 25}
+                    add_node_name = 'control-plane-25' if role == 'control-plane' else 'worker-25'
                     self.prepare_context('add_node')
                     self.prepare_inventory(scheme, 'add_node', add_node_name)
                     if typha_replicas_redefined:
@@ -692,7 +642,7 @@ class RedeployIfNeeded(unittest.TestCase):
         for fullmesh in (False, True):
             with self.subTest(f'fullmesh: {fullmesh}'):
                 self.prepare_context('add_node')
-                self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+                self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'control-plane-3')
                 self.inventory['plugins']['calico']['fullmesh'] = fullmesh
 
                 self.procedure_inventory['nodes'][0].setdefault('labels', {})['route-reflector'] = True
@@ -701,13 +651,13 @@ class RedeployIfNeeded(unittest.TestCase):
 
     def test_add_simple_node_fullmesh_disabled_redeploy_not_needed(self):
         self.prepare_context('add_node')
-        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'control-plane-3')
         self.inventory['plugins']['calico']['fullmesh'] = False
         self._run_and_check(False)
 
     def test_add_route_reflector_custom_procedures_redeploy_not_needed(self):
         self.prepare_context('add_node')
-        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'control-plane-3')
         self.inventory['plugins']['calico']['fullmesh'] = False
         self.inventory['plugins']['calico']['installation'] = {'procedures': [
             {'shell': 'whoami'}

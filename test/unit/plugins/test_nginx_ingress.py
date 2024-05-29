@@ -22,7 +22,6 @@ from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
 
 
-
 class EnrichmentValidation(unittest.TestCase):
     def install(self):
         # pylint: disable=attribute-defined-outside-init
@@ -96,8 +95,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.k8s_1_28_x = self.get_latest_k8s("v1.28")
         # Requires ingress-nginx < v1.9.0
         self.k8s_1_25_x = self.get_latest_k8s("v1.25")
-        # Requires ingress-nginx v1.2.x
-        self.k8s_1_24_x = self.get_latest_k8s("v1.24")
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -154,9 +151,12 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertFalse(any(arg.startswith('--enable-metrics=') for arg in args), "--enable-metrics should be absent")
         self.assertIn('--watch-ingress-without-class=true', args, "Required arg not found")
         self.assertIn('--enable-ssl-passthrough', args, "Required arg not found")
-        self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found ")
-        self.assertIn('--disable-full-test', args, "Required arg not found ")
-        self.assertIn('--disable-catch-all', args, "Required arg not found ")
+        self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found")
+        self.assertIn('--disable-full-test', args, "Required arg not found")
+        self.assertIn('--disable-catch-all', args, "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook=') for arg in args), "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook-certificate=') for arg in args), "Required arg not found")
+        self.assertTrue(any(arg.startswith('--validating-webhook-key=') for arg in args), "Required arg not found")
 
         self.assertEqual([80, 443, 10254, 8443],
                          [item['containerPort'] for item in container['ports']],
@@ -179,9 +179,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for profile, default_label_checker in (('baseline', self.assertIn), ('privileged', self.assertNotIn)):
             with self.subTest(profile):
                 inventory = self.inventory(self.k8s_latest)
-                rbac = inventory.setdefault('rbac', {})
-                rbac['admission'] = 'pss'
-                rbac.setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
+                inventory.setdefault('rbac', {}).setdefault('pss', {}).setdefault('defaults', {})['enforce'] = profile
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
                 target_yaml: dict = self.get_obj(manifest, "Namespace_ingress-nginx")['metadata'].get('labels', {})
@@ -190,7 +188,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def test_webhook_resources_difference(self):
         for k8s_version, expected_num_resources in (
-            (self.k8s_1_24_x, 0),
             (self.k8s_1_25_x, 9),
             (self.k8s_1_28_x, 10),
             (self.k8s_latest, 9)
@@ -222,21 +219,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertEqual(['IPv6'], data['spec']['ipFamilies'],
                         f"ingress-nginx enrichment error for IPv6 family")
 
-    def test_v1_2_x_controller_container_difference(self):
-        for k8s_version, presence_checker in (
-            (self.k8s_1_24_x, self.assertFalse),
-            (self.k8s_latest, self.assertTrue)
-        ):
-            with self.subTest(k8s_version):
-                cluster = demo.new_cluster(self.inventory(k8s_version))
-                manifest = self.enrich_yaml(cluster)
-                container = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
-                    ['spec']['template']['spec']['containers'][0]
-                args = container['args']
-                presence_checker(any(arg.startswith('--validating-webhook=') for arg in args), "Unexpected arguments")
-                presence_checker(any(arg.startswith('--validating-webhook-certificate=') for arg in args), "Unexpected arguments")
-                presence_checker(any(arg.startswith('--validating-webhook-key=') for arg in args), "Unexpected arguments")
-
     def test_enrich_webhook_resources(self):
         inventory = self.inventory(self.k8s_latest)
         nginx = inventory.setdefault('plugins', {}).setdefault('nginx-ingress-controller', {})
@@ -254,29 +236,11 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
             ['spec']['template']['spec']['containers'][0]
         self.assertEqual(expected_image, container_patch['image'], "Unexpected patch job image")
 
-    def test_v1_2_x_role_ingress_nginx_difference(self):
-        for k8s_version, admission, presence_checker in (
-            (self.k8s_1_24_x, 'psp', self.assertTrue),
-            (self.k8s_1_24_x, 'pss', self.assertTrue), # This should probably be assertFalse
-            (self.k8s_latest, 'pss', self.assertFalse)
-        ):
-            with self.subTest(f"{k8s_version}, {admission}"):
-                inventory = self.inventory(k8s_version)
-                inventory.setdefault('rbac', {})['admission'] = admission
-                cluster = demo.new_cluster(inventory)
-                manifest = self.enrich_yaml(cluster)
-                rules = self.get_obj(manifest, "Role_ingress-nginx")['rules']
-                presence_checker(any(("resourceNames", ["oob-host-network-psp"]) in rule.items() for rule in rules),
-                                 "Rules list validation failed")
-
     def test_all_images_contain_registry(self):
-        for k8s_version, expected_num_images in (
-            (self.k8s_1_24_x, 1),
-            (self.k8s_latest, 2)
-        ):
+        for k8s_version in self.latest_k8s_supporting_specific_versions.values():
             with self.subTest(k8s_version):
                 num_images = self.check_all_images_contain_registry(self.inventory(k8s_version))
-                self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
+                self.assertEqual(2, num_images, f"Unexpected number of images found: {num_images}")
 
 
 class RedeployIfNeeded(unittest.TestCase):
@@ -285,7 +249,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # if nginx-ingress-controller plugin is disabled at all
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -309,7 +273,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # if no balancers are presented (in current cluster and as part of add/remove configuration)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=0)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=0)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = inventory['nodes'][0]
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -326,7 +290,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_node_not_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we don't add balancers
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -337,7 +301,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_remove_node_not_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we don't remove balancers
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -347,7 +311,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_add_node_not_first_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we add not first balancer
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=2)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -358,7 +322,7 @@ class RedeployIfNeeded(unittest.TestCase):
     def test_remove_node_not_last_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we remove the last balancer from cluster
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=2)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -369,7 +333,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # Need to redeploy nginx-ingress-controller for add_node procedure,
         # if we add the first balancer
         # and changed parameters are not overriden by user
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
@@ -381,7 +345,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # Need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we remove the last balancer
         # and changed parameters are not overriden by user
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
@@ -394,7 +358,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only use-proxy-protocol (ingress ports should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -421,7 +385,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only one http port (use-proxy-protocol and https port should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -448,7 +412,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides only one https port (use-proxy-protocol and http port should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -475,7 +439,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # but user overrides use-proxy protocol and target http/https port (constant configuration)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -510,7 +474,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides ds ports directly, that has more priority (use-proxy-protocol should already be changed)
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -543,7 +507,7 @@ class RedeployIfNeeded(unittest.TestCase):
         # and user overrides use-proxy-protocol and ds ports directly, that has more priority
 
         # Remove mode
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
+        inventory = demo.generate_inventory(control_plane=2, worker=['control-plane-1', 'control-plane-2'], balancer=1)
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {

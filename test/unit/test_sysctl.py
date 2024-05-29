@@ -36,7 +36,7 @@ def actual_sysctl_params(cluster: demo.FakeKubernetesCluster, node: NodeGroup) -
 
 class ParametersEnrichment(unittest.TestCase):
     def test_make_config_all_nodes_simple_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': 1}
         cluster = demo.new_cluster(inventory)
         self.assertEqual(set(cluster.nodes['all'].get_nodes_names()),
@@ -45,14 +45,14 @@ class ParametersEnrichment(unittest.TestCase):
             self.assertIn('parameter', actual_sysctl_params(cluster, node))
 
     def test_make_config_empty_value(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': ''}
         cluster = demo.new_cluster(inventory)
         for node in cluster.nodes['all'].get_ordered_members_list():
             self.assertNotIn('parameter', actual_sysctl_params(cluster, node))
 
     def test_make_config_all_nodes_extended_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1
         }}
@@ -61,16 +61,16 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_make_config_specific_group(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1, 'groups': ['control-plane']
         }}
         cluster = demo.new_cluster(inventory)
-        self.assertEqual({'master-1'},
+        self.assertEqual({'control-plane-1'},
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_make_config_specific_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         specific_nodes = ['balancer-1', 'worker-1']
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1, 'nodes': specific_nodes
@@ -80,7 +80,7 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_make_config_groups_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1, 'groups': ['worker'], 'nodes': ['balancer-1']
         }}
@@ -89,7 +89,7 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_make_config_unknown_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1, 'nodes': ['unknown-node']
         }}
@@ -98,7 +98,7 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_make_config_parameter_not_install(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 1, 'install': False
         }}
@@ -107,7 +107,7 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'parameter = 1'))
 
     def test_override_default_simple_format_all_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-ip6tables': 0}
 
         cluster = demo.new_cluster(inventory)
@@ -115,29 +115,29 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-ip6tables = 0'))
 
     def test_override_default_extended_format_default_groups(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-iptables': {
             'value': 0
         }}
 
         cluster = demo.new_cluster(inventory)
-        self.assertEqual({'master-1', 'worker-1'},
+        self.assertEqual({'control-plane-1', 'worker-1'},
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 0'))
         self.assertEqual(set(),
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 1'))
 
     def test_override_default_add_nodes(self):
-        inventory = demo.generate_inventory(balancer=2, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=2, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-iptables': {
             'value': 1,
             'nodes': ['balancer-2']
         }}
         cluster = demo.new_cluster(inventory)
-        self.assertEqual({'balancer-2', 'master-1', 'worker-1'},
+        self.assertEqual({'balancer-2', 'control-plane-1', 'worker-1'},
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 1'))
 
     def test_override_not_installed_default(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.bridge.bridge-nf-call-ip6tables': {
             'value': 0
         }}
@@ -153,7 +153,7 @@ class ParametersEnrichment(unittest.TestCase):
                          nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-ip6tables = 0'))
 
     def test_override_default_simple_format_empty_value(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.ipv4.ip_forward': ''}
 
         cluster = demo.new_cluster(inventory)
@@ -161,7 +161,7 @@ class ParametersEnrichment(unittest.TestCase):
             self.assertNotIn('net.ipv4.ip_forward', actual_sysctl_params(cluster, node))
 
     def test_override_default_extended_format_not_install(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'net.ipv4.ip_forward': {
             'value': 0, 'install': False
         }}
@@ -171,14 +171,14 @@ class ParametersEnrichment(unittest.TestCase):
             self.assertNotIn('net.ipv4.ip_forward', actual_sysctl_params(cluster, node))
 
     def test_error_invalid_integer_value_simple_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': 'test'}
         with self.assertRaisesRegex(Exception, re.escape("invalid integer value 'test' "
                                                          "in section ['services']['sysctl']['parameter']")):
             demo.new_cluster(inventory)
 
     def test_error_invalid_integer_value_extended_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': 'test'
         }}
@@ -187,7 +187,7 @@ class ParametersEnrichment(unittest.TestCase):
             demo.new_cluster(inventory)
 
     def test_error_empty_value_extended_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': ''
         }}
@@ -196,7 +196,7 @@ class ParametersEnrichment(unittest.TestCase):
             demo.new_cluster(inventory)
 
     def test_error_invalid_install_value_extended_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'parameter': {
             'value': '1', 'install': 'test'
         }}
@@ -205,7 +205,7 @@ class ParametersEnrichment(unittest.TestCase):
             demo.new_cluster(inventory)
 
     def test_default_enrichment(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         cluster = demo.new_cluster(inventory)
 
         for node in cluster.nodes['all'].get_ordered_members_list():
@@ -221,7 +221,7 @@ class ParametersEnrichment(unittest.TestCase):
             self.assertEqual(expected_params, actual_params)
 
     def test_ipv6_default_enrichment(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         for i, node in enumerate(inventory['nodes']):
             node['internal_address'] = f'2001::{i + 1}'
 
@@ -239,7 +239,7 @@ class ParametersEnrichment(unittest.TestCase):
             self.assertEqual(expected_params, actual_params)
 
     def test_kubelet_doesnt_protect_kernel_defaults(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['kubeadm_kubelet'] = {
             'protectKernelDefaults': False,
         }
@@ -260,13 +260,13 @@ class ParametersEnrichment(unittest.TestCase):
 
 class KernelPidMax(unittest.TestCase):
     def test_default_value_default_kubelet_config(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         cluster = demo.new_cluster(inventory)
         self.assertEqual(set(cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_names()),
                          nodes_having_parameter(cluster, f'kernel.pid_max = 452608'))
 
     def test_default_value_custom_kubelet_config(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['kubeadm_kubelet'] = {
             'maxPods': 1,
             'podPidsLimit': 1,
@@ -276,7 +276,7 @@ class KernelPidMax(unittest.TestCase):
                          nodes_having_parameter(cluster, f'kernel.pid_max = 2049'))
 
     def test_default_value_custom_kubelet_config_and_patches(self):
-        inventory = demo.generate_inventory(balancer=1, master=2, worker=2)
+        inventory = demo.generate_inventory(balancer=1, control_plane=2, worker=2)
         inventory['services']['kubeadm_kubelet'] = {
             'maxPods': 1,
             'podPidsLimit': 1,
@@ -288,16 +288,16 @@ class KernelPidMax(unittest.TestCase):
                     'patch': {'maxPods': 2, 'podPidsLimit': 2}
                 },
                 {
-                    'nodes': ['master-1', 'worker-1'],
+                    'nodes': ['control-plane-1', 'worker-1'],
                     'patch': {'maxPods': 3}
                 }
             ]
         }
 
         def test(cluster_: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1'},
+            self.assertEqual({'control-plane-1'},
                              nodes_having_parameter(cluster_, 'kernel.pid_max = 2051'))
-            self.assertEqual({'master-2'},
+            self.assertEqual({'control-plane-2'},
                              nodes_having_parameter(cluster_, 'kernel.pid_max = 2049'))
             self.assertEqual({'worker-1'},
                              nodes_having_parameter(cluster_, 'kernel.pid_max = 2054'))
@@ -311,7 +311,7 @@ class KernelPidMax(unittest.TestCase):
         test(cluster)
 
     def test_override_global_kubelet_config_and_patches(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'kernel.pid_max': {
             'value': 2 ** 22,
         }}
@@ -329,11 +329,11 @@ class KernelPidMax(unittest.TestCase):
         }
 
         cluster = demo.new_cluster(inventory)
-        self.assertEqual({'master-1', 'worker-1'},
+        self.assertEqual({'control-plane-1', 'worker-1'},
                          nodes_having_parameter(cluster, f'kernel.pid_max = {2 ** 22}'))
 
     def test_override_patches_kubelet_config_and_patches(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=2)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=2)
         inventory['patches'] = [
             {
                 'nodes': ['worker-1'],
@@ -356,7 +356,7 @@ class KernelPidMax(unittest.TestCase):
         }
 
         def test(cluster_: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1'},
+            self.assertEqual({'control-plane-1'},
                              nodes_having_parameter(cluster_, 'kernel.pid_max = 2049'))
             self.assertEqual({'worker-1'},
                              nodes_having_parameter(cluster_, f'kernel.pid_max = {2 ** 22}'))
@@ -370,7 +370,7 @@ class KernelPidMax(unittest.TestCase):
         test(cluster)
 
     def test_error_not_set(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'kernel.pid_max': {
             'value': 2 ** 22,
             'groups': ['balancer', 'control-plane']
@@ -384,7 +384,7 @@ class KernelPidMax(unittest.TestCase):
             'value': 2 ** 22 + 1
         }}
         with self.assertRaisesRegex(Exception, re.escape(sysctl.ERROR_PID_MAX_EXCEEDS.format(
-                node='master-1', value=2 ** 22 + 1, max=2 ** 22))):
+                node='control-plane-1', value=2 ** 22 + 1, max=2 ** 22))):
             demo.new_cluster(inventory)
 
     def test_error_less_than_required(self):
@@ -393,11 +393,11 @@ class KernelPidMax(unittest.TestCase):
             'value': 10000
         }}
         with self.assertRaisesRegex(Exception, re.escape(sysctl.ERROR_PID_MAX_REQUIRED.format(
-                node='master-1', value=10000, required=452608))):
+                node='control-plane-1', value=10000, required=452608))):
             demo.new_cluster(inventory)
 
     def test_error_less_than_required_kubelet_patch(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {'kernel.pid_max': 110 * 4096 + 2048}
         inventory['services']['kubeadm_kubelet'] = {
             'maxPods': 100, 'podPidsLimit': 4000,
@@ -421,7 +421,7 @@ class KernelPidMax(unittest.TestCase):
 
 class PatchesEnrichmentAndFinalization(unittest.TestCase):
     def patch_groups_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['patches'] = [
             {
                 'groups': ['control-plane'],
@@ -435,7 +435,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield inventory
 
         def test(cluster: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1', 'balancer-1'},
+            self.assertEqual({'control-plane-1', 'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter = 1'))
 
         yield test
@@ -460,7 +460,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield test
 
     def patch_different_values(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['patches'] = [
             {
                 'groups': ['control-plane', 'worker'],
@@ -475,7 +475,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield inventory
 
         def test(cluster: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'parameter = 0'))
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter = 1'))
@@ -483,7 +483,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield test
 
     def override_specific_nodes(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {
             'parameter1': 1,
             'parameter2': 1,
@@ -511,7 +511,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
                     },
                     'parameter6': {
                         'value': 1,
-                        'nodes': ['master-1']
+                        'nodes': ['control-plane-1']
                     },
                 }}
             }
@@ -522,25 +522,25 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         def test(cluster: demo.FakeKubernetesCluster):
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter1 = 1'))
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'parameter1 = 2'))
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter2 = 1'))
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'parameter2 = 2'))
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter3 = 1'))
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter4 = 1'))
-            self.assertEqual({'balancer-1', 'master-1'},
+            self.assertEqual({'balancer-1', 'control-plane-1'},
                              nodes_having_parameter(cluster, 'parameter5 = 1'))
-            self.assertEqual({'balancer-1', 'master-1'},
+            self.assertEqual({'balancer-1', 'control-plane-1'},
                              nodes_having_parameter(cluster, 'parameter6 = 1'))
 
         yield test
 
     def override_value_extended_format(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {
             'parameter1': {
                 'value': 1,
@@ -590,11 +590,11 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         def test(cluster: demo.FakeKubernetesCluster):
             self.assertEqual(set(),
                              nodes_having_parameter(cluster, 'parameter1 = 1'))
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'parameter1 = 2'))
             self.assertEqual(set(),
                              nodes_having_parameter(cluster, 'parameter2 = 1'))
-            self.assertEqual({'master-1'},
+            self.assertEqual({'control-plane-1'},
                              nodes_having_parameter(cluster, 'parameter2 = 2'))
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter3 = 1'))
@@ -606,13 +606,13 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
                              nodes_having_parameter(cluster, 'parameter4 = 2'))
             self.assertEqual(set(),
                              nodes_having_parameter(cluster, 'parameter5 = 1'))
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'parameter5 = 2'))
 
         yield test
 
     def override_few_times(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=4)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=4)
         inventory['services']['sysctl'] = {
             'parameter': 0,
         }
@@ -645,7 +645,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         def test(cluster: demo.FakeKubernetesCluster):
             self.assertEqual({'balancer-1'},
                              nodes_having_parameter(cluster, 'parameter = 0'))
-            self.assertEqual({'master-1', 'worker-2'},
+            self.assertEqual({'control-plane-1', 'worker-2'},
                              nodes_having_parameter(cluster, 'parameter = 1'))
             self.assertEqual({'worker-1'},
                              nodes_having_parameter(cluster, 'parameter = 2'))
@@ -655,7 +655,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield test
 
     def patches_override_defaults(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['patches'] = [
             {
                 'groups': ['control-plane', 'worker', 'balancer'],
@@ -683,9 +683,9 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield inventory
 
         def test(cluster: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1', 'worker-1', 'balancer-1'},
+            self.assertEqual({'control-plane-1', 'worker-1', 'balancer-1'},
                              nodes_having_parameter(cluster, 'net.ipv4.ip_forward = 0'))
-            self.assertEqual({'master-1', 'worker-1'},
+            self.assertEqual({'control-plane-1', 'worker-1'},
                              nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 0'))
             self.assertEqual(set(),
                              nodes_having_parameter(cluster, 'net.bridge.bridge-nf-call-iptables = 1'))
@@ -704,7 +704,7 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield test
 
     def sysctl_and_patches_override_defaults(self):
-        inventory = demo.generate_inventory(balancer=1, master=1, worker=1)
+        inventory = demo.generate_inventory(balancer=1, control_plane=1, worker=1)
         inventory['services']['sysctl'] = {
             'net.ipv4.ip_forward': 0,
             'kernel.panic': '',
@@ -724,13 +724,13 @@ class PatchesEnrichmentAndFinalization(unittest.TestCase):
         yield inventory
 
         def test(cluster: demo.FakeKubernetesCluster):
-            self.assertEqual({'master-1', 'balancer-1'},
+            self.assertEqual({'control-plane-1', 'balancer-1'},
                              nodes_having_parameter(cluster, 'net.ipv4.ip_forward = 0'))
             self.assertEqual({'worker-1'},
                              nodes_having_parameter(cluster, 'net.ipv4.ip_forward = 1'))
             self.assertEqual({'worker-1'},
                              nodes_having_parameter(cluster, 'kernel.panic = 10'))
-            self.assertEqual({'master-1', 'balancer-1'},
+            self.assertEqual({'control-plane-1', 'balancer-1'},
                              nodes_having_parameter(cluster, 'vm.overcommit_memory = 0'))
             self.assertEqual(set(),
                              nodes_having_parameter(cluster, 'vm.overcommit_memory = 1'))

@@ -18,16 +18,16 @@ from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.plugins import calico, manifest
 from kubemarine.plugins.calico import get_calico_manifest_processor, CalicoApiServerManifestProcessor
-from kubemarine.plugins.kubernetes_dashboard import get_dashboard_manifest_processor
+from kubemarine.plugins.kubernetes_dashboard import DashboardManifestProcessor
 from kubemarine.plugins.local_path_provisioner import LocalPathProvisionerManifestProcessor
 from kubemarine.plugins.manifest import Identity
-from kubemarine.plugins.nginx_ingress import get_ingress_nginx_manifest_processor
+from kubemarine.plugins.nginx_ingress import IngressNginxManifestProcessor
 
 MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
     Identity("calico"): get_calico_manifest_processor,
     Identity("calico", "apiserver"): CalicoApiServerManifestProcessor,
-    Identity("nginx-ingress-controller"): get_ingress_nginx_manifest_processor,
-    Identity("kubernetes-dashboard"): get_dashboard_manifest_processor,
+    Identity("nginx-ingress-controller"): IngressNginxManifestProcessor,
+    Identity("kubernetes-dashboard"): DashboardManifestProcessor,
     Identity("local-path-provisioner"): LocalPathProvisionerManifestProcessor,
 }
 

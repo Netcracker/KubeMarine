@@ -64,7 +64,7 @@ public_cluster_ip: "10.101.0.1"
 services:
 
   kubeadm:
-    kubernetesVersion: v1.24.2
+    kubernetesVersion: v1.30.1
     controlPlaneEndpoint: 'k8s.example.com:6443'
     imageRepository: artifactory.example.com:5443/registry.k8s.io
     networking:
@@ -157,7 +157,7 @@ services:
 
   thirdparties:
     /usr/bin/kubeadm:
-      source: 'https://example.com/kubernetes/v1.24.2/bin/linux/amd64/kubeadm'
+      source: 'https://example.com/kubernetes/v1.30.1/bin/linux/amd64/kubeadm'
       sha1: e5cdfcda337a5c8d59035da9db0c2b02913271d1
       groups:
         - control-plane
@@ -168,7 +168,7 @@ services:
       unpack: '/opt/cni/bin'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://example.com/calico/v3.24.2/calicoctl-linux-amd64'
+      source: 'https://example.com/calico/v3.27.3/calicoctl-linux-amd64'
 
   kernel_security:
     # For RHEL OS use selinux:
@@ -292,84 +292,20 @@ rbac:
       role: cluster-admin
       namespace: kube-system
 
-  psp:
+  admission: pss
+  pss:
     pod-security: enabled
-    oob-policies:
-      default: enabled
-      host-network: enabled
-      anyuid: enabled
-    custom-policies:
-      psp-list:
-      - apiVersion: policy/v1beta1
-        kind: PodSecurityPolicy
-        metadata:
-          name: most-restricted-psp
-          annotations:
-            seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
-            seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
-        spec:
-          privileged: false
-          # Allow core volume types.
-          hostPID: false
-          hostIPC: false
-          hostNetwork: false
-          volumes:
-            - 'configMap'
-            - 'emptyDir'
-            - 'projected'
-            - 'secret'
-            - 'downwardAPI'
-            - 'persistentVolumeClaim'
-          fsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          readOnlyRootFilesystem: true
-          runAsUser:
-            rule: 'MustRunAsNonRoot'
-          supplementalGroups:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          runAsGroup:
-            rule: 'MustRunAs'
-            ranges:
-              - min: 1
-                max: 65535
-          allowPrivilegeEscalation: false
-          seLinux:
-            rule: 'RunAsAny'
-          requiredDropCapabilities:
-            - ALL
-      roles-list:
-      - apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: most-restricted-psp-cr
-        rules:
-          - apiGroups: ['policy']
-            resources: ['podsecuritypolicies']
-            verbs:     ['use']
-            resourceNames:
-              - most-restricted-psp
-      bindings-list:
-      - kind: ClusterRoleBinding
-        apiVersion: rbac.authorization.k8s.io/v1
-        metadata:
-          name: most-restricted-psp-crb
-        roleRef:
-          kind: ClusterRole
-          name: most-restricted-psp-cr
-          apiGroup: rbac.authorization.k8s.io
-        subjects:
-          - kind: ServiceAccount
-            # it is possible to bind to non-existing SA in non-existing namespace
-            name: sa-name
-            namespace: sa-namespace
-
-
+    defaults:
+      enforce: restricted
+      enforce-version: latest
+      audit: restricted
+      audit-version: latest
+      warn: restricted
+      warn-version: latest
+    exemptions:
+      usernames: ["example-user1", "example-user2"]
+      runtimeClasses: ["example-class-1", "example-class-2"]
+      namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
 
 plugin_defaults:
   installation:
@@ -379,7 +315,7 @@ plugins:
 
   calico:
     install: true
-    version: v3.24.2
+    version: v3.27.3
     installation:
       priority: 0
     mode: ipip
@@ -389,19 +325,19 @@ plugins:
     typha:
       enabled: false
       replicas: 2
-      image: calico/typha:v3.24.2
+      image: calico/typha:v3.27.3
       nodeSelector:
         kubernetes.io/os: linux
     cni:
-      image: calico/cni:v3.24.2
+      image: calico/cni:v3.27.3
     node:
-      image: calico/node:v3.24.2
+      image: calico/node:v3.27.3
     kube-controllers:
-      image: calico/kube-controllers:v3.24.2
+      image: calico/kube-controllers:v3.27.3
       nodeSelector:
         kubernetes.io/os: linux
     apiserver:
-      image: calico/apiserver:v3.24.2
+      image: calico/apiserver:v3.27.3
       enabled: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -414,7 +350,7 @@ plugins:
     installation:
       priority: 1
     controller:
-      image: quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1
+      image: registry.k8s.io/ingress-nginx/controller:v1.10.1
       ssl:
         enableSslPassthrough: false
         default-certificate:
@@ -430,11 +366,11 @@ plugins:
       priority: 2
     hostname: 'dashboard.k8s.example.com'
     dashboard:
-      image: kubernetesui/dashboard:v2.0.0-rc2
+      image: kubernetesui/dashboard:v2.7.0
       nodeSelector:
         kubernetes.io/os: linux
     metrics-scraper:
-      image: kubernetesui/metrics-scraper:v1.0.2
+      image: kubernetesui/metrics-scraper:v1.0.8
       nodeSelector:
         kubernetes.io/os: linux
     ingress:

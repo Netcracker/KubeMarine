@@ -89,10 +89,6 @@ procedures = OrderedDict({
         'description': "Reconfigure managed Kubernetes cluster",
         'group': 'maintenance'
     },
-    'manage_psp': {
-        'description': "Manage PSP on Kubernetes cluster",
-        'group': 'maintenance'
-    },
     'manage_pss': {
         'description': "Manage PSS on Kubernetes cluster",
         'group': 'maintenance'

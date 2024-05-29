@@ -6,20 +6,6 @@ metadata:
   name: iperf3
   namespace: default
 ---
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: iperf3-psp-rb
-  namespace: default
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: oob-privileged-psp-cr
-subjects:
-- kind: ServiceAccount
-  name: iperf3
-  namespace: default
----
 
 apiVersion: apps/v1
 kind: Deployment

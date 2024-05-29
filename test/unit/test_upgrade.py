@@ -1098,7 +1098,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
         # pylint: disable-next=attribute-defined-outside-init
         self.context = demo.create_silent_context(['fake_path.yaml', '--tasks', tasks_filter], procedure='upgrade')
 
-        kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'master', 'control-plane'})]
+        kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'control-plane'})]
         with utils.mock_call(kubernetes.autodetect_non_upgraded_nodes, return_value=kubernetes_nodes):
             return self.run_actions()
 
@@ -1121,7 +1121,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
         return [node for node in self.inventory['nodes'] if set(node['roles']) & roles]
 
     def _first_control_plane(self) -> dict:
-        return self._get_nodes({'master', 'control-plane'})[0]
+        return self._get_nodes({'control-plane'})[0]
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
@@ -1132,9 +1132,6 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
                 self.setUpVersions(old, [new])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
 
                 res = self._run_kubernetes_task()
 
@@ -1157,9 +1154,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
                 self.setUpVersions('v1.27.13', ['v1.28.9'])
-                self.inventory.setdefault('rbac', {}).update({
-                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
-                })
+
                 initial_feature_gates = 'PodSecurity=true'
                 if custom_feature_gates:
                     self.inventory['services']['kubeadm'].update(

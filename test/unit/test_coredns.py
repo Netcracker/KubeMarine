@@ -27,12 +27,12 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         configmap_hosts = '''127.0.0.1  localhost localhost.localdomain
 10.101.2.1   k8s.fake.local control-plain
-192.168.0.1  master-1.k8s.fake.local master-1
-10.101.1.1   master-1-external.k8s.fake.local master-1-external
-192.168.0.2  master-2.k8s.fake.local master-2
-10.101.1.2   master-2-external.k8s.fake.local master-2-external
-192.168.0.3  master-3.k8s.fake.local master-3
-10.101.1.3   master-3-external.k8s.fake.local master-3-external
+192.168.0.1  control-plane-1.k8s.fake.local control-plane-1
+10.101.1.1   control-plane-1-external.k8s.fake.local control-plane-1-external
+192.168.0.2  control-plane-2.k8s.fake.local control-plane-2
+10.101.1.2   control-plane-2-external.k8s.fake.local control-plane-2-external
+192.168.0.3  control-plane-3.k8s.fake.local control-plane-3
+10.101.1.3   control-plane-3-external.k8s.fake.local control-plane-3-external
 '''
         generated_hosts = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
         default_hosts = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
@@ -100,12 +100,12 @@ class CorednsGenerator(unittest.TestCase):
             },
             'etc_hosts_generated': {
                 '10.101.2.1': ['k8s.fake.local', 'control-plain'],
-                '192.168.0.1': ['master-1.k8s.fake.local', 'master-1'],
-                '10.101.1.1': ['master-1-external.k8s.fake.local', 'master-1-external'],
-                '192.168.0.2':  ['master-2.k8s.fake.local', 'master-2'],
-                '10.101.1.2':   ['master-2-external.k8s.fake.local', 'master-2-external'],
-                '192.168.0.3':  ['master-3.k8s.fake.local', 'master-3'],
-                '10.101.1.3':   ['master-3-external.k8s.fake.local', 'master-3-external']
+                '192.168.0.1': ['control-plane-1.k8s.fake.local', 'control-plane-1'],
+                '10.101.1.1': ['control-plane-1-external.k8s.fake.local', 'control-plane-1-external'],
+                '192.168.0.2':  ['control-plane-2.k8s.fake.local', 'control-plane-2'],
+                '10.101.1.2':   ['control-plane-2-external.k8s.fake.local', 'control-plane-2-external'],
+                '192.168.0.3':  ['control-plane-3.k8s.fake.local', 'control-plane-3'],
+                '10.101.1.3':   ['control-plane-3-external.k8s.fake.local', 'control-plane-3-external']
             }
         }
 
@@ -137,12 +137,12 @@ data:
   Hosts: |
     127.0.0.1 localhost localhost.localdomain
     10.101.2.1   k8s.fake.local control-plain
-    192.168.0.1  master-1.k8s.fake.local master-1
-    10.101.1.1   master-1-external.k8s.fake.local master-1-external
-    192.168.0.2  master-2.k8s.fake.local master-2
-    10.101.1.2   master-2-external.k8s.fake.local master-2-external
-    192.168.0.3  master-3.k8s.fake.local master-3
-    10.101.1.3   master-3-external.k8s.fake.local master-3-external
+    192.168.0.1  control-plane-1.k8s.fake.local control-plane-1
+    10.101.1.1   control-plane-1-external.k8s.fake.local control-plane-1-external
+    192.168.0.2  control-plane-2.k8s.fake.local control-plane-2
+    10.101.1.2   control-plane-2-external.k8s.fake.local control-plane-2-external
+    192.168.0.3  control-plane-3.k8s.fake.local control-plane-3
+    10.101.1.3   control-plane-3-external.k8s.fake.local control-plane-3-external
     
 ''', config)
 
@@ -152,7 +152,7 @@ data:
         cluster.inventory['services']['coredns']['add_etc_hosts_generated'] = True
         config = coredns.generate_configmap(cluster.inventory)
         self.assertIn('Hosts: |', config)
-        self.assertIn('192.168.0.2  master-1.k8s.fake.local', config)
+        self.assertIn('192.168.0.2  control-plane-1.k8s.fake.local', config)
 
     def test_configmap_generation_with_corefile_defaults(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)

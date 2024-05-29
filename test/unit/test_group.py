@@ -26,40 +26,40 @@ from kubemarine.demo import FakeKubernetesCluster
 class TestGroupCreation(unittest.TestCase):
 
     # Test should from the following cluster:
-    # master-1 roles: [master, worker]
+    # control-plane-1 roles: [control-plane, worker]
     # worker-1 roles: [worker]
     # Get only node with single worker role using filter lambda function
     def test_new_group_from_lambda_filter(self):
-        multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
+        multirole_inventory = demo.generate_inventory(balancer=0, control_plane=1, worker=['control-plane-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
         expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
-        filtered_group = cluster.nodes['worker'].new_group(apply_filter=lambda node: 'master' not in node['roles'])
+        filtered_group = cluster.nodes['worker'].new_group(apply_filter=lambda node: 'control-plane' not in node['roles'])
 
         self.assertEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
 
     def test_exclude_group(self):
-        inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
+        inventory = demo.generate_inventory(balancer=2, control_plane=2, worker=0)
         cluster = demo.new_cluster(inventory)
 
         result_group = cluster.nodes['all'].exclude_group(cluster.nodes['balancer'])
 
-        self.assertEqual(cluster.nodes['master'].nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(cluster.nodes['control-plane'].nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_exclude_group_2(self):
-        multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
+        multirole_inventory = demo.generate_inventory(balancer=0, control_plane=1, worker=['control-plane-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
         expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
-        result_group = cluster.nodes['worker'].exclude_group(cluster.nodes['master'])
+        result_group = cluster.nodes['worker'].exclude_group(cluster.nodes['control-plane'])
 
         self.assertEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_include_group(self):
-        inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
+        inventory = demo.generate_inventory(balancer=2, control_plane=2, worker=0)
         cluster = demo.new_cluster(inventory)
 
-        result_group = cluster.nodes['balancer'].include_group(cluster.nodes['master'])
+        result_group = cluster.nodes['balancer'].include_group(cluster.nodes['control-plane'])
 
         self.assertEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
 
@@ -157,8 +157,8 @@ class TestGroupCall(unittest.TestCase):
 
     def test_write_stream(self):
         expected_data = 'hello\nworld'
-        self.cluster.nodes['master'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
-        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['master'].get_hosts(), '/tmp/test/file.txt')
+        self.cluster.nodes['control-plane'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
+        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['control-plane'].get_hosts(), '/tmp/test/file.txt')
 
         for host, actual_data in actual_data_group.items():
             self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal for node %s" % host)

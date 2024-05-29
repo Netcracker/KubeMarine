@@ -112,7 +112,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         }
         self.reconfigure['services']['kubeadm_patches'] = {
             'apiServer': [
-                {'nodes': ['master-1'], 'patch': {'api_kp2': 'api_vp2_new'}},
+                {'nodes': ['control-plane-1'], 'patch': {'api_kp2': 'api_vp2_new'}},
                 {'<<': 'merge'}
             ],
             'kubelet': [
@@ -143,7 +143,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         apiserver_certsans = services['kubeadm']['apiServer']['certSANs']
         self.assertNotIn('san1', apiserver_certsans)
         self.assertIn('san2_new', apiserver_certsans)
-        self.assertEqual(enriched, 'master-1' in apiserver_certsans)
+        self.assertEqual(enriched, 'control-plane-1' in apiserver_certsans)
 
         self.assertEqual('5m0s', services['kubeadm']['apiServer']['timeoutForControlPlane'])
 
@@ -176,7 +176,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
 
         kubeadm_patches = services['kubeadm_patches']
         self.assertEqual([
-            {'nodes': ['master-1'], 'patch': {'api_kp2': 'api_vp2_new'}},
+            {'nodes': ['control-plane-1'], 'patch': {'api_kp2': 'api_vp2_new'}},
             {'groups': ['control-plane'], 'patch': {'api_kp1': 'api_vp1'}}
         ], kubeadm_patches['apiServer'])
 
@@ -197,8 +197,6 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['mountPath'])
 
     def test_pss_managed_arg_not_redefined(self):
-        self.inventory.setdefault('rbac', {})['admission'] = 'pss'
-        self.inventory['rbac']['pss'] = {'pod-security': 'enabled'}
         self.reconfigure['services']['kubeadm'] = {
             'apiServer': {
                 'extraArgs': {'admission-control-config-file': '/some/redefined/path'},
@@ -234,37 +232,27 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
                 Exception, re.escape(kubernetes.ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE % 'kubelet')):
             self.new_cluster()
 
-    def test_kubeadm_before_v1_25x_supports_patches(self):
-        kubernetes_version = 'v1.24.11'
+    def test_kubeadm_supports_patches(self):
+        kubernetes_version = 'v1.25.2'
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         self.reconfigure['services']['kubeadm_patches'] = {
             'apiServer': [
-                {'nodes': ['master-1'], 'patch': {'api_key': 'api_value'}},
+                {'nodes': ['control-plane-1'], 'patch': {'api_key': 'api_value'}},
             ],
             'etcd': [
                 {'groups': ['control-plane'], 'patch': {'etcd_key': 'api_value'}},
-            ]
+            ],
+            'kubelet': [
+                {'nodes': ['control-plane-1'], 'patch': {'maxPods': 111}},
+            ],
         }
         # No error should be raised
         self.new_cluster()
 
-    def test_error_kubeadm_before_v1_25x_dont_support_patches_kubelet(self):
-        kubernetes_version = 'v1.24.11'
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
-        self.reconfigure['services']['kubeadm_patches'] = {
-            'kubelet': [
-                {'nodes': ['master-1'], 'patch': {'maxPods': 111}},
-            ]
-        }
-        with self.assertRaisesRegex(
-                Exception, re.escape(kubernetes.ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(
-                    version=kubernetes_version))):
-            self.new_cluster()
-
 
 class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):
     def setUp(self):
-        self.setUpScheme({'balancer': 1, 'master': 1, 'worker': 1})
+        self.setUpScheme({'balancer': 1, 'control_plane': 1, 'worker': 1})
 
     def test_enrich_and_finalize_inventory(self):
         self.inventory['services']['sysctl'] = {
@@ -329,12 +317,12 @@ class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):
         self._test_enrich_and_finalize_inventory_check(cluster3)
 
     def _test_enrich_and_finalize_inventory_check(self, cluster: demo.FakeKubernetesCluster):
-        all_nodes = {'balancer-1', 'master-1', 'worker-1'}
+        all_nodes = {'balancer-1', 'control-plane-1', 'worker-1'}
         self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter1 = 2'))
         self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter2 = 2'))
         self.assertEqual(all_nodes, self._nodes_having_parameter(cluster, 'parameter3 = 2'))
         self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter4 = 1'))
-        self.assertEqual({'master-1'}, self._nodes_having_parameter(cluster, 'parameter4 = 2'))
+        self.assertEqual({'control-plane-1'}, self._nodes_having_parameter(cluster, 'parameter4 = 2'))
         self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter5 = 1'))
         self.assertEqual({'worker-1'}, self._nodes_having_parameter(cluster, 'parameter5 = 2'))
         self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter6 = 1'))
@@ -343,7 +331,7 @@ class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):
         self.assertEqual(set(), self._nodes_having_parameter(cluster, 'parameter7 = 2'))
         self.assertEqual({'balancer-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 1'))
         self.assertEqual({'worker-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 2'))
-        self.assertEqual({'master-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 3'))
+        self.assertEqual({'control-plane-1'}, self._nodes_having_parameter(cluster, 'parameter8 = 3'))
 
     def test_invalid(self):
         for name, parameter, msg, in (
@@ -362,7 +350,7 @@ class ReconfigureSysctlEnrichment(_AbstractReconfigureTest):
                 (
                         'kernel.pid_max_error_less_than_required',
                         {'kernel.pid_max': 10000},
-                        sysctl.ERROR_PID_MAX_REQUIRED.format(node='master-1', value=10000, required=452608)
+                        sysctl.ERROR_PID_MAX_REQUIRED.format(node='control-plane-1', value=10000, required=452608)
                 ),
                 (
                         'ambiguous_conntrack_max',
@@ -450,14 +438,14 @@ class RunTasks(_AbstractReconfigureTest):
     def test_prepare_sysctl_detect_changes_kubelet_maxPods_changed(self):
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
-                {'nodes': ['master-1'], 'patch': {'maxPods': 105}},
+                {'nodes': ['control-plane-1'], 'patch': {'maxPods': 105}},
             ]
         }
         expected_called = ['kubelet']
         with self._sysctl_reconfigured(True), self._kubernetes_components_reconfigured(expected_called):
             res = self._run()
             cluster = res.cluster_if_initialized()
-            control_plane_1 = cluster.make_group_from_nodes(['master-1'])
+            control_plane_1 = cluster.make_group_from_nodes(['control-plane-1'])
             control_plane_1_config = cluster.nodes_inventory[control_plane_1.get_host()]
             self.assertEqual(432128, control_plane_1_config['services']['sysctl']['kernel.pid_max']['value'])
 
