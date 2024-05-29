@@ -19,6 +19,7 @@ import unittest
 
 from kubemarine import demo
 from kubemarine.core import flow
+from kubemarine.core.cluster import EnrichmentStage
 from kubemarine.procedures import do
 
 
@@ -44,6 +45,10 @@ class DoTest(unittest.TestCase):
             flow.ActionsFlow([do.CLIAction(context)]).run_flow(resources, print_summary=False)
 
         self.assertEqual('v0.28.0\n', buf.getvalue(), "Unexpected stdout output")
+
+        cluster = resources.cluster(EnrichmentStage.LIGHT)
+        self.assertEqual(['master'], cluster.inventory['nodes'][0]['roles'])
+        self.assertEqual('control-plane-1', cluster.make_group_from_roles(['control-plane', 'master']).get_node_name())
 
     def test_command_run_any_node(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)

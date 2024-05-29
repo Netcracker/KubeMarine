@@ -430,6 +430,7 @@ class DynamicResources:
             kubemarine.core.defaults.apply_connection_defaults,
             kubemarine.core.defaults.calculate_nodegroups,
             kubemarine.core.defaults.remove_service_roles,
+            kubemarine.kubernetes.verify_roles,
             # Enrichment of inventory for LIGHT stage should be finished at this step.
 
             # Validation of procedure inventory enrichment after compilation

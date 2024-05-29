@@ -4,7 +4,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
     - [Command did not complete within a number of seconds](#command-did-not-complete-within-a-number-of-seconds)
-  - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
+  - [KME0004: There are no control planes defined in the cluster scheme](#kme0004-there-are-no-control-planes-defined-in-the-cluster-scheme)
   - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl Script](#etcdctl-script)
@@ -167,18 +167,18 @@ frozen stage of the procedure. It will be useful to check the cluster with
 [IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity.
 
 
-## KME0004: There are no workers defined in the cluster scheme
+## KME0004: There are no control planes defined in the cluster scheme
 
 ```
 FAILURE!
-KME0004: There are no workers defined in the cluster scheme
+KME0004: There are no control planes defined in the cluster scheme
 ```
 
-An error related with the absence of any worker role in the inventory file. The error occurs before
+An error related with the absence of any control plane role in the inventory file. The error occurs before
 the payload is executed on the cluster.
 
-To fix it, you need to either specify new nodes with the `worker` role, or add the `worker` role to 
-the existing control-planes nodes.
+To fix it, you need to either specify new nodes with the `control-plane` role, or add the `control-plane` role to 
+the existing worker nodes.
 
 An example of specifying different nodes with separate `control-plane` and `worker` roles is as follows.
 

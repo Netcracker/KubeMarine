@@ -33,7 +33,7 @@ def get_kme_dictionary() -> dict:
             "name": "Remote group exception\n{reason}"
         },
         "KME0004": {
-            "name": "There are no workers defined in the cluster scheme"
+            "name": "There are no control planes defined in the cluster scheme"
         },
         "KME0005": {
             "name": "{hostnames} are not sudoers"

@@ -24,6 +24,8 @@ from test.unit import utils as test_utils
 import invoke
 
 from kubemarine.core import flow, static, utils
+from kubemarine.core.cluster import EnrichmentStage
+from kubemarine.procedures import do
 from kubemarine import demo
 
 
@@ -484,6 +486,42 @@ class FlowTest(unittest.TestCase):
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
+
+    def test_detect_nodes_context_do_procedure(self):
+        inventory = {
+            'nodes': [{'roles': ['master'], 'internal_address': '1.1.1.1', 'address': '1.1.1.1', 'keyfile': '/dev/null'}]
+        }
+        hosts = ['1.1.1.1']
+        self._stub_detect_nodes_context(inventory, hosts, hosts)
+
+        results = demo.create_hosts_result(hosts, stdout='root\n', hide=False)
+        self.light_fake_shell.add(results, 'sudo', ['whoami'])
+
+        context = do.create_context(['--', 'whoami'])
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
+
+        flow.ActionsFlow([do.CLIAction(context)]).run_flow(res, print_summary=False)
+
+        cluster = res.cluster(EnrichmentStage.LIGHT)
+        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual(1, len(cluster.nodes_context))
+        for node_context in cluster.nodes_context.values():
+            self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
+            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual('eth0', node_context["active_interface"])
+
+    def test_do_master_offline(self):
+        inventory = {
+            'nodes': [{'roles': ['master'], 'internal_address': '1.1.1.1', 'address': '1.1.1.1', 'keyfile': '/dev/null'}]
+        }
+        self._stub_detect_nodes_context(inventory, [], [])
+
+        context = do.create_context(['--', 'whoami'])
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
+
+        with test_utils.assert_raises_kme(self, 'KME0006', escape=True,
+                                          offline=['1.1.1.1'], inaccessible=[]):
+            res.cluster(EnrichmentStage.LIGHT)
 
     def test_kubernetes_version_not_allowed(self):
         k8s_versions = list(sorted(static.KUBERNETES_VERSIONS["compatibility_map"], key=utils.version_key))
