@@ -4276,14 +4276,14 @@ The certificate and key are provided using one of the following two formats:
               key: /path/to/key
     ```
 
-If the intermediate certificate should be specified, set it in `/path/to/cert` file or in `nginx-ingress-controller.controller.ssl.default-certificate.data.cert` option after the `ingress` certificate:
+If the intermediate certificate should be specified, set it in `/path/to/cert` file or in `nginx-ingress-controller.controller.ssl.default-certificate.data.cert` option after the default ingress certificate:
 
 ```
 -----BEGIN CERTIFICATE-----
-<Ingress       certificate>
+<Default ingress certificate>
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-<Intermediate  certificate>
+<Intermediate    certificate>
 -----END CERTIFICATE-----
 ```
 
