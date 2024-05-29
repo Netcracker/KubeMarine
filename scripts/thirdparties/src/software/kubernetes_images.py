@@ -11,15 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import re
 from collections import OrderedDict
 from typing import List, Dict
 
+from kubemarine import kubernetes
+from kubemarine.core import utils
 from . import thirdparties, SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
 from ..shell import run
 from ..tracker import SummaryTracker, ComposedTracker
 
 # pylint: disable=bad-builtin
+
+ERROR_ASCENDING_VERSIONS = \
+    "Kubernetes images should have non-decreasing versions. " \
+    "Image '{image}' has version {older_version} for Kubernetes {older_k8s_version}, " \
+    "and has lower version {newer_version} for newer Kubernetes {newer_k8s_version}."
 
 
 class KubernetesImagesResolver:
@@ -68,6 +75,8 @@ class KubernetesImages(SoftwareType):
                 }
                 compatibility_map.reset_software_settings(image_name, k8s_version, new_settings)
 
+            validate_compatibility_map(compatibility_map, image_name)
+
         return compatibility_map
 
 
@@ -81,3 +90,32 @@ def get_k8s_images_mapping(images_resolver: KubernetesImagesResolver, k8s_versio
             k8s_images_mapping.setdefault(image_name, OrderedDict()).setdefault(k8s_version, version)
 
     return k8s_images_mapping
+
+
+def validate_compatibility_map(compatibility_map: CompatibilityMap, image_name: str) -> None:
+    image_mapping: dict = compatibility_map.compatibility_map[image_name]
+    k8s_versions = list(image_mapping)
+
+    for i, older_k8s_version in enumerate(k8s_versions):
+        for j in range(i + 1, len(k8s_versions)):
+            newer_k8s_version = k8s_versions[j]
+            if not kubernetes.is_version_upgrade_possible(older_k8s_version, newer_k8s_version):
+                continue
+
+            older_version = image_mapping[older_k8s_version]['version']
+            newer_version = image_mapping[newer_k8s_version]['version']
+            if image_version_key(image_name, newer_version) < image_version_key(image_name, older_version):
+                raise Exception(ERROR_ASCENDING_VERSIONS.format(
+                    image=image_name,
+                    older_k8s_version=older_k8s_version, newer_k8s_version=newer_k8s_version,
+                    older_version=older_version, newer_version=newer_version
+                ))
+
+
+def image_version_key(image_name: str, version: str) -> tuple:
+    if image_name == 'pause':
+        return tuple(map(int, version.split('.')))
+    elif image_name == 'etcd':
+        return tuple(map(int, re.split('[.-]', version)))
+    else:
+        return utils.version_key(version)

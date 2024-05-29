@@ -125,6 +125,7 @@ def resolve_new_settings(compatibility_map: CompatibilityMap, package_name: str,
         package_settings = new_settings
         key = utils.version_key
         prev_k8s_version = max((v for v in package_mapping if key(v) < key(k8s_version)),
+                               key=key,
                                default=None)
         if prev_k8s_version is not None:
             print(f"Mapping for package {package_name!r} and Kubernetes {k8s_version} does not exist. "

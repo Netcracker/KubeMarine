@@ -22,13 +22,14 @@ from unittest import mock
 from test.unit import utils as test_utils
 from test.unit.tools.thirdparties.stub import (
     FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
-    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig
+    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig,
+    FakeKubernetesImagesResolver
 )
 
 from kubemarine.core import utils, static
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, Processor, Identity
-from scripts.thirdparties.src.software import thirdparties, plugins
+from scripts.thirdparties.src.software import thirdparties, plugins, kubernetes_images
 from scripts.thirdparties.src.software.plugins import (
     ManifestResolver, ManifestsEnrichment,
     ERROR_UNEXPECTED_IMAGE, ERROR_SUSPICIOUS_ABA_VERSIONS
@@ -48,6 +49,7 @@ class SynchronizationTest(unittest.TestCase):
     def setUp(self) -> None:
         self.compatibility = FakeInternalCompatibility()
         self.kubernetes_versions = FakeKubernetesVersions()
+        self.images_resolver = FakeKubernetesImagesResolver()
         self.manifest_resolver = FAKE_CACHED_MANIFEST_RESOLVER
         self.manifests_enrichment = NoneManifestsEnrichment()
         self.upgrade_config = FakeUpgradeConfig()
@@ -156,9 +158,11 @@ class SynchronizationTest(unittest.TestCase):
     def _check_added_k8s_images(self, ver: str, _: str):
         for k8s_image in ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler', 'kube-proxy',
                           'pause', 'etcd', 'coredns/coredns'):
+            expected_version = self.images_resolver.stub_image(ver, k8s_image).split(':')[1]
+
             software_mapping = self.compatibility.stored['kubernetes_images.yaml'][k8s_image]
             actual_mapping = software_mapping.get(ver, {})
-            self.assertEqual(f"fake-{k8s_image}-version",
+            self.assertEqual(expected_version,
                              actual_mapping.get('version'),
                              f"Version for {k8s_image!r} and Kubernetes {ver} was not synced")
             self.assertTrue(utils.is_sorted(list(software_mapping), key=utils.version_key),
@@ -382,6 +386,52 @@ class SynchronizationTest(unittest.TestCase):
                 with self.assertRaisesRegex(Exception, ERROR_SUSPICIOUS_ABA_VERSIONS.format(**kwargs)):
                     self.run_sync()
 
+    def test_kubernetes_images_not_ascending_order(self):
+        k8s_versions = self.latest_patch_k8s_versions()
+        if len(k8s_versions) == 1:
+            self.skipTest("Cannot check kubernetes images ascending order for the only minor Kubernetes version.")
+
+        for image_name in ('pause', 'etcd', 'coredns/coredns'):
+            with self.subTest(image_name):
+                k8s_oldest = k8s_versions[0]
+                k8s_latest = k8s_versions[-1]
+                k8s_new = test_utils.increment_version(k8s_oldest)
+
+                self.kubernetes_versions = FakeKubernetesVersions()
+                self.compatibility_map()[k8s_new] = deepcopy(self.compatibility_map()[k8s_oldest])
+
+                image_oldest = ORIGINAL_COMPATIBILITY_MAPS['kubernetes_images.yaml'][image_name][k8s_oldest]['version']
+                image_latest = ORIGINAL_COMPATIBILITY_MAPS['kubernetes_images.yaml'][image_name][k8s_latest]['version']
+
+                if image_name in ('pause', 'etcd'):
+                    new_image_version = image_latest[:-1] + str(int(image_latest[-1]) + 1)
+                else:
+                    new_image_version = test_utils.increment_version(image_latest)
+
+                class FakeResolver(FakeKubernetesImagesResolver):
+                    def resolve(self, k8s_version: str) -> List[str]:
+                        # pylint: disable=cell-var-from-loop
+
+                        k8s_resolve = k8s_oldest if k8s_version == k8s_new else k8s_version
+                        images = super().resolve(k8s_resolve)
+                        if k8s_version == k8s_new:
+                            for i, image in enumerate(images):
+                                if image_name in image:
+                                    images[i] = image.replace(image_oldest, new_image_version)
+                                    break
+
+                        return images
+
+                self.images_resolver = FakeResolver()
+
+                kwargs = {
+                    'image': re.escape(image_name),
+                    'older_version': re.escape(new_image_version), 'older_k8s_version': re.escape(k8s_new),
+                    'newer_version': '.*', 'newer_k8s_version': '.*',
+                }
+                with self.assertRaisesRegex(Exception, kubernetes_images.ERROR_ASCENDING_VERSIONS.format(**kwargs)):
+                    self.run_sync()
+
     def test_manifests_enrichment_add_new_version(self):
         k8s_latest = self.k8s_versions()[-1]
         new_version = test_utils.increment_version(k8s_latest)
@@ -532,6 +582,7 @@ class SynchronizationTest(unittest.TestCase):
         return FakeSynchronization(
             self.compatibility,
             self.kubernetes_versions,
+            self.images_resolver,
             self.manifest_resolver,
             self.manifests_enrichment,
             self.upgrade_config,

@@ -57,15 +57,23 @@ class FakeKubernetesImagesResolver(KubernetesImagesResolver):
         kubernetes_images: dict = yaml.safe_load(stream)
 
     def resolve(self, k8s_version: str) -> List[str]:
-        kubernetes_images = FakeKubernetesImagesResolver.kubernetes_images
-        if any(k8s_version in mapping for mapping in kubernetes_images.values()):
-            return [f"k8s.gcr.io/{name}:{mapping[k8s_version]['version']}"
-                    for name, mapping in kubernetes_images.items()
-                    if k8s_version in mapping]
+        return [self.stub_image(k8s_version, name)
+                for name in ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler', 'kube-proxy',
+                             'pause', 'etcd', 'coredns/coredns')]
+
+    def stub_image(self, k8s_version: str, name: str) -> str:
+        if name.startswith('kube-'):
+            return f"k8s.gcr.io/{name}:{k8s_version}"
         else:
-            return [f"k8s.gcr.io/{name}:fake-{name}-version"
-                    for name in ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler', 'kube-proxy',
-                                 'pause', 'etcd', 'coredns/coredns']]
+            mapping = FakeKubernetesImagesResolver.kubernetes_images[name]
+            key = utils.version_key
+            near_k8s_version = max((v for v in mapping if key(v) <= key(k8s_version)),
+                                   key=key,
+                                   default=None)
+            if near_k8s_version is None:
+                return f"k8s.gcr.io/{name}:fake-{name}-version"
+            else:
+                return f"k8s.gcr.io/{name}:{mapping[near_k8s_version]['version']}"
 
 
 class FakeManifest(Manifest):
@@ -157,6 +165,7 @@ class FakeSynchronization(Synchronization):
     def __init__(self,
                  compatibility: FakeInternalCompatibility,
                  kubernetes_versions: FakeKubernetesVersions,
+                 images_resolver: FakeKubernetesImagesResolver,
                  manifest_resolver=FAKE_CACHED_MANIFEST_RESOLVER,
                  manifests_enrichment=NoneManifestsEnrichment(),
                  upgrade_config=FakeUpgradeConfig(),
@@ -164,7 +173,7 @@ class FakeSynchronization(Synchronization):
         super().__init__(
             compatibility,
             kubernetes_versions,
-            FakeKubernetesImagesResolver(),
+            images_resolver,
             manifest_resolver,
             FakeThirdpartyResolver(),
             manifests_enrichment,
