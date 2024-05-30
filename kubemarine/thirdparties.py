@@ -329,24 +329,34 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
     # is destination directory exists?
     remote_commands += 'mkdir -p %s' % destination_directory
 
+    if config.get('sha1') is not None:
+        cluster.log.verbose('SHA1 hash is defined, it will be used during installation')
+
     if is_curl:
         cluster.log.verbose('Installation via curl download detected')
         if config.get('sha1') is not None:
-            cluster.log.verbose('SHA1 hash is defined, it will be used during installation')
             # if hash equal, then stop further actions immediately! unpack should not be performed too
-            remote_commands += ' && FILE_HASH=$(sudo openssl sha1 %s | sed "s/^.* //"); ' \
-                               '[ "%s" == "${FILE_HASH}" ] && exit 0 || true ' % (destination, config['sha1'])
-        remote_commands += (' && sudo rm -f %s && sudo curl --max-time %d -k -f -g -L %s -o %s && '
+            remote_commands += (' && [ -f %s ] && [ "%s" == "$(sudo openssl sha1 %s | sed "s/^.* //")" ]'
+                                ' && exit 0 || true '
+                                % (destination, config['sha1'], destination))
+        remote_commands += (' && sudo rm -f %s && sudo curl --max-time %d -k -f -g -s --show-error -L %s -o %s && '
                             % (destination, cluster.inventory['globals']['timeout_download'], config['source'], destination))
     else:
         cluster.log.verbose('Installation via sftp upload detected')
-        cluster.log.debug(common_group.sudo(remote_commands))
-        remote_commands = ''
-        # TODO: Possible use SHA1 from inventory instead of calculating if provided?
-        script = utils.read_internal(config['source'])
-        common_group.put(io.StringIO(script), destination, sudo=True)
+        if config.get('sha1') is not None:
+            remote_commands += (' && [ -f %s ] && sudo openssl sha1 %s | sed "s/^.* //" || true'
+                                % (destination, destination))
 
-        # TODO: Do not upload local files if they already exists on remote machines
+        result = common_group.sudo(remote_commands)
+        group_to_upload = common_group
+        compare_hashes = True
+        if config.get('sha1') is not None:
+            group_to_upload = common_group.exclude_group(result.get_nodes_group_where_value_in_stdout(config['sha1']))
+            compare_hashes = False
+
+        remote_commands = ''
+        script = utils.read_internal(config['source'])
+        group_to_upload.put(io.StringIO(script), destination, sudo=True, compare_hashes=compare_hashes)
 
     remote_commands += 'sudo chmod %s %s' % (config['mode'], destination)
     remote_commands += ' && sudo chown %s %s' % (config['owner'], destination)
