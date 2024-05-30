@@ -185,7 +185,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
 
             exe.cluster.log.debug("Installing latest containerd on %s node" % node.get_node_name())
             # always install latest available containerd
-            packages.install(node, include=os_specific_associations['package_name'], callback=collector)
+            packages.install(node, include=os_specific_associations['package_name'], pty=True, callback=collector)
 
             # remove previous config.toml to avoid problems in case when previous config was broken
             node.sudo("rm -f %s && sudo systemctl restart %s"

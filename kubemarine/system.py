@@ -370,7 +370,7 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         if cordon_required:
             res = first_control_plane.sudo(
                 kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
-                warn=True)
+                warn=True, pty=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)

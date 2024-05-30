@@ -661,7 +661,7 @@ def _reconfigure_apiserver_certsans(node: DeferredGroup, reconfigure_config: str
     # create cert
     node.sudo(f'{apiserver_certs} -delete')
     init_phase = COMPONENTS_CONSTANTS['kube-apiserver/cert-sans']['init_phase']
-    node.sudo(f'kubeadm init phase {init_phase} --config {reconfigure_config}')
+    node.sudo(f'kubeadm init phase {init_phase} --config {reconfigure_config}', pty=True)
 
 
 def _reconfigure_control_plane_component(cluster: KubernetesCluster, node: DeferredGroup, component: str,
@@ -675,7 +675,7 @@ def _reconfigure_control_plane_component(cluster: KubernetesCluster, node: Defer
 
     # update
     init_phase = COMPONENTS_CONSTANTS[component]['init_phase']
-    node.sudo(f'kubeadm init phase {init_phase} --config {reconfigure_config}')
+    node.sudo(f'kubeadm init phase {init_phase} --config {reconfigure_config}', pty=True)
 
     # compare
     node.sudo(f'cat {backup_file}', callback=collector)
@@ -738,7 +738,7 @@ def _reconfigure_kubelet(cluster: KubernetesCluster, node: DeferredGroup,
     node.sudo(f"cp {config} {backup_file}")
 
     # update
-    node.sudo(f'kubeadm upgrade node phase kubelet-config --patches=/etc/kubernetes/patches')
+    node.sudo(f'kubeadm upgrade node phase kubelet-config --patches=/etc/kubernetes/patches', pty=True)
 
     # compare
     node.sudo(f'cat {backup_file}', callback=collector)
@@ -996,7 +996,7 @@ def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components:
     # Take into account probably missed container because kubelet may be restarting them at this moment.
     # Though still ensure the command to delete the container successfully if it is present.
     restart_container = ("(set -o pipefail && sudo crictl ps --name {component} -q "
-                         "| xargs -I CONTAINER sudo crictl rm -f CONTAINER)")
+                         "| xargs -I CONTAINER sudo crictl rm -f CONTAINER) > /dev/null")
 
     for component in components:
         commands.append(restart_container.format(component=component))
@@ -1029,7 +1029,7 @@ def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components:
     node.wait_commands_successful(commands,
                                   timeout=expect_config['timeout'],
                                   retries=expect_config['retries'],
-                                  sudo=False)
+                                  sudo=False, pty=True)
 
 
 def _delete_pods(cluster: KubernetesCluster, node: AbstractGroup[RunResult],

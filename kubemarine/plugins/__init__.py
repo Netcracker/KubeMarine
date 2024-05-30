@@ -460,7 +460,7 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
 
     while retries > 0:
 
-        result = control_plane.sudo(command, warn=True)
+        result = control_plane.sudo(command, warn=True, pty=True)
 
         stdout = list(result.values())[0].stdout
         running_pods_stdout = ''

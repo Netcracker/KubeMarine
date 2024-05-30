@@ -104,7 +104,7 @@ def stop_cluster(cluster: KubernetesCluster) -> None:
         'sudo crictl ps -a; '
         'sudo rm -rf /var/lib/etcd; '
         'sudo mkdir -p /var/lib/etcd',
-        warn=True)
+        pty=True, warn=True)
     cluster.log.verbose(result)
 
 
@@ -124,7 +124,7 @@ def restore_dns_resolv_conf(cluster: KubernetesCluster) -> None:
     result = cluster.nodes['all'].sudo(
         f"readlink /etc/resolv.conf ; "
         f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; {unpack_cmd} && sudo chattr +i /etc/resolv.conf; "
-        f"fi ")
+        f"fi ", pty=True)
 
     cluster.log.debug(result)
 
@@ -140,7 +140,7 @@ def import_nodes(cluster: KubernetesCluster) -> None:
     cluster.log.debug('Unpacking backup...')
 
     unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite --exclude /etc/resolv.conf"
-    result = cluster.nodes['all'].sudo(unpack_cmd)
+    result = cluster.nodes['all'].sudo(unpack_cmd, pty=True)
 
     cluster.log.debug(result)
 
@@ -195,7 +195,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--data-dir=/var/lib/etcd/snapshot '
             f'--initial-cluster={initial_cluster} '
             f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380',
-            hide=False)
+            hide=False, pty=True)
 
         _ = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
@@ -218,7 +218,8 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--peer-client-cert-auth=true '
             f'--peer-cert-file={etcd_peer_cert} '
             f'--peer-key-file={etcd_peer_key} '
-            f'--peer-trusted-ca-file={etcd_peer_cacert} ').get_simple_out().strip()
+            f'--peer-trusted-ca-file={etcd_peer_cacert} ',
+            pty=True)
 
         etcd_instances += 1
 
@@ -250,7 +251,8 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     # Stop and remove container
     cluster.nodes['control-plane'].sudo(
         f"ctr task rm -f {container_name} && "
-        f"sudo ctr container rm {container_name}")
+        f"sudo ctr container rm {container_name}",
+        pty=True)
 
 
 def reboot(cluster: KubernetesCluster) -> None:

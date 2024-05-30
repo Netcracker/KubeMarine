@@ -740,15 +740,16 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_command_successful(self, command: str,
                                 *,
                                 retries: int = 15, timeout: int = 5,
-                                hide: bool = False) -> None:
+                                hide: bool = False, pty: bool = False) -> None:
         logger = self.cluster.log
 
         def attempt() -> bool:
-            result = self.sudo(command, warn=True, hide=hide)
+            result = self.sudo(command, warn=True, hide=hide, pty=pty)
             if hide:
                 logger.verbose(result)
                 for host in result.get_failed_hosts_list():
-                    stderr = result[host].stderr.rstrip('\n')
+                    output = result[host].stdout if pty else result[host].stderr
+                    stderr = output.rstrip('\n')
                     if stderr:
                         logger.debug(f"{host}: {stderr}")
 
@@ -759,7 +760,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_commands_successful(self, commands: List[str],
                                  *,
                                  retries: int = 15, timeout: int = 5,
-                                 sudo: bool = True) -> None:
+                                 sudo: bool = True, pty: bool = False) -> None:
         if len(self.nodes) != 1:
             raise Exception("Waiting for few commands is currently supported only for single node")
 
@@ -770,9 +771,9 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
             defer = self.new_defer()
             for command in remained_commands:
                 if sudo:
-                    defer.sudo(command)
+                    defer.sudo(command, pty=pty)
                 else:
-                    defer.run(command)
+                    defer.run(command, pty=pty)
 
             try:
                 defer.flush()
@@ -780,7 +781,8 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
                 results = e.results[self.get_host()]
                 for result in results:
                     if isinstance(result, UnexpectedExit):
-                        logger.debug(result.result.stderr)
+                        output = result.result.stdout if pty else result.result.stderr
+                        logger.debug(output)
                         break
                     if isinstance(result, BaseException):
                         raise

@@ -97,7 +97,7 @@ def restart_pods_task(cluster: KubernetesCluster) -> None:
     for node in kube_nodes.get_ordered_members_list():
         first_control_plane.sudo(
             kubernetes.prepare_drain_command(cluster, node.get_node_name(), disable_eviction=False),
-            hide=False)
+            hide=False, pty=True)
         first_control_plane.sudo("kubectl uncordon %s" % node.get_node_name(), hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")

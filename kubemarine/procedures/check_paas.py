@@ -32,7 +32,7 @@ from kubemarine import (
     plugins, modprobe, admission
 )
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup, CollectorCallback
+from kubemarine.core.group import NodeGroup, CollectorCallback, GroupResultException
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
 from kubemarine.plugins import calico, builtin, manifest
@@ -422,10 +422,10 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
                 # Load thirdparty to temporary dir
                 remote_commands += "&& sudo curl -k -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
-                results = first_control_plane.sudo(remote_commands, warn=True)
+                results = first_control_plane.sudo(remote_commands, pty=True, warn=True)
                 if results.is_any_failed():
                     host = first_control_plane_host
-                    msg = f"Can`t download thirdparty {path} on {host} for getting sha: {results[host].stderr}"
+                    msg = f"Can`t download thirdparty {path} on {host} for getting sha: {results[host].stdout}"
                     broken.append(msg)
                     cluster.log.verbose(msg)
                 else:
@@ -700,10 +700,10 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                 found_url = results.get_simple_out()
                 if ipaddress.ip_address(found_url).version == 4:
                     check_url = control_plane.sudo(
-                        f'curl -k -I https://{found_url}:443 -s -S  -w "%{{http_code}}"', warn=True)
+                        f'curl -k -I https://{found_url}:443 -s -S  -w "%{{http_code}}"', pty=True, warn=True)
                 else:
                     check_url = control_plane.sudo(
-                        f'curl -g -k -I https://[{found_url}]:443 -s -S -w "%{{http_code}}"', warn=True)
+                        f'curl -g -k -I https://[{found_url}]:443 -s -S -w "%{{http_code}}"', pty=True, warn=True)
                 status = list(check_url.values())[0].stdout
                 lst = status.split('\n')
                 if lst[len(lst)-1] == '200':
@@ -732,11 +732,11 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                 if ipaddress.ip_address(ingress_ip).version == 4:
                     check_url = control_plane.sudo(
                         f'curl -k -I -L --resolve {found_url}:443:{ingress_ip} https://{found_url} '
-                        f'-s -S -w "%{{http_code}}"', warn=True)
+                        f'-s -S -w "%{{http_code}}"', pty=True, warn=True)
                 else:
                     check_url = control_plane.sudo(
                         f'curl -g -k -I -L --resolve "{found_url}:443:{ingress_ip}" https://{found_url} '
-                        f'-s -S -w "%{{http_code}}"', warn=True)
+                        f'-s -S -w "%{{http_code}}"', pty=True, warn=True)
                 status = list(check_url.values())[0].stdout
                 lst = status.split('\n')
                 if lst[len(lst)-1] == '200':
@@ -1435,10 +1435,14 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
                                    "Check DEBUG logs for details.")
 
         # Check calicoctl and calico version match, and check ipam problems.
-        result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'")
-        found_problems = result.get_simple_result()
-        if 'Version mismatch' in found_problems.stderr:
-            version_mismatch_lines = found_problems.stderr.split('\n')
+        collector = CollectorCallback(cluster)
+        first_control_plane.sudo(
+            "calicoctl ipam check", pty=True, warn=True, callback=collector)
+
+        ipam_check = collector.result.get_simple_out()
+        problems = re.findall(r'found (\d+) problems', ipam_check)
+        if 'Version mismatch' in ipam_check:
+            version_mismatch_lines = ipam_check.split('\n')
 
             def calico_version(criteria: str) -> str:
                 return next(map(lambda l: l.split()[-1],
@@ -1450,9 +1454,11 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
             client_version = calico_version('Client Version')
             cluster_version = calico_version('Cluster Version')
             failed_messages.append(f"client version {client_version} mismatches the cluster version {cluster_version}")
-        elif int(found_problems.stdout) > 0:
+        elif problems and int(problems[0]) > 0:
             failed_messages.append("ipam check indicates some problems, "
                                    "for more info you can use `calicoctl ipam check --show-problem-ips`")
+        elif collector.result.is_any_failed() or not problems:
+            raise GroupResultException(collector.result)
         if failed_messages:
             raise TestFailure('invalid', hint="\n".join(failed_messages))
         elif warn_messages:
@@ -1474,12 +1480,14 @@ def calico_apiserver_health_status(cluster: KubernetesCluster) -> None:
 
         control_planes = cluster.nodes["control-plane"]
         with kubernetes.local_admin_config(control_planes) as kubeconfig:
-            result = control_planes.sudo(f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org", warn=True)
+            result = control_planes.sudo(
+                f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org > /dev/null",
+                pty=True, warn=True)
 
         if result.is_any_failed():
             message = "Calico API server is not ready:\n"
             for host in result.get_failed_hosts_list():
-                stderr = result[host].stderr
+                stderr = result[host].stdout
                 if stderr:
                     message += f"{host}: {stderr}"
             raise TestFailure('invalid', hint=message)

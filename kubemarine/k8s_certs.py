@@ -21,7 +21,7 @@ from kubemarine.core.group import NodeGroup
 def k8s_certs_overview(control_planes: NodeGroup) -> None:
     for control_plane in control_planes.get_ordered_members_list():
         control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane.get_node_name()}")
-        control_plane.sudo("kubeadm certs check-expiration", hide=False)
+        control_plane.sudo("kubeadm certs check-expiration", hide=False, pty=True)
 
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
@@ -40,7 +40,7 @@ def renew_apply(control_planes: NodeGroup) -> None:
     cert_list = procedure["cert-list"]
 
     for cert in cert_list:
-        control_planes.sudo(f"kubeadm certs renew {cert}")
+        control_planes.sudo(f"kubeadm certs renew {cert}", pty=True)
 
     if "all" in cert_list or "admin.conf" in cert_list:
         # need to update cluster-admin config

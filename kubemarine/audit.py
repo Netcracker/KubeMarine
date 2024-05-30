@@ -75,7 +75,7 @@ def install(group: NodeGroup) -> Optional[RunnersGroupResult]:
     with cluster.make_group(not_installed_hosts).new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             package_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'package_name')
-            packages.install(node, include=package_name, callback=collector)
+            packages.install(node, include=package_name, pty=True, callback=collector)
 
             service_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'service_name')
             system.enable_service(node, name=service_name, callback=collector)

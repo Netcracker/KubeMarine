@@ -389,8 +389,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
                            % (destination, config['owner'], config['unpack'])
             remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
 
-
-    return common_group.sudo(remote_commands)
+    return common_group.sudo(remote_commands, pty=True)
 
 
 def install_all_thirparties(group: NodeGroup) -> None:

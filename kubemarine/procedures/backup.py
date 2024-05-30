@@ -15,7 +15,6 @@
 import concurrent
 import datetime
 import gzip
-import io
 import json
 import os
 import shutil
@@ -30,6 +29,7 @@ from typing import List, Tuple, Union, Dict, Optional, Iterator, Literal
 
 import yaml
 
+from kubemarine import etcd
 from kubemarine.core import utils, flow, log, connections
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RemoteExecutor
@@ -142,7 +142,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
                      'sudo ls -la /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo du -hs /tmp/kubemarine-backup.tar.gz' % (' '.join(backup_list))
 
-    data_copy_res = cluster.nodes['all'].run(backup_command)
+    data_copy_res = cluster.nodes['all'].run(backup_command, pty=True)
 
     cluster.log.debug('Backup created:\n%s' % data_copy_res)
 
@@ -164,10 +164,7 @@ def export_etcd(cluster: KubernetesCluster) -> None:
     # Try to detect cluster health and other metadata like db size, leader
     etcd_status = None
     try:
-        status_json = etcd_node.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
-        cluster.log.verbose(status_json)
-
-        etcd_status = json.load(io.StringIO(status_json.lower()))
+        _, etcd_status = etcd.execute_endpoints_command(cluster, etcd_node, 'status', warn=False)
         parsed_etcd_status = {}
         for item in etcd_status:
             # get rid of https:// and :2379
@@ -203,7 +200,8 @@ def export_etcd(cluster: KubernetesCluster) -> None:
                             f'&& sudo mv /var/lib/etcd/{snap_name} /tmp/{snap_name} '
                             f'&& sudo ls -la /tmp/{snap_name} '
                             f'&& sudo du -hs /tmp/{snap_name} '
-                            f'&& sudo chmod 666 /tmp/{snap_name}', timeout=600)
+                            f'&& sudo chmod 666 /tmp/{snap_name}',
+                            pty=True, timeout=600)
     cluster.log.debug(result)
     etcd_node.get('/tmp/' + snap_name, backup_directory + '/etcd.db')
     cluster.log.verbose('Deleting ETCD snapshot file from "%s"...')
@@ -578,7 +576,7 @@ class ExportKubernetesDownloader:
               f'-o yaml | gzip -c) > {temp_remote_filepath}'
 
         group = self.executor.group
-        group.run(cmd)
+        group.run(cmd, pty=True)
         group.get(temp_remote_filepath, temp_local_filepath)
         group.sudo(f'rm {temp_remote_filepath}')
         group.flush()

@@ -39,7 +39,7 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
 
 def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name())
-    return group.sudo('yum clean all && sudo yum updateinfo -d1')
+    return group.sudo('yum clean all && sudo yum updateinfo -d1', pty=True)
 
 
 def get_repo_file_name() -> str:
@@ -65,7 +65,7 @@ def create_repo_file(group: AbstractGroup[RunResult],
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
-    return group.sudo("yum clean all")
+    return group.sudo("yum clean all", pty=True)
 
 
 def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
@@ -88,18 +88,18 @@ def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str
 
 def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
             exclude: Union[str, List[str]] = None,
-            callback: Callback = None) -> GROUP_RUN_TYPE:
+            pty: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to install')
 
     command = get_install_cmd(include, exclude)
 
-    return group.sudo(command, callback=callback)
+    return group.sudo(command, pty=pty, callback=callback)
 
 
 def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
            exclude: Union[str, List[str]] = None,
-           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
+           warn: bool = False, hide: bool = True, pty: bool = False) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -112,11 +112,12 @@ def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] 
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, warn=warn, hide=hide)
+    return group.sudo(command, warn=warn, hide=hide, pty=pty)
 
 
 def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
+            exclude: Union[str, List[str]] = None,
+            pty: bool = False) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
@@ -129,7 +130,7 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command)
+    return group.sudo(command, pty=pty)
 
 
 def no_changes_found(action: str, result: RunnersResult) -> bool:
@@ -161,4 +162,4 @@ def search(group: DeferredGroup, package: str, callback: Callback = None) -> Tok
         raise Exception('You must specify package to search')
     command = 'yum list -d1 %s' % package
 
-    return group.sudo(command, warn=True, callback=callback)
+    return group.sudo(command, pty=True, warn=True, callback=callback)
