@@ -27,7 +27,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn
+from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn, BinaryIO
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -322,15 +322,19 @@ def determine_resource_absolute_dir(path: str) -> Tuple[str, bool]:
 
 
 def get_local_file_sha1(filename: str) -> str:
+    with open(filename, 'rb') as f:
+        return get_stream_sha1(f)
+
+
+def get_stream_sha1(stream: BinaryIO) -> str:
     sha1 = hashlib.sha1()
 
-    # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
-    with open(filename, 'rb') as f:
-        while True:
-            data = f.read(2 ** 16)
-            if not data:
-                break
-            sha1.update(data)
+    # Read by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
+    while True:
+        data = stream.read(2 ** 16)
+        if not data:
+            break
+        sha1.update(data)
 
     return sha1.hexdigest()
 
@@ -659,7 +663,7 @@ class ClusterStorage:
 
         self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
         remote_archive = self.dir_location + "local.tar.gz"
-        control_planes.put(self.local_archive_path, remote_archive, sudo=True)
+        control_planes.put(self.local_archive_path, remote_archive, sudo=True, compare_hashes=False)
         control_planes.sudo(
             f'tar -C {self.dir_location} -xzv --no-same-owner -f {remote_archive}  && '
             f'sudo rm -f {remote_archive} ')
@@ -737,6 +741,6 @@ class ClusterStorage:
         log.debug("Archive with procedures history is downloaded")
 
         for group in new_control_planes.get_ordered_members_list():
-            group.put(archive_dump_path, archive_remote_path, sudo=True)
+            group.put(archive_dump_path, archive_remote_path, sudo=True, compare_hashes=False)
             group.sudo(f'tar -C / -xzvf {archive_remote_path}')
             log.debug(f"Archive with procedures history is uploaded to {group.get_node_name()!r}")

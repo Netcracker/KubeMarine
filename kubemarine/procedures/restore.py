@@ -114,7 +114,7 @@ def import_nodes_data(cluster: KubernetesCluster) -> None:
             node_name = node.get_node_name()
             cluster.log.debug('Uploading backup for \'%s\'' % node_name)
             node.put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node_name),
-                     '/tmp/kubemarine-backup.tar.gz')
+                     '/tmp/kubemarine-backup.tar.gz', compare_hashes=True)
 
 
 def restore_dns_resolv_conf(cluster: KubernetesCluster) -> None:
@@ -164,7 +164,8 @@ def import_etcd(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug('Uploading ETCD snapshot...')
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
-    cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name, sudo=True)
+    cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name,
+                                       sudo=True, compare_hashes=True)
 
     initial_cluster_list = []
     initial_cluster_list_without_names = []

@@ -435,7 +435,7 @@ class FakeNodeGroup(NodeGroup, FakeAbstractGroup[RunnersGroupResult]):
     def _make_defer(self, executor: RemoteExecutor) -> FakeDeferredGroup:
         return FakeDeferredGroup(self.nodes, self.cluster, executor)
 
-    def get_local_file_sha1(self, filename: str) -> str:
+    def get_local_file_sha1(self, local_file: Union[bytes, str]) -> str:
         return '0'
 
     def get_remote_file_sha1(self, filename: str) -> Dict[str, Optional[str]]:
