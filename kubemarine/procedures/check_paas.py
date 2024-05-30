@@ -443,13 +443,16 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
                 first_control_plane.sudo(final_commands, warn=True)
+            else:
+                script = utils.read_internal(config['source'])
+                expected_sha = utils.get_stream_sha1(io.BytesIO(script.encode('utf-8')))
 
             recommended_sha = thirdparties.get_thirdparty_recommended_sha(path, cluster)
             if recommended_sha is not None and recommended_sha != expected_sha:
                 warnings.append(f"{path} source contains not recommended thirdparty version for used kubernetes version")
 
             if config.get("sha1", expected_sha) != expected_sha and expected_sha is not None:
-                broken .append("Given sha is not equal with actual sha from source for %s" % path)
+                broken.append("Given sha is not equal with actual sha from source for %s" % path)
 
             expected_sha = config.get("sha1", expected_sha)
 
