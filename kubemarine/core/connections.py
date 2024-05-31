@@ -51,21 +51,28 @@ class ConnectionPool:
                                         gateway: fabric.connection.Connection = None,
                                         inline_ssh_env: bool = True) -> fabric.connection.Connection:
 
-        creds={}
+        connection_defaults = static.GLOBALS['connection']['defaults']
+        connect_kwargs = {}
         if conn_details.get('keyfile'):
-            creds['key_filename'] = os.path.expanduser(conn_details['keyfile'])
+            connect_kwargs['key_filename'] = os.path.expanduser(conn_details['keyfile'])
         elif conn_details.get('password'):
-            creds['password'] = conn_details.get('password')
+            connect_kwargs['password'] = conn_details.get('password')
+
+        # connect_timeout is for TCP connect, while channel_timeout is for SSH machinery.
+        # Although they have different nature, there is no request to separate them for now.
+        # channel_timeout can also be "worked around" by reconnecting the whole connection (including TCP connect)
+        connect_timeout = conn_details.get('connection_timeout', connection_defaults['timeout'])
+        connect_kwargs['channel_timeout'] = connect_timeout
+
         cfg = fabric.Config(overrides={'run': {'encoding': "utf-8"}})
         return fabric.connection.Connection(
             host=ip,
-            user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
+            user=conn_details.get('username', connection_defaults['username']),
             gateway=gateway,
-            port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port']),
+            port=conn_details.get('connection_port', connection_defaults['port']),
             config=cfg,
-            connect_timeout=conn_details.get('connection_timeout',
-                                             static.GLOBALS['connection']['defaults']['timeout']),
-            connect_kwargs=creds,
+            connect_timeout=connect_timeout,
+            connect_kwargs=connect_kwargs,
             inline_ssh_env=inline_ssh_env
         )
 
@@ -89,11 +96,4 @@ class ConnectionPool:
         if gateway is None:
             raise Exception('Requested gateway \'%s\' is not found in configfile' % name)
 
-        if gateway.get('address') is None:
-            raise Exception('There is no address specified in configfile for gateway \'%s\'' % name)
-        if gateway.get('keyfile') is None:
-            raise Exception('There is no keyfile specified in configfile for gateway \'%s\'' % name)
-
-        # todo since we have no workaround for gateway connections currently,
-        #  probably we need different default connection timeout
         return self._create_connection_from_details(gateway["address"], gateway, inline_ssh_env=False)
