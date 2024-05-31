@@ -14,6 +14,7 @@ connection:
     - encountered RSA key
     - Socket is closed
     - WinError 10060
+    - Timeout opening channel
 etcd:
   default_arguments:
     cert: /etc/kubernetes/pki/etcd/server.crt
