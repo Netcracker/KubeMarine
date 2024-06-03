@@ -4249,7 +4249,7 @@ The certificate and key are provided using one of the following two formats:
   * The `controller.ssl.default-certificate.data` format is used to provide a certificate and a key inplace in the pem format:
     
     ```yaml
-      nginx-ingress-controller:
+    nginx-ingress-controller:
       controller:
         ssl:
           default-certificate:
@@ -4267,7 +4267,7 @@ The certificate and key are provided using one of the following two formats:
   * The `controller.ssl.default-certificate.paths` format is used to provide a certificate and a key as paths to the pem files:
    
     ```yaml
-      nginx-ingress-controller:
+    nginx-ingress-controller:
       controller:
         ssl:
           default-certificate:
@@ -4275,6 +4275,18 @@ The certificate and key are provided using one of the following two formats:
               cert: /path/to/cert
               key: /path/to/key
     ```
+
+If the intermediate certificate should be specified, set it in `/path/to/cert` file or in `nginx-ingress-controller.controller.ssl.default-certificate.data.cert` option after the default ingress certificate:
+
+```
+-----BEGIN CERTIFICATE-----
+<Default ingress certificate>
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+<Intermediate    certificate>
+-----END CERTIFICATE-----
+```
+
 * The `config_map` parameter is used to customize or fine tune NGINX behavior. Before proceeding, refer to the [Official NGINX Ingress Controller documentation](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/)
 For example:    
 ```yaml
