@@ -640,8 +640,10 @@ class RawExecutor:
             left_nodes = [host for host, result in results.items()
                           if (isinstance(result, Exception)
                               # Something is wrong with sudo access. Node is active.
-                              and not self.is_require_nopasswd_exception(result))
-                          or (not isinstance(result, Exception)
+                              and not self.is_require_nopasswd_exception(result)
+                              # If not a connection-related exception, do not try to connect further
+                              and self._is_allowed_connection_exception(str(result)))
+                          or (isinstance(result, RunnersResult)
                               and result == initial_boot_history.get(host))]
 
             waited = (datetime.now() - time_start).total_seconds()
