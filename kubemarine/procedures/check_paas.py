@@ -1074,13 +1074,12 @@ def etcd_health_status(cluster: KubernetesCluster) -> None:
     """
     with TestCase(cluster, '219', "ETCD", "Health status ETCD") as tc:
         try:
-            etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['control-plane'].get_any_member())
+            etcd.wait_for_health(cluster, cluster.nodes['control-plane'].get_any_member())
         except Exception as e:
             cluster.log.verbose('Failed to load and parse ETCD status')
             raise TestFailure('invalid',
                               hint=f"ETCD not ready, please check"
                                    f" because of {e} ") from None
-        cluster.log.debug(etcd_health_status)
         tc.success(results='healthy')
 
 

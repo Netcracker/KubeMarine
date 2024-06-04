@@ -27,7 +27,6 @@ etcd:
     - "etcdserver: leader changed"
     - "etcdserver: request timed out"
   health:
-    init_timeout: 30
     timeout: 2
     retries: 20
 kubernetes:
