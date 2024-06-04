@@ -423,7 +423,7 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
 
 class FakeAbstractGroup(AbstractGroup[GROUP_RUN_TYPE], ABC):
-    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+    def _put_with_mv(self, local_stream: Union[bytes, str], remote_file: str,
                      backup: bool, sudo: bool, mkdir: bool, immutable: bool) -> None:
         super()._put_with_mv(local_stream, remote_file, backup=False, sudo=False, mkdir=False, immutable=False)
 

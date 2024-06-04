@@ -86,8 +86,11 @@ class RunnersResult:
 
     @staticmethod
     def merge(results: List['RunnersResult']) -> 'RunnersResult':
-        if len(results) == 0:
+        len_ = len(results)
+        if len_ == 0:
             raise ValueError("At least one result should be present")
+        elif len_ == 1:
+            return results[0]
 
         hide = results[0].hide
         commands = []
@@ -97,10 +100,10 @@ class RunnersResult:
         for result in results:
             if result.hide != hide:
                 raise ValueError("Cannot merge instances of RunnersResult with different 'hide' property")
-            commands.append(result.command)
+            commands.extend(result.commands)
             stdout += result.stdout
             stderr += result.stderr
-            exit_codes.append(result.exited)
+            exit_codes.extend(result.exit_codes)
 
         return RunnersResult(commands, exit_codes, stdout, stderr, hide=hide)
 
@@ -404,15 +407,16 @@ class RawExecutor:
         token = self._next_token()
 
         do_type, args, kwargs = action
+        repr_args = self._repr_args(do_type, args)
         not_supported_args = set(kwargs.keys()) - self._supported_args
         if not_supported_args:
             raise Exception(f"Arguments {', '.join(map(repr, not_supported_args))} are not supported")
 
         if not target:
-            self.logger.verbose('No nodes to perform %s %s with options: %s' % (do_type, args, kwargs))
+            self.logger.verbose('No nodes to perform %s %s with options: %s' % (do_type, repr_args, kwargs))
         else:
             self.logger.verbose(
-                'Performing %s %s on nodes %s with options: %s' % (do_type, args, list(target), kwargs))
+                'Performing %s %s on nodes %s with options: %s' % (do_type, repr_args, list(target), kwargs))
             for host in target:
                 self._connections_queue.setdefault(host, []).append((action, callback, token))
 
@@ -476,16 +480,11 @@ class RawExecutor:
         if do_type == 'get':
             self.logger.verbose('Executing get %s on host %s with options: %s' % (args, host, kwargs))
         if do_type == 'put':
-            local_stream, remote_file = args
-            if isinstance(local_stream, io.BytesIO):
+            self.logger.verbose(
+                'Executing put %s on host %s with options: %s' % (self._repr_args(do_type, args), host, kwargs))
+            if isinstance(args[0], bytes):
                 # Each thread should use its own instance of BytesIO.
-                local_stream = io.BytesIO(local_stream.getvalue())
-                self.logger.verbose(
-                    'Executing put %s on host %s with options: %s' % (('<text>', remote_file), host, kwargs))
-            else:
-                self.logger.verbose('Executing put %s on host %s with options: %s' % (args, host, kwargs))
-
-            args = (local_stream, remote_file)
+                args = io.BytesIO(args[0]), args[1]
 
         if do_type in ('run', 'sudo'):
             if kwargs.get('timeout', None) is None:
@@ -505,6 +504,13 @@ class RawExecutor:
             args = (merged_command,)
 
         return do_type, args, kwargs
+
+    @staticmethod
+    def _repr_args(do_type: str, args: tuple) -> tuple:
+        if do_type == 'put' and isinstance(args[0], bytes):
+            return '<text>', args[1]
+
+        return args
 
     def _flush_logger_writers(self, batch: Dict[str, List[_PayloadItem]]) -> None:
         for payloads in batch.values():
