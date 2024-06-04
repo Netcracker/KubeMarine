@@ -343,7 +343,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # if text contains non-ASCII characters.
             # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
 
-            local_stream: Union[io.BytesIO, str] = io.BytesIO(local_file.getvalue().encode('utf-8'))
+            local_stream: Union[bytes, str] = local_file.getvalue().encode('utf-8')
             group_to_upload = self
         else:
             if not os.path.isfile(local_file):
@@ -376,7 +376,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         group_to_upload._put_with_mv(local_stream, remote_file,
                                      backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
 
-    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+    def _put_with_mv(self, local_stream: Union[bytes, str], remote_file: str,
                      backup: bool, sudo: bool, mkdir: bool, immutable: bool) -> None:
 
         if sudo:
@@ -440,7 +440,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         self.sudo(mv_command)
 
     @abstractmethod
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         pass
 
     def _unsafe_make_runners_result(self, host_results: HostToResult) -> RunnersGroupResult:
@@ -660,7 +660,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_exec("get", remote_file, local_file)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_exec("put", local_stream, remote_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -804,7 +804,7 @@ class DeferredGroup(AbstractGroup[Token]):
             raise ValueError("Streaming of output is currently not supported in deferred mode")
         return self._do_queue(do_type, command, **kwargs)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_queue("put", local_stream, remote_file)
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: Any) -> Token:
