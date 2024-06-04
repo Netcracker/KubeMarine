@@ -21,7 +21,7 @@ from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 )
 
-DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
+DEBIAN_HEADERS = 'sudo DEBIAN_FRONTEND=noninteractive'
 
 
 def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
@@ -40,7 +40,7 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
 
 def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name())
-    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update')
+    return group.sudo(f'{DEBIAN_HEADERS} apt clean -q && {DEBIAN_HEADERS} apt update -q')
 
 
 def get_repo_file_name() -> str:
@@ -63,19 +63,16 @@ def create_repo_file(group: AbstractGroup[RunResult],
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
-    return group.sudo(DEBIAN_HEADERS + "apt clean")
+    return group.sudo(f"{DEBIAN_HEADERS} apt clean -q")
 
 
 def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt update && ' + \
-              DEBIAN_HEADERS + 'sudo apt install -y %s' % include
+    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install -y -q {include}'
 
     if exclude is not None:
-        if isinstance(exclude, list):
-            exclude = ','.join(exclude)
-        command += ' --exclude=%s' % exclude
+        raise Exception("Option 'exclude' is not supported for apt package manager")
 
     # apt fails to install (downgrade) package if it is already present and has higher version,
     # thus we do not need additional checks here (in contrast to yum)
@@ -100,12 +97,10 @@ def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] 
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt purge -y %s' % include
+    command = f'{DEBIAN_HEADERS} apt-get purge -y -q {include}'
 
     if exclude is not None:
-        if isinstance(exclude, list):
-            exclude = ','.join(exclude)
-        command += ' --exclude=%s' % exclude
+        raise Exception("Option 'exclude' is not supported for apt package manager")
 
     return group.sudo(command, warn=warn, hide=hide)
 
@@ -117,13 +112,10 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt update && ' + \
-              DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include
+    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install --only-upgrade -y -q {include}'
 
     if exclude is not None:
-        if isinstance(exclude, list):
-            exclude = ','.join(exclude)
-        command += ' --exclude=%s' % exclude
+        raise Exception("Option 'exclude' is not supported for apt package manager")
 
     return group.sudo(command)
 
@@ -137,6 +129,6 @@ def no_changes_found(action: str, result: RunnersResult) -> bool:
 def search(group: DeferredGroup, package: str, callback: Callback = None) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
-    command = DEBIAN_HEADERS + 'apt show %s' % package
+    command = f'{DEBIAN_HEADERS} apt show -q {package}'
 
     return group.sudo(command, warn=True, callback=callback)

@@ -39,7 +39,7 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
 
 def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name())
-    return group.sudo('yum clean all && sudo yum updateinfo')
+    return group.sudo('yum clean all && sudo yum updateinfo -d1')
 
 
 def get_repo_file_name() -> str:
@@ -71,13 +71,15 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
 def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
-    command = 'yum install -y %s' % include
+    command = 'yum install -y -d1 --color=never %s' % include
 
     if exclude is not None:
         if isinstance(exclude, list):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
-    command += f"; rpm -q {include}; if [ $? != 0 ]; then echo \"Failed to check version for some packages. " \
+    command += f"; PACKAGES=$(rpm -q {include}); " \
+               f"if [ $? != 0 ]; then echo \"$PACKAGES\" | grep 'is not installed'; " \
+               f"echo \"Failed to check version for some packages. " \
                f"Make sure packages are not already installed with higher versions. " \
                f"Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi "
 
@@ -103,7 +105,7 @@ def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] 
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = 'yum remove -y %s' % include
+    command = 'yum remove -y -d1 --color=never %s' % include
 
     if exclude is not None:
         if isinstance(exclude, list):
@@ -120,7 +122,7 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = 'yum upgrade -y %s' % include
+    command = 'yum upgrade -y -d1 --color=never %s' % include
 
     if exclude is not None:
         if isinstance(exclude, list):
@@ -131,19 +133,32 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 
 
 def no_changes_found(action: str, result: RunnersResult) -> bool:
-    if action == 'install':
-        return "Nothing to do" in result.stdout
-    elif action == 'upgrade':
-        return "No packages marked for update" in result.stdout
-    elif action == 'remove':
-        return "No Packages marked for removal" in result.stdout
-    else:
+    if action not in ('install', 'upgrade', 'remove'):
         raise Exception(f"Unknown action {action}")
+
+    output = result.stdout.rstrip('\n')
+    if "Nothing to do." in output:
+        return True
+    # Remove next checks after `rhel` (version 7) OS family support stop.
+    if action == 'install' and all(
+            'already installed and latest version' in line
+            for line in output.split('\n')):
+        return True
+    if action == 'upgrade' and not output or all(
+            'No Match for argument' in line
+            for line in output.split('\n')):
+        return True
+    if action == 'remove' and all(
+            'No Match for argument' in line
+            for line in output.split('\n')):
+        return True
+
+    return False
 
 
 def search(group: DeferredGroup, package: str, callback: Callback = None) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
-    command = 'yum list %s' % package
+    command = 'yum list -d1 %s' % package
 
     return group.sudo(command, warn=True, callback=callback)
