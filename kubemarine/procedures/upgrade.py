@@ -15,6 +15,7 @@
 import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
+import uuid
 
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
@@ -160,6 +161,54 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
 
     plugins.install(cluster, upgrade_candidates)
 
+def release_calico_leaked_ips(cluster):
+    """
+    During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
+    For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
+    Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
+    This task releases problem ips with force.
+    """
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    cluster.log.debug("Getting leaked ips...")
+    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", is_async=False, hide=False)
+    leaked_ips = result.get_simple_out()
+    leaked_ips_count = leaked_ips.count('leaked')
+    cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
+
+    # Initialize lists to store IPs with missing handles and handles with no matching IPs
+    ips_with_missing_handles = []
+    handles_with_no_matching_ips = []
+
+    if leaked_ips_count != 0:
+        # Parse the leaked IPAM report to identify IPs with missing handles and handles with no matching IPs
+        with open(random_report_name, 'r') as report_file:
+            for line in report_file:
+                if 'IPs that are allocated but not actually in use' in line:
+                    continue
+                elif 'IPAM handles with no matching IPs' in line:
+                    break
+                elif 'affinity' in line:
+                    ip_address = line.split()[2]
+                    ips_with_missing_handles.append(ip_address)
+                elif 'affinity=host' in line:
+                    handle = line.split()[3][:-1]  # Remove trailing colon
+                    handles_with_no_matching_ips.append(handle)
+
+        # Release IPs with missing handles
+        if ips_with_missing_handles:
+            cluster.log.debug("Releasing IPs with missing handles...")
+            for ip in ips_with_missing_handles:
+                first_control_plane.sudo(f"calicoctl ipam release --ip={ip} --force", is_async=False, hide=False)
+
+        # Release handles with no matching IPs
+        if handles_with_no_matching_ips:
+            cluster.log.debug("Releasing handles with no matching IPs...")
+            for handle in handles_with_no_matching_ips:
+                first_control_plane.sudo(f"calicoctl ipam release --handle={handle} --force", is_async=False, hide=False)
+
+    # Clean up the temporary report file
+    first_control_plane.sudo(f"rm {random_report_name}", is_async=False, hide=False)
 
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
@@ -170,6 +219,7 @@ tasks = OrderedDict({
     "kubernetes_cleanup": kubernetes_cleanup_nodes_versions,
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
+    "release_calico_leaked_ips": release_calico_leaked_ips,  # Added here
     "overview": install.overview
 })
 
