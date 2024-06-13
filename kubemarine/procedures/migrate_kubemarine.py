@@ -149,7 +149,7 @@ class CriUpgradeAction(Action):
             drain_cmd = kubernetes.prepare_drain_command(
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
-            control_plane.sudo(drain_cmd, hide=False)
+            control_plane.sudo(drain_cmd, hide=False, pty=True)
 
             kubernetes.upgrade_cri_if_required(node)
             node.sudo('systemctl restart kubelet')
@@ -229,7 +229,8 @@ class BalancerUpgradeAction(Action):
 
     def _run(self, group: NodeGroup) -> None:
         cluster: KubernetesCluster = group.cluster
-        packages.install(group, include=cluster.get_package_association(self.package_name, 'package_name'))
+        pkgs = cluster.get_package_association(self.package_name, 'package_name')
+        packages.install(group, include=pkgs, pty=True)
         if self.package_name == 'haproxy':
             haproxy.restart(group)
         else:

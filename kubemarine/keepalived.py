@@ -179,7 +179,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         for node in defer.get_ordered_members_list():
             package_name = cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'package_name')
-            packages.install(node, include=package_name, callback=collector)
+            packages.install(node, include=package_name, pty=True, callback=collector)
 
         defer.flush()
 
@@ -199,9 +199,6 @@ def install_haproxy_check_script(group: DeferredGroup) -> None:
     script = utils.read_internal("./resources/scripts/check_haproxy.sh")
     group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
-
-def uninstall(group: NodeGroup) -> RunnersGroupResult:
-    return packages.remove(group, include='keepalived')
 
 
 def restart(group: NodeGroup) -> None:

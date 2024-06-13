@@ -12,11 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import concurrent
 import datetime
 import gzip
-import io
 import json
 import os
 import shutil
@@ -26,12 +24,13 @@ import time
 import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
+from queue import Queue, Empty
 from typing import List, Tuple, Union, Dict, Optional, Iterator, Literal
 
 import yaml
 
-from kubemarine.core import utils, flow, log
+from kubemarine import etcd
+from kubemarine.core import utils, flow, log, connections
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.cri import containerd
@@ -143,7 +142,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
                      'sudo ls -la /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo du -hs /tmp/kubemarine-backup.tar.gz' % (' '.join(backup_list))
 
-    data_copy_res = cluster.nodes['all'].run(backup_command)
+    data_copy_res = cluster.nodes['all'].run(backup_command, pty=True)
 
     cluster.log.debug('Backup created:\n%s' % data_copy_res)
 
@@ -165,10 +164,7 @@ def export_etcd(cluster: KubernetesCluster) -> None:
     # Try to detect cluster health and other metadata like db size, leader
     etcd_status = None
     try:
-        status_json = etcd_node.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
-        cluster.log.verbose(status_json)
-
-        etcd_status = json.load(io.StringIO(status_json.lower()))
+        _, etcd_status = etcd.execute_endpoints_command(cluster, etcd_node, 'status', warn=False)
         parsed_etcd_status = {}
         for item in etcd_status:
             # get rid of https:// and :2379
@@ -204,7 +200,8 @@ def export_etcd(cluster: KubernetesCluster) -> None:
                             f'&& sudo mv /var/lib/etcd/{snap_name} /tmp/{snap_name} '
                             f'&& sudo ls -la /tmp/{snap_name} '
                             f'&& sudo du -hs /tmp/{snap_name} '
-                            f'&& sudo chmod 666 /tmp/{snap_name}', timeout=600)
+                            f'&& sudo chmod 666 /tmp/{snap_name}',
+                            pty=True, timeout=600)
     cluster.log.debug(result)
     etcd_node.get('/tmp/' + snap_name, backup_directory + '/etcd.db')
     cluster.log.verbose('Deleting ETCD snapshot file from "%s"...')
@@ -326,7 +323,7 @@ class ExportKubernetesParser:
         self.total_files = 0
         self._graceful_finish_barrier = graceful_finish_barrier
         self._task_queue: 'Queue[ParserPayload]' = Queue()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def schedule(self, payload: ParserPayload) -> None:
         with self._lock:
@@ -338,9 +335,12 @@ class ExportKubernetesParser:
     def finish(self, graceful: bool) -> None:
         with self._lock:
             self._graceful_finish_barrier -= 1
-            if not self.closed and (self._graceful_finish_barrier == 0 or not graceful):
+            if self.closed:
+                return
+            if not graceful:
+                self._close()
+            if self._graceful_finish_barrier == 0 or not graceful:
                 self._task_queue.put(ParserPayload("end", "", None))
-                self._graceful_finish_barrier = 0
 
     def run(self) -> None:
         try:
@@ -355,11 +355,20 @@ class ExportKubernetesParser:
                 self._clear(payload)
                 self.elapsed += (time.time() - start)
         finally:
-            with self._lock:
-                self.closed = True
-                # Queue might be not empty in case of exception. Need to clear all pending payloads
-                for payload in self._task_queue.queue:
-                    self._clear(payload)
+            self._close()
+
+    def _close(self) -> None:
+        with self._lock:
+            if self.closed:
+                return
+            # Queue might be not empty in case of exception. Need to clear all pending payloads
+            while True:
+                try:
+                    self._clear(self._task_queue.get_nowait())
+                except Empty:
+                    break
+
+            self.closed = True
 
     @staticmethod
     def _clear(payload: ParserPayload) -> None:
@@ -513,6 +522,8 @@ class ExportKubernetesDownloader:
         self.backup_directory = backup_directory
         self.control_plane = control_plane
         self.connection_pool = cluster.create_connection_pool(control_plane.get_hosts())
+        # Use own connection instance to run commands
+        self.executor = RemoteExecutor(self.control_plane, self.connection_pool)
         self.tasks_queue = tasks_queue
         self.parser = parser
         self.elapsed: float = 0
@@ -551,6 +562,9 @@ class ExportKubernetesDownloader:
             self.elapsed = time.time() - start
             self.connection_pool.close()
 
+    def interrupt(self) -> None:
+        self.executor.interrupt()
+
     def _download(self, task: DownloaderPayload, temp_local_filepath: str) -> None:
         namespace = task.namespace
         temp_remote_filepath = utils.get_remote_tmp_path(os.path.basename(temp_local_filepath))
@@ -561,12 +575,11 @@ class ExportKubernetesDownloader:
               f'{",".join(r for r in task.resources)} ' \
               f'-o yaml | gzip -c) > {temp_remote_filepath}'
 
-        # Use own connection instance to run commands
-        with RemoteExecutor(self.control_plane, self.connection_pool) as exe:
-            group = exe.group
-            group.run(cmd)
-            group.get(temp_remote_filepath, temp_local_filepath)
-            group.sudo(f'rm {temp_remote_filepath}')
+        group = self.executor.group
+        group.run(cmd, pty=True)
+        group.get(temp_remote_filepath, temp_local_filepath)
+        group.sudo(f'rm {temp_remote_filepath}')
+        group.flush()
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
@@ -612,8 +625,8 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
     logger.debug(f'Using {len(downloaders)} workers to download resources.')
 
     with ThreadPoolExecutor(max_workers=len(downloaders) + 1) as tpe:
-        downloaders_async = [tpe.submit(downloader.run) for downloader in downloaders]
-        parser_async = tpe.submit(parser.run)
+        parser_async: Optional[concurrent.futures.Future] = None
+        downloaders_async: List[concurrent.futures.Future] = []
 
         def _graceful_shutdown_downloaders() -> Optional[BaseException]:
             # Although parser may exit successfully, not all resources might be processed due to errors in downloaders.
@@ -625,26 +638,61 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
                 except BaseException as e:
                     logger.verbose(e)
                     if isinstance(e, DownloadException):
-                        logger.error(f"Failed to download resources {','.join(e.task.resources)} "
-                                     f"for namespace {e.task.namespace}")
+                        namespace = e.task.namespace
+                        logger.error(f"Failed to download resources {','.join(e.task.resources)}"
+                                     + ('' if namespace is None else f" for namespace {namespace!r}."))
                         exc = e.reason
                     else:
                         exc = e
 
             return exc
 
+        interrupted = False
+        exception: Optional[BaseException]
         try:
-            # Wait for successful parsing of resources or till exception.
-            parser_async.result()
-        except BaseException:
-            # Wait for graceful exiting of downloaders after their currently running command is finished.
-            # If few background tasks fail, the parser exception has priority, and the other is logged.
-            _graceful_shutdown_downloaders()
-            raise
+            while True:
+                try:
+                    if not interrupted:
+                        for downloader in downloaders:
+                            downloaders_async.append(tpe.submit(downloader.run))
 
-        downloader_exception = _graceful_shutdown_downloaders()
-        if downloader_exception is not None:
-            raise downloader_exception
+                        parser_async = tpe.submit(parser.run)
+                    elif parser_async is None:
+                        break
+
+                    # Wait for successful parsing of resources or till exception.
+                    while concurrent.futures.wait({parser_async}, timeout=connections.input_sleep).not_done:
+                        pass
+
+                except KeyboardInterrupt:
+                    interrupted = True
+                    for downloader in downloaders:
+                        # Interrupting of downloaders eventually makes them close the parser.
+                        # KeyboardInterrupt will be raised from any downloader.
+                        downloader.interrupt()
+
+                    continue
+
+                break
+        finally:
+            # Only obtain the result of finished futures
+            try:
+                if parser_async is not None:
+                    parser_async.result()
+            except BaseException as e:
+                exception = e
+                # Wait for exiting of downloaders after their currently running command is finished / interrupted.
+                # If few background tasks fail, the parser exception has priority, and the others are logged.
+                _graceful_shutdown_downloaders()
+            else:
+                exception = _graceful_shutdown_downloaders()
+
+        if isinstance(exception, KeyboardInterrupt):
+            raise exception
+        elif interrupted:
+            raise KeyboardInterrupt()
+        elif exception is not None:
+            raise exception
 
     downloaded_resources_descriptor = cluster.context['backup_descriptor']['kubernetes']['resources']
     if parser.namespaced_resources_result_map:

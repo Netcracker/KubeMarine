@@ -138,7 +138,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         collector = CollectorCallback(cluster)
         for node in defer.get_ordered_members_list():
             package_associations = _get_associations_for_node(node)
-            packages.install(node, include=package_associations['package_name'], callback=collector)
+            packages.install(node, include=package_associations['package_name'], pty=True, callback=collector)
 
         defer.flush()
 
@@ -151,10 +151,6 @@ def install(group: NodeGroup) -> RunnersGroupResult:
 
     defer.flush()
     return collector.result
-
-
-def uninstall(group: NodeGroup) -> RunnersGroupResult:
-    return packages.remove(group, include=['haproxy', 'rh-haproxy18'])
 
 
 def restart(group: NodeGroup) -> None:

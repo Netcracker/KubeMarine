@@ -266,7 +266,7 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
             'sudo kubeadm reset phase cleanup-node; '  # it is required to "cleanup-node" for all procedures
             'sudo systemctl stop kubelet; '
             'sudo rm -rf /etc/kubernetes/manifests /var/lib/kubelet/pki /var/lib/etcd /etc/kubernetes/patches; '
-            'sudo mkdir -p /etc/kubernetes/manifests; ', warn=True)
+            'sudo mkdir -p /etc/kubernetes/manifests; ', warn=True, pty=True)
 
         # Disabled initial prune for images prepull feature. Need analysis for possible negative impact.
         # result.update(cri.prune(active_nodes, all_implementations=True))
@@ -301,7 +301,7 @@ def drain_nodes(group: NodeGroup, disable_eviction: bool = False,
             drain_cmd = prepare_drain_command(
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
-            control_plane.sudo(drain_cmd, hide=False)
+            control_plane.sudo(drain_cmd, hide=False, pty=True)
         else:
             log.warning("Node %s is not found in cluster and can't be drained" % node_name)
 
@@ -326,7 +326,7 @@ def delete_nodes(group: NodeGroup) -> RunnersGroupResult:
         # Check if node_name exactly matches any line
         if node_name in stdout_lines:
             log.debug("Deleting node %s from the cluster..." % node_name)
-            control_plane.sudo("kubectl delete node %s" % node_name, hide=False)
+            control_plane.sudo("kubectl delete node %s" % node_name, hide=False, pty=True)
         else:
             log.warning("Node %s is not found in cluster and can't be removed" % node_name)
 
@@ -402,7 +402,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
         " --config=/etc/kubernetes/join-config.yaml "
         " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
         " --v=5",
-        hide=False)
+        hide=False, pty=True)
     copy_admin_config(log, node)
 
     components.wait_for_pods(node)
@@ -509,7 +509,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
         " --config=/etc/kubernetes/init-config.yaml"
         " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
         " --v=5",
-        hide=False)
+        hide=False, pty=True)
 
     copy_admin_config(log, first_control_plane)
 
@@ -547,8 +547,8 @@ def wait_uncordon(node: NodeGroup) -> None:
     timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
     # This forces to use local API server and waits till it is up.
     with local_admin_config(node) as kubeconfig:
-        node.wait_command_successful(f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()}",
-                                     hide=False,
+        node.wait_command_successful(f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()} > /dev/null",
+                                     hide=False, pty=True,
                                      timeout=timeout_config['timeout'],
                                      retries=timeout_config['retries'])
 
@@ -565,9 +565,9 @@ def wait_for_nodes(group: NodeGroup) -> None:
         "NetworkUnavailable": "False"
     }
     if len(node_names) > 1:
-        status_cmd = "kubectl get nodes %s -o jsonpath='{.items[*].status.conditions[?(@.type==\"%s\")].status}'"
+        status_cmd = "kubectl get nodes %s -o jsonpath='{.items[*].status.conditions[?(@.type==\"%s\")].status}{\"\\n\"}'"
     else:
-        status_cmd = "kubectl get nodes %s -o jsonpath='{.status.conditions[?(@.type==\"%s\")].status}'"
+        status_cmd = "kubectl get nodes %s -o jsonpath='{.status.conditions[?(@.type==\"%s\")].status}{\"\\n\"}'"
 
     timeout = int(cluster.inventory['globals']['nodes']['ready']['timeout'])
     retries = int(cluster.inventory['globals']['nodes']['ready']['retries'])
@@ -575,17 +575,19 @@ def wait_for_nodes(group: NodeGroup) -> None:
     while retries > 0:
         correct_conditions = 0
         for condition, cond_value in wait_conditions.items():
-            result = first_control_plane.sudo(status_cmd % (" ".join(node_names), condition), warn=True)
-            node_result = list(result.values())[0]
+            result = first_control_plane.sudo(status_cmd % (" ".join(node_names), condition), warn=True, pty=True)
+            node_result = result.get_simple_result()
             if node_result.failed:
                 log.debug(f"kubectl exited with non-zero exit code. Haproxy or kube-apiserver are not yet started?")
                 log.verbose(node_result)
                 break
-            condition_results = node_result.stdout.split(" ")
-            correct_values = [value for value in condition_results if value == cond_value]
-            if len(correct_values) == len(node_names):
-                correct_conditions = correct_conditions + 1
-                log.debug(f"Condition {condition} is {cond_value} for all nodes.")
+            for line in node_result.stdout.rstrip('\n').split('\n'):
+                condition_results = line.split(" ")
+                correct_values = [value for value in condition_results if value == cond_value]
+                if len(correct_values) == len(node_names):
+                    correct_conditions = correct_conditions + 1
+                    log.debug(f"Condition {condition} is {cond_value} for all nodes.")
+                    break
             else:
                 log.debug(f"Condition {condition} is not met, retrying")
                 break
@@ -628,7 +630,7 @@ def init_workers(group: NodeGroup) -> None:
             "kubeadm join --config=/etc/kubernetes/join-config.yaml"
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
             " --v=5",
-            hide=False)
+            hide=False, pty=True)
 
         components.wait_for_pods(node)
 
@@ -680,7 +682,8 @@ def apply_taints(group: NodeGroup) -> RunnersGroupResult:
 def is_cluster_installed(cluster: KubernetesCluster) -> bool:
     cluster.log.verbose('Searching for already installed cluster...')
     try:
-        results = cluster.nodes['control-plane'].sudo('kubectl cluster-info', warn=True, timeout=15)
+        results = cluster.nodes['control-plane'].sudo(
+            'kubectl cluster-info', pty=True, warn=True, timeout=15)
         for host, result in results.items():
             if 'is running at' in result.stdout:
                 cluster.log.verbose('Detected running Kubernetes cluster on %s' % host)
@@ -714,7 +717,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
              f"--patches=/etc/kubernetes/patches")
 
     drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
-    first_control_plane.sudo(drain_cmd, hide=False)
+    first_control_plane.sudo(drain_cmd, hide=False, pty=True)
 
     upgrade_cri_if_required(first_control_plane)
     fix_flag_kubelet(first_control_plane)
@@ -722,7 +725,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     first_control_plane.sudo(
         f"sudo kubeadm upgrade apply {version} {flags} && "
         f"sudo kubectl uncordon {node_name} && "
-        f"sudo systemctl restart kubelet", hide=False)
+        f"sudo systemctl restart kubelet", hide=False, pty=True)
 
     copy_admin_config(cluster.log, first_control_plane)
 
@@ -749,7 +752,7 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             components.create_kubeadm_patches_for_node(cluster, node)
 
             drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
-            node.sudo(drain_cmd, hide=False)
+            node.sudo(drain_cmd, hide=False, pty=True)
 
             upgrade_cri_if_required(node)
             fix_flag_kubelet(node)
@@ -758,7 +761,7 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
                 f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
                 f"sudo kubectl uncordon {node_name} && "
                 f"sudo systemctl restart kubelet",
-                hide=False)
+                hide=False, pty=True)
 
             expect_kubernetes_version(cluster, version, apply_filter=node_name)
             copy_admin_config(cluster.log, node)
@@ -784,14 +787,14 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         components.create_kubeadm_patches_for_node(cluster, node)
 
         drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
-        first_control_plane.sudo(drain_cmd, hide=False)
+        first_control_plane.sudo(drain_cmd, hide=False, pty=True)
 
         upgrade_cri_if_required(node)
         fix_flag_kubelet(node)
 
         node.sudo(
             "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-            "sudo systemctl restart kubelet")
+            "sudo systemctl restart kubelet", pty=True)
 
         first_control_plane.sudo("kubectl uncordon %s" % node_name, hide=False)
 
@@ -829,7 +832,7 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
         cri_packages = cluster.get_package_association_for_node(group.get_host(), 'containerd', 'package_name')
 
         log.debug(f"Installing {cri_packages} on node: {group.get_node_name()}")
-        packages.install(group, include=cri_packages)
+        packages.install(group, include=cri_packages, pty=True)
         log.debug(f"Restarting all containers on node: {group.get_node_name()}")
         group.sudo("crictl rm -fa", warn=True)
     else:
@@ -917,7 +920,7 @@ def expect_kubernetes_version(cluster: KubernetesCluster, version: str,
         command += ' | grep -w %s' % apply_filter
 
     while retries > 0:
-        result = node.sudo(command, warn=True)
+        result = node.sudo(command, warn=True, pty=True)
         stdout = list(result.values())[0].stdout
         cluster.log.verbose(stdout)
         nodes_version_correct = True
@@ -1123,7 +1126,7 @@ def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml",
-                      callback=collector)
+                      pty=True, callback=collector)
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster) -> None:

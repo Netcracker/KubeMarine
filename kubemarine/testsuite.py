@@ -22,7 +22,7 @@ from typing import Dict, Optional, Type, Union, List
 from kubemarine.core import utils, log
 
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import GroupException
+from kubemarine.core.executor import BaseExecutorException
 
 TC_UNKNOWN = -1
 TC_PASSED = 0
@@ -44,7 +44,7 @@ class TestCase:
     def __enter__(self) -> 'TestCase':
         return self
 
-    def __exit__(self, _: Optional[Type[Exception]], value: Optional[Exception],
+    def __exit__(self, _: Optional[Type[BaseException]], value: Optional[BaseException],
                  traceback: Optional[TracebackType]) -> bool:
         if value is None:
             if self.status is TC_UNKNOWN:
@@ -56,6 +56,10 @@ class TestCase:
         else:
             self.exception(value)
         print(self.get_summary(show_hint=True))  # pylint: disable=bad-builtin
+        if isinstance(value, KeyboardInterrupt):
+            # No need to print output of remote commands twice.
+            raise KeyboardInterrupt()
+
         return True
 
     def __init__(self, cluster: KubernetesCluster, id_: str, category: str, name: str,
@@ -88,11 +92,12 @@ class TestCase:
 
     def exception(self, results: BaseException) -> None:
         self.status = TC_EXCEPTED
-        if isinstance(results, GroupException):
+        if isinstance(results, BaseExecutorException):
             self.cluster.log.debug(results)
             self.results = "Remote group exception"
         else:
-            print_exc()
+            if not isinstance(results, KeyboardInterrupt):
+                print_exc()
             self.results = results
 
     def get_summary(self, show_hint: bool = False, show_minimal: bool = False, show_recommended: bool = False) -> str:

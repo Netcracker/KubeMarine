@@ -515,14 +515,15 @@ class PackageManager(Protocol):
 
     def install(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
                 exclude: Union[str, List[str]] = None,
-                callback: Callback = None) -> GROUP_RUN_TYPE: ...
+                pty: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE: ...
 
     def remove(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
                exclude: Union[str, List[str]] = None,
-               warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE: ...
+               warn: bool = False, hide: bool = True, pty: bool = False) -> GROUP_RUN_TYPE: ...
 
     def upgrade(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+                exclude: Union[str, List[str]] = None,
+                pty: bool = False) -> GROUP_RUN_TYPE: ...
 
     def no_changes_found(self, action: str, result: RunnersResult) -> bool: ...
 
@@ -566,18 +567,20 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
 
 def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
             exclude: Union[str, List[str]] = None,
-            callback: Callback = None) -> GROUP_RUN_TYPE:
-    return get_package_manager(group).install(group, include, exclude, callback)
+            pty: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).install(group, include, exclude,
+                                              pty=pty, callback=callback)
 
 
 def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
-           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
-    return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide)
+           warn: bool = False, hide: bool = True, pty: bool = False) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide, pty=pty)
 
 
 def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
-    return get_package_manager(group).upgrade(group, include, exclude)
+            exclude: Union[str, List[str]] = None,
+            pty: bool = False) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).upgrade(group, include, exclude, pty=pty)
 
 
 def no_changes_found(group: NodeGroup, action: str, result: RunnersResult) -> bool:

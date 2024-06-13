@@ -25,33 +25,33 @@ from typing import (
     Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast, Sequence
 )
 
-from kubemarine.core import utils, log, errors
+from kubemarine.core import utils, log, executor as exe
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult, UnexpectedExit,
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, UnexpectedExit,
+    RESULT, GroupResult,
 )
 
 NodeConfig = Dict[str, Any]
 GroupFilter = Union[Callable[[NodeConfig], bool], NodeConfig]
 
-_RESULT = TypeVar('_RESULT', bound=GenericResult, covariant=True)
 _T = TypeVar('_T', bound=Union['RunnersGroupResult', bool, None])
 
 
-class GenericGroupResult(Mapping[str, _RESULT]):
+class GenericGroupResult(GroupResult[RESULT], Mapping[str, RESULT]):
 
-    def __init__(self, cluster: object, results: Mapping[str, _RESULT]) -> None:
+    def __init__(self, cluster: object, results: Mapping[str, RESULT]) -> None:
+        super().__init__({host: [result] for host, result in results.items()})
         self.cluster = cluster
-        self._result: Dict[str, _RESULT] = dict(results)
 
-    def __getitem__(self, host: str) -> _RESULT:
-        return self._result[host]
+    def __getitem__(self, host: str) -> RESULT:
+        return self._results[host][0]
 
     def __len__(self) -> int:
-        return len(self._result)
+        return len(self._results)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._result)
+        return iter(self._results)
 
     def get_simple_out(self) -> str:
         return self.get_simple_result().stdout
@@ -67,26 +67,6 @@ class GenericGroupResult(Mapping[str, _RESULT]):
                                       % type(res))
 
         return res
-
-    def __str__(self) -> str:
-        host_outputs = []
-        for host, result in self.items():
-            output = f"{host}:"
-
-            if isinstance(result, RunnersResult):
-                output += f" code={result.repr_code()}"
-                repr_out = result.repr_out()
-                if repr_out:
-                    output += '\n\t' + repr_out.replace('\n', '\n\t')
-
-            # The exception may be only the last in the list. We are also sure to have at least one result per node.
-            if isinstance(result, Exception):
-                exception = errors.wrap_kme_exception(result)
-                output += '\n\t' + str(exception).replace('\n', '\n\t')
-
-            host_outputs.append(output)
-
-        return "\n".join(host_outputs)
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -194,32 +174,6 @@ class GenericGroupResult(Mapping[str, _RESULT]):
         """
         return len(self.get_hosts_list_where_value_in_stderr(value)) > 0
 
-    def __eq__(self, other: object) -> bool:
-        if self is other:
-            return True
-
-        if not isinstance(other, GenericGroupResult):
-            return False
-
-        if len(self) != len(other):
-            return False
-
-        for host, result in self.items():
-            compared_result = other.get(host)
-            if compared_result is None:
-                return False
-
-            if not isinstance(result, RunnersResult) or not isinstance(compared_result, RunnersResult):
-                raise NotImplementedError('Currently only instances of RunnersResult can be compared')
-
-            if result != compared_result:
-                return False
-
-        return True
-
-    def __ne__(self, other: object) -> bool:
-        return not self == other
-
 
 class NodeGroupResult(GenericGroupResult[GenericResult]):
     pass
@@ -303,26 +257,73 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         return not self == other
 
     def run(self, command: str,
-            warn: bool = False, hide: bool = True,
+            *,
+            warn: bool = False, hide: bool = True, pty: bool = False,
             env: Dict[str, str] = None, timeout: int = None,
             callback: Callback = None) -> GROUP_RUN_TYPE:
+        """
+        Execute `fabric.Connection.run()` for each node in the group.
+        Most of kwargs have the same semantics as in `invoke.Runner.run()`
+        with probably changed default values, except the `callback`.
+
+        :param command: the shell command to execute
+        :param warn: whether to continue on non-zero code, instead of raising a `.GroupException`
+        :param hide:
+            Do not copy stdout / stderr from remote to local.
+            See `invoke.Runner.run()` for details.
+        :param pty:
+            Enables the actual pseudoterminal. See `invoke.Runner.run()` for details.
+
+            The following properties should be kept in mind:
+
+            - The remote command may behave interactively with `pty=True`, e.g. apply paging, coloring,
+              and hang up expecting user input. This may be mitigated by the command-specific flags and env variables.
+
+            - Stdout and stderr are combined. If parsing is required, it should be resistant
+              to potentially broken formatting due to unexpected errors / warnings redirected from stderr.
+              It may be useful to redirect unnecessary stream to /dev/null
+
+            - The command can be interrupted using SIGINT or ^C, or `timeout`.
+              In case of a Ctrl + C, the derived KeyboardInterrupt is thrown containing current output.
+
+        :param env: a dict to update the remote environment.
+        :param timeout:
+            Close the channel and raise `.GroupException` containing `executor.CommandTimedOut`
+            after the specified number of seconds.
+            Global timeout for all operations: 2700 seconds.
+            **Note:** this does not interrupt the remote command unless `pty=True` is additionally used.
+        :param callback:
+            Callback to process the result of commands.
+            See `executor.Callback.accept()` for details.
+        :return:
+            Depending on a specific class, real `executor.RunnersResult`,
+            or token to obtain the result of deferred command.
+        """
         caller: Optional[Dict[str, object]] = None
         if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("run", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, pty=pty,
+                         env=env, timeout=timeout, callback=callback)
 
     def sudo(self, command: str,
-             warn: bool = False, hide: bool = True,
+             *,
+             warn: bool = False, hide: bool = True, pty: bool = False,
              env: Dict[str, str] = None, timeout: int = None,
              callback: Callback = None) -> GROUP_RUN_TYPE:
+        """
+        Execute `fabric.Connection.sudo()` for each node in the group.
+
+        See `.run()` for details.
+        """
         caller: Optional[Dict[str, object]] = None
         if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("sudo", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, pty=pty,
+                         env=env, timeout=timeout, callback=callback)
 
     @abstractmethod
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -334,8 +335,20 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         pass
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str,
+            *,
             backup: bool = False, sudo: bool = False,
-            mkdir: bool = False, immutable: bool = False) -> None:
+            mkdir: bool = False, immutable: bool = False,
+            compare_hashes: bool = False) -> None:
+        local_stream = self._prepare_local(local_file, remote_file)
+        group_to_upload = self._group_to_upload(local_stream, remote_file, compare_hashes)
+        if group_to_upload.is_empty():
+            return
+
+        # pylint: disable-next=protected-access
+        group_to_upload._put_with_mv(local_stream, remote_file,
+                                     backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
+
+    def _prepare_local(self, local_file: Union[io.StringIO, str], remote_file: str) -> Union[bytes, str]:
         if isinstance(local_file, io.StringIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s"
                                      % (remote_file, list(self.nodes)))
@@ -343,8 +356,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # if text contains non-ASCII characters.
             # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
 
-            local_stream: Union[io.BytesIO, str] = io.BytesIO(local_file.getvalue().encode('utf-8'))
-            group_to_upload = self
+            return local_file.getvalue().encode('utf-8')
         else:
             if not os.path.isfile(local_file):
                 raise Exception(f"File {local_file} does not exist")
@@ -352,31 +364,40 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s"
                                      % (local_file, remote_file, list(self.nodes)))
 
-            self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
-            eager_group = self.cluster.make_group(self.nodes)
-            local_file_hash = eager_group.get_local_file_sha1(local_file)
-            self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
-            remote_file_hashes = eager_group.get_remote_file_sha1(remote_file)
-            self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
+            return local_file
 
-            hosts_to_upload = []
-            for remote_ip, remote_file_hash in remote_file_hashes.items():
-                if remote_file_hash != local_file_hash:
-                    self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s'
-                                             % (remote_ip, local_file_hash, remote_file_hash))
-                    hosts_to_upload.append(remote_ip)
-            if not hosts_to_upload:
-                self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
-                return
+    def _group_to_upload(self: GROUP_SELF, local_file: Union[bytes, str], remote_file: str,
+                         compare_hashes: bool) -> GROUP_SELF:
+        if self.is_empty():
+            repr_local = '<text>' if isinstance(local_file, bytes) else local_file
+            self.cluster.log.verbose(f'No nodes to transfer {repr_local} to remote file {remote_file}')
+            return self
 
-            local_stream = local_file
-            group_to_upload = self._make_group(hosts_to_upload)
+        if not compare_hashes:
+            return self
 
-        # pylint: disable-next=protected-access
-        group_to_upload._put_with_mv(local_stream, remote_file,
-                                     backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
+        file_size = len(local_file) if isinstance(local_file, bytes) else os.path.getsize(local_file)
+        self.cluster.log.verbose(f'File size: %s' % file_size)
+        eager_group = self.cluster.make_group(self.nodes)
+        local_file_hash = eager_group.get_local_file_sha1(local_file)
+        self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
+        remote_file_hashes = eager_group.get_remote_file_sha1(remote_file)
+        self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
 
-    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+        hosts_to_upload = []
+        for remote_ip, remote_file_hash in remote_file_hashes.items():
+            if remote_file_hash != local_file_hash:
+                self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s'
+                                         % (remote_ip, local_file_hash, remote_file_hash))
+                hosts_to_upload.append(remote_ip)
+
+        group_to_upload = self._make_group(hosts_to_upload)
+        if group_to_upload.is_empty():
+            self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
+
+        return group_to_upload
+
+    def _put_with_mv(self, local_stream: Union[bytes, str], remote_file: str,
                      backup: bool, sudo: bool, mkdir: bool, immutable: bool) -> None:
 
         if sudo:
@@ -440,7 +461,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         self.sudo(mv_command)
 
     @abstractmethod
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         pass
 
     def _unsafe_make_runners_result(self, host_results: HostToResult) -> RunnersGroupResult:
@@ -660,7 +681,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_exec("get", remote_file, local_file)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_exec("put", local_stream, remote_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -685,19 +706,23 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
         executor = RawExecutor(self.cluster)
         executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
-        executor.flush()
 
-        results = {host: next(iter(results.values()))
-                   for host, results in executor.get_last_results().items()}
+        excepted = False
+        try:
+            executor.flush()
+        except exe.GroupException:
+            excepted = True
 
-        if any(isinstance(result, Exception) for result in results.values()):
+        results = {host: results[0]
+                   for host, results in executor.get_flat_result().items()}
+        if excepted:
             raise GroupResultException(NodeGroupResult(self.cluster, results))
 
         return results
 
     def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout: int = None) -> RunnersGroupResult:
         results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
-        if any(isinstance(result, Exception) or result == initial_boot_history.get(host)
+        if any(isinstance(result, BaseException) or result == initial_boot_history.get(host)
                for host, result in results.items()):
             raise GroupResultException(NodeGroupResult(self.cluster, results))
 
@@ -715,15 +740,16 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_command_successful(self, command: str,
                                 *,
                                 retries: int = 15, timeout: int = 5,
-                                hide: bool = False) -> None:
+                                hide: bool = False, pty: bool = False) -> None:
         logger = self.cluster.log
 
         def attempt() -> bool:
-            result = self.sudo(command, warn=True, hide=hide)
+            result = self.sudo(command, warn=True, hide=hide, pty=pty)
             if hide:
                 logger.verbose(result)
                 for host in result.get_failed_hosts_list():
-                    stderr = result[host].stderr.rstrip('\n')
+                    output = result[host].stdout if pty else result[host].stderr
+                    stderr = output.rstrip('\n')
                     if stderr:
                         logger.debug(f"{host}: {stderr}")
 
@@ -734,7 +760,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_commands_successful(self, commands: List[str],
                                  *,
                                  retries: int = 15, timeout: int = 5,
-                                 sudo: bool = True) -> None:
+                                 sudo: bool = True, pty: bool = False) -> None:
         if len(self.nodes) != 1:
             raise Exception("Waiting for few commands is currently supported only for single node")
 
@@ -745,19 +771,20 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
             defer = self.new_defer()
             for command in remained_commands:
                 if sudo:
-                    defer.sudo(command)
+                    defer.sudo(command, pty=pty)
                 else:
-                    defer.run(command)
+                    defer.run(command, pty=pty)
 
             try:
                 defer.flush()
-            except RemoteGroupException as e:
+            except GroupException as e:
                 results = e.results[self.get_host()]
                 for result in results:
                     if isinstance(result, UnexpectedExit):
-                        logger.debug(result.result.stderr)
+                        output = result.result.stdout if pty else result.result.stderr
+                        logger.debug(output)
                         break
-                    if isinstance(result, Exception):
+                    if isinstance(result, BaseException):
                         raise
 
                     del remained_commands[0]
@@ -768,8 +795,11 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
         utils.wait_command_successful(logger, attempt, retries, timeout)
 
-    def get_local_file_sha1(self, filename: str) -> str:
-        return utils.get_local_file_sha1(filename)
+    def get_local_file_sha1(self, local_file: Union[bytes, str]) -> str:
+        if isinstance(local_file, str):
+            return utils.get_local_file_sha1(local_file)
+        else:
+            return utils.get_stream_sha1(io.BytesIO(local_file))
 
     def get_remote_file_sha1(self, filename: str) -> Dict[str, Optional[str]]:
         results = self.sudo("openssl sha1 %s" % filename, warn=True)
@@ -804,7 +834,7 @@ class DeferredGroup(AbstractGroup[Token]):
             raise ValueError("Streaming of output is currently not supported in deferred mode")
         return self._do_queue(do_type, command, **kwargs)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_queue("put", local_stream, remote_file)
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: Any) -> Token:
@@ -841,17 +871,16 @@ class RemoteExecutor(RawExecutor):
 
         :return: grouped tokenized results per connection.
         """
-        super().flush()
+        try:
+            super().flush()
+        except exe.GroupException as e:
+            raise GroupException(self.cluster, e.results) from None
 
-        for results in self._last_results.values():
-            if any(isinstance(result, Exception) for _, result in results.items()):
-                raise RemoteGroupException(self.cluster, self._last_results)
 
-
-class GroupException(Exception):
-    def __init__(self, cluster: object, results: Dict[str, List[GenericResult]]):
+class GroupException(exe.GroupException):
+    def __init__(self, cluster: object, results: Mapping[str, Sequence[GenericResult]]):
+        super().__init__(results)
         self.cluster = cluster
-        self.results = results
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -872,7 +901,7 @@ class GroupException(Exception):
         """
         excepted_hosts: List[str] = []
         for host, results in self.results.items():
-            if any(isinstance(result, Exception) for result in results):
+            if any(isinstance(result, BaseException) for result in results):
                 excepted_hosts.append(host)
         return excepted_hosts
 
@@ -906,39 +935,8 @@ class GroupException(Exception):
         nodes_list = self.get_exited_hosts_list()
         return self._make_group(nodes_list)
 
-    def __str__(self) -> str:
-        # We always print output of all commands in the batch even if they are not failed,
-        # for the reason that the user code might want to print output of some commands in the batch,
-        # but failed to do that because of the exception.
-        host_outputs = []
-        for host, results in self.results.items():
-            output = f"{host}:"
-
-            # filter out transfer results and the last exception if present
-            runners_results = [res for res in results if isinstance(res, RunnersResult)]
-            if runners_results:
-                merged_result = RunnersResult.merge(runners_results)
-                output += f" code={merged_result.repr_code()}"
-                repr_out = merged_result.repr_out(hide_already_printed=True)
-                if repr_out:
-                    output += '\n\t' + repr_out.replace('\n', '\n\t')
-
-            # The exception may be only the last in the list. We are also sure to have at least one result per node.
-            if isinstance(results[-1], Exception):
-                exception = errors.wrap_kme_exception(results[-1])
-                output += '\n\t' + str(exception).replace('\n', '\n\t')
-
-            host_outputs.append(output)
-
-        return "\n".join(host_outputs)
-
 
 class GroupResultException(GroupException):
     def __init__(self, result: GenericGroupResult[GenericResult]):
         super().__init__(result.cluster, {host: [res] for host, res in result.items()})
         self.result = result
-
-
-class RemoteGroupException(GroupException):
-    def __init__(self, cluster: object, results: Dict[str, TokenizedResult]):
-        super().__init__(cluster, {host: list(res.values()) for host, res in results.items()})

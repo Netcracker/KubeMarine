@@ -51,8 +51,8 @@ def put_certificate(control_plane: NodeGroup, cert: io.StringIO, key: io.StringI
     :param cert: data with certificate
     :param key: data with private key
     """
-    control_plane.put(cert, _certificate_path, sudo=True)
-    control_plane.put(key, _private_key_path, sudo=True)
+    control_plane.put(cert, _certificate_path, sudo=True, compare_hashes=False)
+    control_plane.put(key, _private_key_path, sudo=True, compare_hashes=False)
 
 
 def create_certificate(control_plane: NodeGroup, config: str, customization_flags: str) -> None:

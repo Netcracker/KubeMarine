@@ -169,8 +169,8 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
     expect_config = cluster.inventory['plugins']['calico']['apiserver']['expect']['apiservice']
     with kubernetes.local_admin_config(control_planes) as kubeconfig:
         control_planes.call(NodeGroup.wait_command_successful,
-                            command=f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org",
-                            hide=True,
+                            command=f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org > /dev/null",
+                            hide=True, pty=True,
                             retries=expect_config['retries'], timeout=expect_config['timeout'])
 
 

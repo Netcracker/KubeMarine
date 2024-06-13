@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import json
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
+from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, CollectorCallback
 
 
 # the methods requires etcdctl.sh to be installed on all active control-plane nodes during thirdparties task.
@@ -51,39 +51,29 @@ def remove_members(group: NodeGroup) -> None:
         if node_name in etcd_members:
             command = "etcdctl member remove " + etcd_members[node_name]
             log.verbose(f"Removing found etcd member {node_name}...")
-            managing_control_plane.sudo(command)
+            managing_control_plane.sudo(command, pty=True)
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
 
-def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[Dict]:
+def wait_for_health(cluster: KubernetesCluster, node: NodeGroup) -> List[Dict]:
     """
     The method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
     if all member are healthy the method checks the leader.
     """
     log = cluster.log
-    init_timeout = cluster.globals['etcd']['health']['init_timeout']
     timeout = cluster.globals['etcd']['health']['timeout']
     retries = cluster.globals['etcd']['health']['retries']
 
     is_healthy = False
-    time.sleep(init_timeout)
     while retries > 0:
         start_time = time.time()
-        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json').get_simple_out()
+        is_healthy = _is_healthy(cluster, node)
         end_time = time.time()
         sudo_time = int(end_time - start_time)
-        log.verbose(etcd_health_raw)
-        etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
 
-        health = 0
-        for etcd_health in etcd_health_list:
-            if etcd_health.get('health'):
-                health += 1
-
-        if health == len(etcd_health_list):
+        if is_healthy:
             log.debug('All ETCD members are healthy!')
-            is_healthy = True
             break
 
         log.debug('Wait for ETCD cluster is not healthy!')
@@ -92,9 +82,7 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
         retries -= 1
 
     if is_healthy:
-        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
-        log.verbose(etcd_status_raw)
-        etcd_status_list: List[dict] = json.load(io.StringIO(etcd_status_raw.lower().strip()))
+        _, etcd_status_list = execute_endpoints_command(cluster, node, 'status', warn=False)
         elected_leader: Optional[int] = None
         for item in etcd_status_list:
             leader: Optional[int] = item.get('status', {}).get('leader')
@@ -111,3 +99,42 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
     log.verbose('ETCD cluster is healthy!')
 
     return etcd_status_list
+
+
+def _is_healthy(cluster: KubernetesCluster, node: NodeGroup) -> bool:
+    is_healthy, etcd_health_list = execute_endpoints_command(cluster, node, 'health', warn=True)
+    if not is_healthy:
+        return False
+
+    health = sum(1 for etcd_health in etcd_health_list if etcd_health.get('health'))
+    if health != cluster.nodes['control-plane'].nodes_amount():
+        return False
+
+    return True
+
+
+def execute_endpoints_command(cluster: KubernetesCluster, node: NodeGroup, command: str,
+                              *, warn: bool) -> Tuple[bool, List[dict]]:
+    logger = cluster.log
+    tmp_path = utils.get_remote_tmp_path()
+    host = node.get_host()
+
+    defer = node.new_defer()
+    collector = CollectorCallback(cluster)
+
+    # Separate stdout and stderr using extra temporary file
+    defer.sudo(f'etcdctl endpoint {command} --cluster -w json > {tmp_path}',
+               pty=True, warn=warn, callback=collector)
+    defer.sudo(f'cat {tmp_path}', pty=True, warn=warn, callback=collector)
+    defer.sudo(f'rm -f {tmp_path}', pty=True, warn=warn, callback=collector)
+
+    defer.flush()
+    if collector.result.is_any_failed():
+        logger.verbose(collector.result)
+        return False, []
+
+    endpoints_raw = collector.results[host][1].stdout
+    cluster.log.verbose(endpoints_raw)
+    endpoints_list: List[dict] = json.loads(endpoints_raw.lower().rstrip('\n'))
+
+    return True, endpoints_list

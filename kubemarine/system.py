@@ -219,8 +219,9 @@ def stop_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Call
     return group.sudo('systemctl stop %s' % name, callback=callback)
 
 
-def start_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Callback = None) -> GROUP_RUN_TYPE:
-    return group.sudo('systemctl start %s' % name, callback=callback)
+def start_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, warn: bool = False,
+                  callback: Callback = None) -> GROUP_RUN_TYPE:
+    return group.sudo('systemctl start %s' % name, warn=warn, callback=callback)
 
 
 def restart_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None,
@@ -369,7 +370,7 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         if cordon_required:
             res = first_control_plane.sudo(
                 kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
-                warn=True)
+                warn=True, pty=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)
@@ -601,7 +602,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
         }
         nodes_context[host]['access'] = access_info
 
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             if RawExecutor.is_require_nopasswd_exception(result):
                 # The error is thrown only if connection is successful, but something is wrong with sudo access.
                 # In general, sudo password is incorrect. In our case, user is not a sudoer, or not a nopasswd sudoer.
@@ -616,7 +617,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
             elif isinstance(result, paramiko.ssh_exception.NoValidConnectionsError):
                 # Internal socket error, for example, when ssh daemon is off. All statuses are unchecked.
                 pass
-            elif isinstance(exc, Exception):
+            elif isinstance(exc, GroupResultException):
                 raise exc
         else:
             access_info['online'] = True

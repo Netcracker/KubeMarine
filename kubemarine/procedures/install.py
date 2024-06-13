@@ -263,7 +263,7 @@ def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
 
             if pkgs:
                 cluster.log.debug(f"Installing {pkgs} on {node.get_node_name()!r}")
-                packages.install(node, include=pkgs, callback=collector)
+                packages.install(node, include=pkgs, pty=True, callback=collector)
 
     return collector.result
 
@@ -277,21 +277,21 @@ def manage_custom_packages(group: NodeGroup) -> None:
         cluster.log.debug("Running kubemarine.packages.remove: ")
         remove = packages_section['remove']
         batch_results['remove'] = results = packages.remove(
-            group, include=remove['include'], exclude=remove.get('exclude'))
+            group, include=remove['include'], exclude=remove.get('exclude'), pty=True)
         cluster.log.debug(results)
 
     if packages_section.get("install", {}).get("include"):
         cluster.log.debug("Running kubemarine.packages.install: ")
         install = packages_section['install']
         batch_results['install'] = results = packages.install(
-            group, include=install['include'], exclude=install.get('exclude'))
+            group, include=install['include'], exclude=install.get('exclude'), pty=True)
         cluster.log.debug(results)
 
     if packages_section.get("upgrade", {}).get("include"):
         cluster.log.debug("Running kubemarine.packages.upgrade: ")
         upgrade = packages_section['upgrade']
         batch_results['upgrade'] = results = packages.upgrade(
-            group, include=upgrade['include'], exclude=upgrade.get('exclude'))
+            group, include=upgrade['include'], exclude=upgrade.get('exclude'), pty=True)
         cluster.log.debug(results)
 
     if not batch_results:

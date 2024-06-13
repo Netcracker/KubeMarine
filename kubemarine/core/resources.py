@@ -315,7 +315,7 @@ class DynamicResources:
             yield
         except errors.FailException:
             raise
-        except Exception as exc:
+        except (Exception, KeyboardInterrupt) as exc:
             raise errors.FailException("Failed to proceed inventory file", exc)
 
     def _create_cluster(self, context: dict, stage: c.EnrichmentStage,
