@@ -2,7 +2,7 @@
 
 Source [https://github.com/Pharb/kubernetes-iperf3](https://github.com/Pharb/kubernetes-iperf3).
 
-To check cluster network performance, it is necessary to do the following:
+To check the cluster network performance, it is necessary to do the following:
 
 1. Add the following configuration to the **plugins** section:
    ```yaml
@@ -18,7 +18,7 @@ To check cluster network performance, it is necessary to do the following:
                  - iperf3-clients
    ```
 
-    For this plugin it is possible to configure nodeSelector, so that all iperf3 pods will be ran only on particular nodes:
+    For this plugin, it is possible to configure nodeSelector, so that all iperf3 pods will be ran only on particular nodes:
     ```yaml
     plugins:
       iperf3:
