@@ -161,7 +161,7 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
 
     plugins.install(cluster, upgrade_candidates)
 
-def release_calico_leaked_ips(cluster):
+def release_calico_leaked_ips(cluster) -> None:
     """
     During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
     For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
