@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import json
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -56,34 +55,24 @@ def remove_members(group: NodeGroup) -> None:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
 
-def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[Dict]:
+def wait_for_health(cluster: KubernetesCluster, node: NodeGroup) -> List[Dict]:
     """
     The method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
     if all member are healthy the method checks the leader.
     """
     log = cluster.log
-    init_timeout = cluster.globals['etcd']['health']['init_timeout']
     timeout = cluster.globals['etcd']['health']['timeout']
     retries = cluster.globals['etcd']['health']['retries']
 
     is_healthy = False
-    time.sleep(init_timeout)
     while retries > 0:
         start_time = time.time()
-        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json').get_simple_out()
+        is_healthy = _is_healthy(cluster, node)
         end_time = time.time()
         sudo_time = int(end_time - start_time)
-        log.verbose(etcd_health_raw)
-        etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
 
-        health = 0
-        for etcd_health in etcd_health_list:
-            if etcd_health.get('health'):
-                health += 1
-
-        if health == len(etcd_health_list):
+        if is_healthy:
             log.debug('All ETCD members are healthy!')
-            is_healthy = True
             break
 
         log.debug('Wait for ETCD cluster is not healthy!')
@@ -92,9 +81,7 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
         retries -= 1
 
     if is_healthy:
-        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
-        log.verbose(etcd_status_raw)
-        etcd_status_list: List[dict] = json.load(io.StringIO(etcd_status_raw.lower().strip()))
+        _, etcd_status_list = _execute_endpoints_command(cluster, node, 'status', warn=False)
         elected_leader: Optional[int] = None
         for item in etcd_status_list:
             leader: Optional[int] = item.get('status', {}).get('leader')
@@ -111,3 +98,31 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
     log.verbose('ETCD cluster is healthy!')
 
     return etcd_status_list
+
+
+def _is_healthy(cluster: KubernetesCluster, node: NodeGroup) -> bool:
+    is_healthy, etcd_health_list = _execute_endpoints_command(cluster, node, 'health', warn=True)
+    if not is_healthy:
+        return False
+
+    health = sum(1 for etcd_health in etcd_health_list if etcd_health.get('health'))
+    if health != cluster.nodes['control-plane'].nodes_amount():
+        return False
+
+    return True
+
+
+def _execute_endpoints_command(cluster: KubernetesCluster, node: NodeGroup, command: str,
+                               *, warn: bool) -> Tuple[bool, List[dict]]:
+    logger = cluster.log
+
+    result = node.sudo(f'etcdctl endpoint {command} --cluster -w json', warn=warn)
+    if result.is_any_failed():
+        logger.verbose(result)
+        return False, []
+
+    endpoints_raw = result.get_simple_out()
+    cluster.log.verbose(endpoints_raw)
+    endpoints_list: List[dict] = json.loads(endpoints_raw.lower().rstrip('\n'))
+
+    return True, endpoints_list
