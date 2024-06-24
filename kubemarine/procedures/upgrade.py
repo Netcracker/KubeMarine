@@ -170,7 +170,10 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
-    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
+    result = first_control_plane.sudo(
+        "calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true",
+        hide=False
+    )
     leaked_ips = result.get_simple_out()
     leaked_ips_count = leaked_ips.count('leaked')
     cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
@@ -179,21 +182,17 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     ips_with_missing_handles = []
     handles_with_no_matching_ips = []
 
-    if leaked_ips_count != 0:
-        # Parse the leaked IPAM report to identify IPs with missing handles and handles with no matching IPs
-        with open(random_report_name, 'r') as report_file:
+    if leaked_ips_count > 0:
+        cluster.log.debug("Collecting IPs with missing handles and handles with no matching IPs...")
+        with open(random_report_name, 'r', encoding='utf-8') as report_file:
             for line in report_file:
-                if 'IPs that are allocated but not actually in use' in line:
-                    continue
-                elif 'IPAM handles with no matching IPs' in line:
-                    break
-                else:
+                if 'no matching handle' in line:
                     ip = line.split()[0]
                     ips_with_missing_handles.append(ip)
-
-            for line in report_file:
-                handle = line.split()[3][:-1]  # Remove trailing colon
-                handles_with_no_matching_ips.append(handle)
+                    continue
+                if 'no matching IP' in line:
+                    handle = line.split()[3][:-1]  # Remove trailing colon
+                    handles_with_no_matching_ips.append(handle)
 
         # Release IPs with missing handles
         if ips_with_missing_handles:
