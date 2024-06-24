@@ -1348,7 +1348,8 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     trns_cmd: Dict[str, str] = {}
 
     binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check.gz')
-    ipip_check = utils.get_remote_tmp_path()
+    ipip_check = '/tmp/kubemarine_ipip_check'
+    ipip_check_pid = utils.get_remote_tmp_path()
     # Random message
     random.seed()
     msg = ''.join(random.choices(string.ascii_letters + string.digits, k=15))
@@ -1378,7 +1379,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             # the process is killed by terminating command
             trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
                              f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
-                             f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
+                             f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check_pid}"
             # Receiver start command
             # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from neighbor node
             recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport}" \
@@ -1391,7 +1392,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         trns_neighbor_host = nodes_list[1]['internal_address']
         trns_cmd[host] = f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} " \
                          f"-ext {trns_neighbor_host} -sport {random_sport} -dport {random_dport} " \
-                         f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid"
+                         f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check_pid}"
         host = nodes_list[1]['internal_address']
         recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -sport {random_sport} " \
                          f"-dport {random_dport} -msg {msg} -timeout 3 2> /dev/null"
@@ -1399,9 +1400,9 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     try:
         collector = CollectorCallback(group.cluster)
         cluster.log.debug("Copy binaries to the nodes")
-        group.put(binary_check_path, f"{ipip_check}.gz")
-        group.sudo(f"gzip -d {ipip_check}.gz")
-        group.sudo(f"sudo chmod +x {ipip_check}")
+        group.put(binary_check_path, f"{ipip_check}.gz", compare_hashes=True)
+        group.run(f"gzip -d -k -f {ipip_check}.gz")
+        group.run(f"chmod +x {ipip_check}")
         # Run transmitters if it's applicable for node
         cluster.log.debug("Run transmitters")
         with group.new_executor() as exe:
@@ -1434,8 +1435,9 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         cluster.log.debug("Delete binaries")
         with group_to_rollback.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
-                node_exe.sudo(f"pkill -9 -P $(cat {ipip_check}.pid | xargs | tr ' ' ','); " \
-                              f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
+                node_exe.sudo(
+                    f"pkill -9 -P $(cat {ipip_check_pid} | xargs | tr ' ' ','); "
+                    f"sudo rm -f {ipip_check_pid}", warn=True)
 
 
 def fs_mount_options(cluster: KubernetesCluster) -> None:

@@ -1064,7 +1064,7 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     else:
         apply_common_group = cluster.create_group_from_groups_nodes_names(apply_groups, apply_nodes)
 
-    destination_common_group.put(source, destination_path, backup=True, mkdir=True, sudo=use_sudo)
+    destination_common_group.put(source, destination_path, backup=True, mkdir=True, sudo=use_sudo, compare_hashes=True)
 
     if apply_required:
         cluster.log.debug("Applying yaml...")

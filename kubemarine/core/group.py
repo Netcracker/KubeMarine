@@ -303,6 +303,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         return not self == other
 
     def run(self, command: str,
+            *,
             warn: bool = False, hide: bool = True,
             env: Dict[str, str] = None, timeout: int = None,
             callback: Callback = None) -> GROUP_RUN_TYPE:
@@ -314,6 +315,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
                          warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
 
     def sudo(self, command: str,
+             *,
              warn: bool = False, hide: bool = True,
              env: Dict[str, str] = None, timeout: int = None,
              callback: Callback = None) -> GROUP_RUN_TYPE:
@@ -334,8 +336,20 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         pass
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str,
+            *,
             backup: bool = False, sudo: bool = False,
-            mkdir: bool = False, immutable: bool = False) -> None:
+            mkdir: bool = False, immutable: bool = False,
+            compare_hashes: bool = False) -> None:
+        local_stream = self._prepare_local(local_file, remote_file)
+        group_to_upload = self._group_to_upload(local_stream, remote_file, compare_hashes)
+        if group_to_upload.is_empty():
+            return
+
+        # pylint: disable-next=protected-access
+        group_to_upload._put_with_mv(local_stream, remote_file,
+                                     backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
+
+    def _prepare_local(self, local_file: Union[io.StringIO, str], remote_file: str) -> Union[bytes, str]:
         if isinstance(local_file, io.StringIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s"
                                      % (remote_file, list(self.nodes)))
@@ -343,8 +357,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # if text contains non-ASCII characters.
             # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
 
-            local_stream: Union[io.BytesIO, str] = io.BytesIO(local_file.getvalue().encode('utf-8'))
-            group_to_upload = self
+            return local_file.getvalue().encode('utf-8')
         else:
             if not os.path.isfile(local_file):
                 raise Exception(f"File {local_file} does not exist")
@@ -352,31 +365,40 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s"
                                      % (local_file, remote_file, list(self.nodes)))
 
-            self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
-            eager_group = self.cluster.make_group(self.nodes)
-            local_file_hash = eager_group.get_local_file_sha1(local_file)
-            self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
-            remote_file_hashes = eager_group.get_remote_file_sha1(remote_file)
-            self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
+            return local_file
 
-            hosts_to_upload = []
-            for remote_ip, remote_file_hash in remote_file_hashes.items():
-                if remote_file_hash != local_file_hash:
-                    self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s'
-                                             % (remote_ip, local_file_hash, remote_file_hash))
-                    hosts_to_upload.append(remote_ip)
-            if not hosts_to_upload:
-                self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
-                return
+    def _group_to_upload(self: GROUP_SELF, local_file: Union[bytes, str], remote_file: str,
+                         compare_hashes: bool) -> GROUP_SELF:
+        if self.is_empty():
+            repr_local = '<text>' if isinstance(local_file, bytes) else local_file
+            self.cluster.log.verbose(f'No nodes to transfer {repr_local} to remote file {remote_file}')
+            return self
 
-            local_stream = local_file
-            group_to_upload = self._make_group(hosts_to_upload)
+        if not compare_hashes:
+            return self
 
-        # pylint: disable-next=protected-access
-        group_to_upload._put_with_mv(local_stream, remote_file,
-                                     backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
+        file_size = len(local_file) if isinstance(local_file, bytes) else os.path.getsize(local_file)
+        self.cluster.log.verbose(f'File size: %s' % file_size)
+        eager_group = self.cluster.make_group(self.nodes)
+        local_file_hash = eager_group.get_local_file_sha1(local_file)
+        self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
+        remote_file_hashes = eager_group.get_remote_file_sha1(remote_file)
+        self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
 
-    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+        hosts_to_upload = []
+        for remote_ip, remote_file_hash in remote_file_hashes.items():
+            if remote_file_hash != local_file_hash:
+                self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s'
+                                         % (remote_ip, local_file_hash, remote_file_hash))
+                hosts_to_upload.append(remote_ip)
+
+        group_to_upload = self._make_group(hosts_to_upload)
+        if group_to_upload.is_empty():
+            self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
+
+        return group_to_upload
+
+    def _put_with_mv(self, local_stream: Union[bytes, str], remote_file: str,
                      backup: bool, sudo: bool, mkdir: bool, immutable: bool) -> None:
 
         if sudo:
@@ -440,7 +462,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         self.sudo(mv_command)
 
     @abstractmethod
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         pass
 
     def _unsafe_make_runners_result(self, host_results: HostToResult) -> RunnersGroupResult:
@@ -660,7 +682,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_exec("get", remote_file, local_file)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_exec("put", local_stream, remote_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -768,8 +790,11 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
         utils.wait_command_successful(logger, attempt, retries, timeout)
 
-    def get_local_file_sha1(self, filename: str) -> str:
-        return utils.get_local_file_sha1(filename)
+    def get_local_file_sha1(self, local_file: Union[bytes, str]) -> str:
+        if isinstance(local_file, str):
+            return utils.get_local_file_sha1(local_file)
+        else:
+            return utils.get_stream_sha1(io.BytesIO(local_file))
 
     def get_remote_file_sha1(self, filename: str) -> Dict[str, Optional[str]]:
         results = self.sudo("openssl sha1 %s" % filename, warn=True)
@@ -804,7 +829,7 @@ class DeferredGroup(AbstractGroup[Token]):
             raise ValueError("Streaming of output is currently not supported in deferred mode")
         return self._do_queue(do_type, command, **kwargs)
 
-    def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
+    def _put(self, local_stream: Union[bytes, str], remote_file: str) -> None:
         self._do_queue("put", local_stream, remote_file)
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: Any) -> Token:
