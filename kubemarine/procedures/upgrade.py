@@ -12,9 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
+import uuid
 
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
@@ -161,6 +163,53 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
     plugins.install(cluster, upgrade_candidates)
 
 
+def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
+    """
+    Releases leaked IPs with force to handle IPAM issues caused by leftover IPs from pods not properly cleaned up.
+    """
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    cluster.log.debug("Getting leaked ips...")
+    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    result = first_control_plane.sudo(
+        "calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true",
+        hide=False
+    )
+    leaked_ips = result.get_simple_out()
+    leaked_ips_count = leaked_ips.count('leaked')
+    cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
+
+    # Initialize lists to store IPs with missing handles and handles with no matching IPs
+    ips_with_missing_handles = []
+    handles_with_no_matching_ips = []
+
+    if leaked_ips_count > 0:
+        cluster.log.debug("Collecting IPs with missing handles and handles with no matching IPs...")
+        with open(random_report_name, 'r', encoding='utf-8') as report_file:
+            for line in report_file:
+                if 'no matching handle' in line:
+                    ip = line.split()[0]
+                    ips_with_missing_handles.append(ip)
+                    continue
+                if 'no matching IP' in line:
+                    handle = line.split()[3][:-1]  # Remove trailing colon
+                    handles_with_no_matching_ips.append(handle)
+
+        # Release IPs with missing handles
+        if ips_with_missing_handles:
+            cluster.log.debug("Releasing IPs with missing handles...")
+            for ip in ips_with_missing_handles:
+                first_control_plane.sudo(f"calicoctl ipam release --ip={ip} --force", hide=False)
+
+        # Release handles with no matching IPs
+        if handles_with_no_matching_ips:
+            cluster.log.debug("Releasing handles with no matching IPs...")
+            for handle in handles_with_no_matching_ips:
+                first_control_plane.sudo(f"calicoctl ipam release --handle={handle} --force", hide=False)
+
+    # Clean up the temporary report file
+    first_control_plane.sudo(f"rm {random_report_name}", hide=False)
+
+
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
@@ -170,6 +219,7 @@ tasks = OrderedDict({
     "kubernetes_cleanup": kubernetes_cleanup_nodes_versions,
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
+    "release_calico_leaked_ips": release_calico_leaked_ips,  # Added here
     "overview": install.overview
 })
 
