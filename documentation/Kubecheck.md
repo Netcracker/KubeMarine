@@ -23,7 +23,7 @@ This section provides information about the Kubecheck functionality.
       - [007 RAM Amount - Workers](#007-ram-amount---workers)
     - [008 Distributive](#008-distributive)
     - [018 FS mount options](#018-fs-mount-options)
-    - Network
+    - [Network](#network)
       - [009 PodSubnet](#009-podsubnet)
       - [010 ServiceSubnet](#010-servicesubnet)
       - [011 TCP & UDP Ports](#011-tcp--udp-ports)
@@ -311,6 +311,10 @@ This test checks the family and release version of the operating system on the h
 *Task*: `system.fs_mount_options`
 
 This test checks the presence of filesystem mount option that affects contatiner functionality
+
+##### Network
+
+Tests of this type perform the different network checks.
 
 ##### 009 PodSubnet
 
