@@ -3624,11 +3624,11 @@ rbac:
   pss:
     pod-security: enabled
     defaults:
-      enforce: baseline
+      enforce: restricted
       enforce-version: latest
-      audit: baseline
+      audit: restricted
       audit-version: latest
-      warn: baseline
+      warn: restricted
       warn-version: latest
     exemptions:
       usernames: []
