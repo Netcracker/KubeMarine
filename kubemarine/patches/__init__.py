@@ -22,14 +22,8 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p1_calico_typha_schedule_control_planes import CalicoTyphaScheduleControlPlane
-from kubemarine.patches.p2_reinstall_etcdctl_thirdparty import ReinstallEtcdctl
-from kubemarine.patches.p3_reconfigure_audit import ReconfigureAudit
 
 patches: List[Patch] = [
-    CalicoTyphaScheduleControlPlane(),
-    ReinstallEtcdctl(),
-    ReconfigureAudit(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

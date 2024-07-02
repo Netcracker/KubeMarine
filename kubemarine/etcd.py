@@ -134,6 +134,7 @@ def execute_endpoints_command(cluster: KubernetesCluster, node: NodeGroup, comma
         return False, []
 
     endpoints_raw = collector.results[host][1].stdout
+
     cluster.log.verbose(endpoints_raw)
     endpoints_list: List[dict] = json.loads(endpoints_raw.lower().rstrip('\n'))
 

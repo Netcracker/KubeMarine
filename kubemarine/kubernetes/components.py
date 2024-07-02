@@ -262,13 +262,6 @@ def get_init_config(cluster: KubernetesCluster, group: AbstractGroup[RunResult],
             }
         }
 
-    if inventory['services']['kubeadm']['controllerManager']['extraArgs'].get('external-cloud-volume-plugin'):
-        init_config['nodeRegistration'] = {
-            'kubeletExtraArgs': {
-                'cloud-provider': 'external'
-            }
-        }
-
     if control_plane and worker:
         init_config.setdefault('nodeRegistration', {})['taints'] = []
 
