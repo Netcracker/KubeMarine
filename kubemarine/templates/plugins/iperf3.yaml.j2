@@ -1,16 +1,26 @@
 # Source: https://raw.githubusercontent.com/Pharb/kubernetes-iperf3/master/iperf3.yaml
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: Namespace
 metadata:
   name: iperf3
-  namespace: default
+    {% if rbac["pss"]["pod-security"] == "enabled" and rbac["pss"]["defaults"]["enforce"] == "restricted" %}
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: latest
+    {% endif %}
+
 ---
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: iperf3-server-deployment
+  namespace: iperf3
   labels:
     app: iperf3-server
 spec:
@@ -41,10 +51,9 @@ spec:
                 operator: In
                 values:
                 - control-plane
-      serviceAccountName: iperf3
       containers:
       - name: iperf3-server
-        image: networkstatic/iperf3
+        image: {% set registry = plugins['iperf3']['installation'].get('registry', '') %}{% if registry | length %}{{ registry }}/{% endif %}networkstatic/iperf3
         args: ['-s']
         ports:
         - containerPort: 5201
@@ -57,6 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: iperf3-server
+  namespace: iperf3
 spec:
   selector:
     app: iperf3-server
@@ -71,6 +81,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: iperf3-clients
+  namespace: iperf3
   labels:
     app: iperf3-client
 spec:
@@ -90,10 +101,9 @@ spec:
       tolerations:
         {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
-      serviceAccountName: iperf3
       containers:
       - name: iperf3-client
-        image: networkstatic/iperf3
+        image: {% set registry = plugins['iperf3']['installation'].get('registry', '') %}{% if registry | length %}{{ registry }}/{% endif %}networkstatic/iperf3
         command: ['/bin/sh', '-c', 'sleep infinity']
         # To benchmark manually: kubectl exec iperf3-clients-jlfxq -- /bin/sh -c 'iperf3 -c iperf3-server'
       terminationGracePeriodSeconds: 0
