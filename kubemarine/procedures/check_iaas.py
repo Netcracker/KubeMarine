@@ -379,11 +379,13 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
             for node in common_group.get_ordered_members_list():
                 host = node.get_host()
                 python_executable = cluster.nodes_context[host]['python']['executable']
-                res = node.run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
-                                                cluster.inventory['globals']['timeout_download']), warn=True)
+                res = node.run("%s %s %s %s"
+                               % (python_executable, random_temp_path, config['source'],
+                                  cluster.inventory['globals']['timeout_download']),
+                               pty=True, warn=True)
                 problem_handler = resolve_problem_handler(host)
                 if res.is_any_failed():
-                    problem_handler.append(f"{host}, {destination}: {res[host].stderr}")
+                    problem_handler.append(f"{host}, {destination}: {res[host].stdout}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -526,7 +528,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
                         node.run('%s %s %s %s'
                                  % (python_executable, random_temp_path, repo_url,
                                     cluster.inventory['globals']['timeout_download']),
-                                 warn=True, callback=collector)
+                                 pty=True, warn=True, callback=collector)
 
             for host, url_results in collector.results.items():
                 # Check if resolv.conf is actual
@@ -540,7 +542,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
                     problem_handler = broken
                 for i, result in enumerate(url_results):
                     if result.failed:
-                        problem_handler.append(f"{host}, {repository_urls[i]}: {result.stderr}")
+                        problem_handler.append(f"{host}, {repository_urls[i]}: {result.stdout}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -634,17 +636,11 @@ def suspend_firewalld(cluster: KubernetesCluster) -> Iterator[None]:
     firewalld_statuses = system.fetch_firewalld_status(group)
     stop_firewalld_group = firewalld_statuses.get_nodes_group_where_value_in_stdout("active (running)")
 
-    nodes_to_rollback = cluster.make_group([])
     try:
-        try:
-            nodes_to_rollback = system.stop_service(stop_firewalld_group, "firewalld").get_group()
-        except GroupException as e:
-            nodes_to_rollback = e.get_exited_nodes_group()
-            raise
-
+        system.stop_service(stop_firewalld_group, "firewalld")
         yield
     finally:
-        system.start_service(nodes_to_rollback, "firewalld")
+        system.start_service(stop_firewalld_group, "firewalld", warn=True)
 
 
 def get_host_network_ports(_: KubernetesCluster) -> Dict[str, Set[str]]:
@@ -793,22 +789,17 @@ def get_input_ports(cluster: KubernetesCluster, group: NodeGroup, subnet_type: s
 def assign_ips(group: NodeGroup,
                host_to_ip: Dict[str, str], host_to_inf: Dict[str, str],
                prefix: int) -> Iterator[None]:
-    group_to_rollback = group
     try:
         # Create alias from the node network interface for the subnet on every node
-        try:
-            with group.new_executor() as exe:
-                for node in exe.group.get_ordered_members_list():
-                    host = node.get_host()
-                    node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
-        except GroupException as e:
-            group_to_rollback = e.get_exited_nodes_group()
-            raise
+        with group.new_executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
+                node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
 
         yield
     finally:
         # Remove the created aliases from network interfaces
-        with group_to_rollback.new_executor() as exe:
+        with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 node.sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
@@ -946,7 +937,7 @@ def port_connect(cluster: KubernetesCluster, port_client: str,
     # For UDP, `action` is ignored and random stream of bytes is sent anyway.
     # Currently, for 53 port we do not expect any addressee except the test listener.
     cmd = f"{python_executable} {port_client} {action} {port} {address} {ip_version}"
-    node.run(cmd, timeout=timeout)
+    node.run(cmd, timeout=timeout, pty=True)
 
 
 def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
@@ -964,12 +955,12 @@ def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
            "done; " \
            "DATA=$(echo -n \"$DATA\" && dd iflag=nonblock status=none <&3 2>/dev/null); " \
            "if [[ $DATA == \"In use\" ]]; then " \
-               "echo \"$PORT in use\" >&2 ; " \
+               "echo \"$PORT in use\" ; " \
                "exit 0; " \
            "elif [[ $DATA == \"Listen\" ]]; then " \
                "exit 0; " \
            "fi; " \
-           "echo -n \"$DATA\" >&2 ; " \
+           "echo -n \"$DATA\" ; " \
            "exit 1"
 
 
@@ -1147,21 +1138,21 @@ def install_listeners(cluster: KubernetesCluster,
 
                 python_executable = cluster.nodes_context[host]['python']['executable']
                 port_start_listener_cmd = get_start_listener_cmd(python_executable, port_listener)
-                listener_cmd = cmd_for_ports(host_ports[host], port_start_listener_cmd)
-                node.sudo(listener_cmd, callback=collector)
+                for port in host_ports[host]:
+                    node.sudo(f"echo 'port: {port}' && ( {port_start_listener_cmd % port} )",
+                              callback=collector, pty=True)
 
-        port_in_use_ptrn = re.compile(r'^(\d+) in use$')
-        for host, result in collector.result.items():
+        port_in_use_ptrn = re.compile(r'^port: (\d+)\n((\1) in use\n)?$', re.M)
+        for host, results in collector.results.items():
             ports_in_use = []
-            if result.stderr:
-                for msg in result.stderr.rstrip('\n').split('\n'):
-                    matcher = port_in_use_ptrn.match(msg)
-                    if matcher is None:
-                        raise GroupResultException(collector.result)
-                    else:
-                        port = matcher.group(1)
-                        ports_in_use.append(port)
-                        logger.verbose(f"{proto.upper()} port {port} is already in use on {cluster.get_node_name(host)}")
+            for result in results:
+                matcher = port_in_use_ptrn.match(result.stdout)
+                if matcher is None:
+                    raise GroupResultException(collector.result)
+                elif matcher.group(2) is not None:
+                    port = matcher.group(1)
+                    ports_in_use.append(port)
+                    logger.verbose(f"{proto.upper()} port {port} is already in use on {cluster.get_node_name(host)}")
 
             for port in host_ports[host]:
                 in_use = port in ports_in_use
@@ -1416,7 +1407,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
                 if recv_cmd.get(host_int, ""):
-                    node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
+                    node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, pty=True, callback=collector)
 
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)

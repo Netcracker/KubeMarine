@@ -41,7 +41,7 @@ from kubemarine.core import log
 from kubemarine.core.errors import pretty_print_error
 
 
-def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> NoReturn:
+def do_fail(message: str = '', reason: BaseException = None, hint: str = '', logger: log.EnhancedLogger = None) -> NoReturn:
 
     if not logger:
         sys.stderr.write("\033[91m")

@@ -16,8 +16,9 @@ import json
 import time
 from typing import List, Dict, Optional, Tuple
 
+from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, CollectorCallback
 
 
 # the methods requires etcdctl.sh to be installed on all active control-plane nodes during thirdparties task.
@@ -50,7 +51,7 @@ def remove_members(group: NodeGroup) -> None:
         if node_name in etcd_members:
             command = "etcdctl member remove " + etcd_members[node_name]
             log.verbose(f"Removing found etcd member {node_name}...")
-            managing_control_plane.sudo(command)
+            managing_control_plane.sudo(command, pty=True)
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
@@ -81,7 +82,7 @@ def wait_for_health(cluster: KubernetesCluster, node: NodeGroup) -> List[Dict]:
         retries -= 1
 
     if is_healthy:
-        _, etcd_status_list = _execute_endpoints_command(cluster, node, 'status', warn=False)
+        _, etcd_status_list = execute_endpoints_command(cluster, node, 'status', warn=False)
         elected_leader: Optional[int] = None
         for item in etcd_status_list:
             leader: Optional[int] = item.get('status', {}).get('leader')
@@ -101,7 +102,7 @@ def wait_for_health(cluster: KubernetesCluster, node: NodeGroup) -> List[Dict]:
 
 
 def _is_healthy(cluster: KubernetesCluster, node: NodeGroup) -> bool:
-    is_healthy, etcd_health_list = _execute_endpoints_command(cluster, node, 'health', warn=True)
+    is_healthy, etcd_health_list = execute_endpoints_command(cluster, node, 'health', warn=True)
     if not is_healthy:
         return False
 
@@ -112,16 +113,28 @@ def _is_healthy(cluster: KubernetesCluster, node: NodeGroup) -> bool:
     return True
 
 
-def _execute_endpoints_command(cluster: KubernetesCluster, node: NodeGroup, command: str,
-                               *, warn: bool) -> Tuple[bool, List[dict]]:
+def execute_endpoints_command(cluster: KubernetesCluster, node: NodeGroup, command: str,
+                              *, warn: bool) -> Tuple[bool, List[dict]]:
     logger = cluster.log
+    tmp_path = utils.get_remote_tmp_path()
+    host = node.get_host()
 
-    result = node.sudo(f'etcdctl endpoint {command} --cluster -w json', warn=warn)
-    if result.is_any_failed():
-        logger.verbose(result)
+    defer = node.new_defer()
+    collector = CollectorCallback(cluster)
+
+    # Separate stdout and stderr using extra temporary file
+    defer.sudo(f'etcdctl endpoint {command} --cluster -w json > {tmp_path}',
+               pty=True, warn=warn, callback=collector)
+    defer.sudo(f'cat {tmp_path}', pty=True, warn=warn, callback=collector)
+    defer.sudo(f'rm -f {tmp_path}', pty=True, warn=warn, callback=collector)
+
+    defer.flush()
+    if collector.result.is_any_failed():
+        logger.verbose(collector.result)
         return False, []
 
-    endpoints_raw = result.get_simple_out()
+    endpoints_raw = collector.results[host][1].stdout
+
     cluster.log.verbose(endpoints_raw)
     endpoints_list: List[dict] = json.loads(endpoints_raw.lower().rstrip('\n'))
 
