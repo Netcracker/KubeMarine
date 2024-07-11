@@ -164,9 +164,10 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
 
 def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
-    Sometimes ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips".
-    Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
-    This task releases problem ips with force.
+    Sometimes IPs can stay in Calico IPAM despite not being used. 
+    You can check this by running "calicoctl ipam check --show-problem-ips".
+    Those IPs are cleaned by Calico garbage collector, but it can take about 20 minutes.
+    This task releases problem IPs with force.
     """
     # Identify the first control plane node
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -176,17 +177,22 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
     try:
         # Run calicoctl ipam check and save the results
-        result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
+        first_control_plane.sudo(
+            f"calicoctl ipam check --show-problem-ips -o {random_report_name} "
+            "| grep 'leaked' || true", hide=False
+        )
         cluster.log.debug(f"IPAM check completed and results saved to {random_report_name}")
 
         # Release the leaked IPs
-        release_command = f"calicoctl ipam release --from-report={random_report_name} --force"
-        release_output = first_control_plane.sudo(release_command, hide=False)
-
+        first_control_plane.sudo(
+            f"calicoctl ipam release --from-report={random_report_name} --force", 
+            hide=False
+        )
     finally:
         # Clean up the temporary report file
         first_control_plane.sudo(f"rm {random_report_name}", hide=False)
         cluster.log.debug(f"Cleaned up report file: {random_report_name}")
+
 
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
