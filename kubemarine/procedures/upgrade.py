@@ -162,7 +162,7 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
     plugins.install(cluster, upgrade_candidates)
 
 
-def release_calico_leaked_ips(cluster):
+def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
     Sometimes ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips".
     Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
