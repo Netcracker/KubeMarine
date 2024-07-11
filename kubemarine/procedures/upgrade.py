@@ -17,7 +17,6 @@ import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
 import uuid
-
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
@@ -163,52 +162,31 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
     plugins.install(cluster, upgrade_candidates)
 
 
-def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
+def release_calico_leaked_ips(cluster):
     """
-    Releases leaked IPs with force to handle IPAM issues caused by leftover IPs from pods not properly cleaned up.
+    Sometimes ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips".
+    Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
+    This task releases problem ips with force.
     """
+    # Identify the first control plane node
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
-    cluster.log.debug("Getting leaked ips...")
+    cluster.log.debug("Getting leaked IPs...")
+
+    # Generate a unique report name
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
-    result = first_control_plane.sudo(
-        "calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true",
-        hide=False
-    )
-    leaked_ips = result.get_simple_out()
-    leaked_ips_count = leaked_ips.count('leaked')
-    cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
+    try:
+        # Run calicoctl ipam check and save the results
+        result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
+        cluster.log.debug(f"IPAM check completed and results saved to {random_report_name}")
 
-    # Initialize lists to store IPs with missing handles and handles with no matching IPs
-    ips_with_missing_handles = []
-    handles_with_no_matching_ips = []
+        # Release the leaked IPs
+        release_command = f"calicoctl ipam release --from-report={random_report_name} --force"
+        release_output = first_control_plane.sudo(release_command, hide=False)
 
-    if leaked_ips_count > 0:
-        cluster.log.debug("Collecting IPs with missing handles and handles with no matching IPs...")
-        with open(random_report_name, 'r', encoding='utf-8') as report_file:
-            for line in report_file:
-                if 'no matching handle' in line:
-                    ip = line.split()[0]
-                    ips_with_missing_handles.append(ip)
-                    continue
-                if 'no matching IP' in line:
-                    handle = line.split()[3][:-1]  # Remove trailing colon
-                    handles_with_no_matching_ips.append(handle)
-
-        # Release IPs with missing handles
-        if ips_with_missing_handles:
-            cluster.log.debug("Releasing IPs with missing handles...")
-            for ip in ips_with_missing_handles:
-                first_control_plane.sudo(f"calicoctl ipam release --ip={ip} --force", hide=False)
-
-        # Release handles with no matching IPs
-        if handles_with_no_matching_ips:
-            cluster.log.debug("Releasing handles with no matching IPs...")
-            for handle in handles_with_no_matching_ips:
-                first_control_plane.sudo(f"calicoctl ipam release --handle={handle} --force", hide=False)
-
-    # Clean up the temporary report file
-    first_control_plane.sudo(f"rm {random_report_name}", hide=False)
-
+    finally:
+        # Clean up the temporary report file
+        first_control_plane.sudo(f"rm {random_report_name}", hide=False)
+        cluster.log.debug(f"Cleaned up report file: {random_report_name}")
 
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
