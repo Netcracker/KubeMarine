@@ -280,3 +280,5 @@ def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str], logger: 
 
 if __name__ == '__main__':
     main()
+
+#to check mypy
