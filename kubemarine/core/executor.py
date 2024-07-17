@@ -24,7 +24,7 @@ from datetime import datetime
 from types import TracebackType
 from typing import (
     Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable,
-    Sequence, Generic
+    Sequence, Generic, Generator
 )
 
 import fabric  # type: ignore[import-untyped]
@@ -791,7 +791,7 @@ class RawExecutor:
             def __init__(self) -> None:
                 super().__init__(re.escape(prompt), "")
 
-            def submit(self, stream: str) -> Iterable[str]:
+            def submit(self, stream: str) -> Generator[str, None, None]:
                 if self.pattern_matches(stream, self.pattern, "index"):
                     # If user appears to be not a NOPASSWD sudoer, "sudo" suggests to write password.
                     # This is a W/A to handle the situation in a docker container without pseudo-TTY (no -t option)
@@ -799,7 +799,7 @@ class RawExecutor:
                     raise invoke.exceptions.ResponseNotAccepted("The user should be a NOPASSWD sudoer")
 
                 # The only acceptable situation, responder does nothing.
-                return []
+                yield from []
 
         # Currently only NOPASSWD sudoers are supported.
         # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
