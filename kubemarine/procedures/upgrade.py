@@ -12,10 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
-
+import uuid
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
@@ -161,6 +162,38 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
     plugins.install(cluster, upgrade_candidates)
 
 
+def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
+    """
+    Sometimes IPs can stay in Calico IPAM despite not being used. 
+    You can check this by running "calicoctl ipam check --show-problem-ips".
+    Those IPs are cleaned by Calico garbage collector, but it can take about 20 minutes.
+    This task releases problem IPs with force.
+    """
+    # Identify the first control plane node
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    cluster.log.debug("Getting leaked IPs...")
+
+    # Generate a unique report name
+    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    try:
+        # Run calicoctl ipam check and save the results
+        first_control_plane.sudo(
+            f"calicoctl ipam check --show-problem-ips -o {random_report_name} "
+            "| grep 'leaked' || true", hide=False
+        )
+        cluster.log.debug(f"IPAM check completed and results saved to {random_report_name}")
+
+        # Release the leaked IPs
+        first_control_plane.sudo(
+            f"calicoctl ipam release --from-report={random_report_name} --force", 
+            hide=False
+        )
+    finally:
+        # Clean up the temporary report file
+        first_control_plane.sudo(f"rm {random_report_name}", hide=False)
+        cluster.log.debug(f"Cleaned up report file: {random_report_name}")
+
+
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
@@ -170,6 +203,7 @@ tasks = OrderedDict({
     "kubernetes_cleanup": kubernetes_cleanup_nodes_versions,
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
+    "release_calico_leaked_ips": release_calico_leaked_ips,  # Added here
     "overview": install.overview
 })
 
