@@ -56,12 +56,11 @@ requires-python = ">=3.8"
 ansible = ["ansible==7.7.*"]
 mypy = [
     "mypy==1.10.*",
-    "types-PyYAML==6.*",
-    "types-invoke==2.*",
-    "types-toml==0.*",
-    "types-python-dateutil==2.*",
-    "types-paramiko==3.*",
-    "types-jsonschema==4.*",
+    "types-PyYAML==6.0.*",
+    "types-toml==0.10.*",
+    "types-python-dateutil==2.9.*",
+    "types-paramiko==3.4.*",
+    "types-jsonschema==4.22.*",
     "types-pyinstaller==6.6.0.*",
 ]
 pylint = [
