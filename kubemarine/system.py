@@ -373,7 +373,12 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
                 warn=True, pty=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node_name}"')
-        raw_results = perform_group_reboot(node)
+        try:
+            raw_results = perform_group_reboot(node)
+        except Exception as e:
+            log.error(f'Error rebooting node "{node_name}": {str(e)}')
+            raise
+
         if cordon_required:
             res = first_control_plane.sudo(f'kubectl uncordon {node_name}', warn=True)
             log.verbose(res)
@@ -389,12 +394,16 @@ def get_reboot_history(group: NodeGroup) -> RunnersGroupResult:
 def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
     log = group.cluster.log
 
-    initial_boot_history = get_reboot_history(group)
-    result = group.sudo(group.cluster.globals['nodes']['boot']['reboot_command'], warn=True)
-    log.debug("Waiting for boot up...")
-    log.verbose("Initial boot history:\n%s" % initial_boot_history)
-    group.wait_for_reboot(initial_boot_history)
-    return result
+    try:
+        initial_boot_history = get_reboot_history(group)
+        result = group.sudo(group.cluster.globals['nodes']['boot']['reboot_command'], warn=True)
+        log.debug("Waiting for boot up...")
+        log.verbose("Initial boot history:\n%s" % initial_boot_history)
+        group.wait_for_reboot(initial_boot_history)
+        return result
+    except Exception as e:
+        log.error(f'Error during perform_group_reboot: {str(e)}')
+        raise
 
 
 def reload_systemctl(group: AbstractGroup[GROUP_RUN_TYPE]) -> GROUP_RUN_TYPE:

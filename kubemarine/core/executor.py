@@ -846,7 +846,12 @@ class RawExecutor:
         for host in hosts:
             self.logger.verbose('Disconnected session with %s' % host)
             cxn = self.connection_pool.get_connection(host)
-            cxn.close()
+            try:
+                cxn.close()
+            except EOFError as eof_err:
+                self.logger.error(f"EOFError while disconnecting {host}: {str(eof_err)}")
+            except Exception as e:
+                self.logger.error(f"Error while disconnecting {host}: {str(e)}")
 
 
 def get_flat_result(results: Dict[str, TokenizedResult]) -> Mapping[str, Sequence[GenericResult]]:
