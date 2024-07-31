@@ -208,7 +208,8 @@ def system_prepare_dns_resolv_conf(group: NodeGroup) -> None:
 def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
     remained_offline = cluster.nodes['all'].get_online_nodes(False)
     if not remained_offline.is_empty():
-        cluster.log.warning("Nodes %s are not reachable. You can update their /etc/hosts by running install job with the task prepare.dns.etc_hosts only when these nodes become available." % remained_offline.get_hosts())
+        cluster.log.warning("Nodes %s are not reachable. You can update their /etc/hosts by running install job "
+                "with the task prepare.dns.etc_hosts only when these nodes become available." % remained_offline.get_hosts())
 
     config = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
     config += system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
