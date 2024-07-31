@@ -208,7 +208,7 @@ def system_prepare_dns_resolv_conf(group: NodeGroup) -> None:
 def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
     remained_offline = cluster.nodes['all'].get_online_nodes(False)
     if not remained_offline.is_empty():
-        raise Exception("Nodes %s are not reachable" % remained_offline.get_hosts())
+        cluster.log.warning("Nodes %s are not reachable. You can update their /etc/hosts by running install job with the task prepare.dns.etc_hosts only when these nodes become available." % remained_offline.get_hosts())
 
     config = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
     config += system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
@@ -216,7 +216,7 @@ def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
     utils.dump_file(cluster, config, 'etc_hosts')
     cluster.log.debug("\nUploading...")
 
-    group = cluster.nodes['all']
+    group = cluster.nodes['all'].get_online_nodes(True)
 
     system.update_etc_hosts(group, config=config)
     cluster.log.debug(group.sudo("ls -la /etc/hosts"))
