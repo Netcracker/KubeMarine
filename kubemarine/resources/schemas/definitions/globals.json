@@ -111,5 +111,10 @@
          }
       }
     }
+  },
+  "ignore_unavailable_nodes_for_etchosts_update": {
+    "type": "boolean",
+    "default": false,
+    "description": "Switcher to allow /etc/hosts update at the cluster nodes when there are unavailable nodes"
   }
 }

@@ -18,6 +18,7 @@ globals:
       retries: 15
   timeout_download:
     60
+  ignore_unavailable_nodes_for_etchosts_update: false
 
 node_defaults:
   boot:
