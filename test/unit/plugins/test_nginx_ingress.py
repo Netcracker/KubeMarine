@@ -15,12 +15,13 @@ import re
 import unittest
 from unittest import mock
 from test.unit.plugins import _AbstractManifestEnrichmentTest
+from distutils.version import LooseVersion
 
 from kubemarine import demo, plugins
 from kubemarine.core import errors, flow
 from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
-from distutils.version import LooseVersion
+
 
 class EnrichmentValidation(unittest.TestCase):
     def install(self):
