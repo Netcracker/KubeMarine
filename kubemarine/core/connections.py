@@ -132,6 +132,11 @@ class SFTPClient(paramiko.SFTPClient):
         sftp_file._prefetch_thread = _prefetch_thread.__get__(sftp_file, paramiko.SFTPFile)  # type: ignore[attr-defined]
         return sftp_file
 
+    def close(self):
+        try:
+            super().close()
+        except EOFError as e:
+            self.logger.warning(f"Caught EOFError during closing sftp connection {e}")
 
 class Connection(fabric.Connection):  # type: ignore[misc]
     def __init__(self, host: str, **kwargs: Any):
