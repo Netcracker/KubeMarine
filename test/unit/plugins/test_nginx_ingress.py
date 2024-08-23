@@ -15,6 +15,7 @@ import re
 import unittest
 from unittest import mock
 from test.unit.plugins import _AbstractManifestEnrichmentTest
+from distutils.version import LooseVersion
 
 from kubemarine import demo, plugins
 from kubemarine.core import errors, flow
@@ -197,11 +198,12 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 manifest = self.enrich_yaml(cluster)
                 webhook_resources = 0
 
-                # Check if nginx-ingress-controller version is v1.9.5 or v1.9.6 before counting webhook resources
+                # Check if nginx-ingress-controller version is v1.9.5 or higher before counting webhook resources
                 nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
-                    ['spec']['template']['spec']['containers'][0]['image']
-                if "v1.9.5" in nginx_version or "v1.9.6" in nginx_version or "v1.10.1" in nginx_version:
-                    expected_num_resources = 9  # Adjust expected number for v1.9.5 and v1.9.6
+                    ['spec']['template']['spec']['containers'][0]['image'].split(":")[-1]
+            
+                if LooseVersion(nginx_version) >= LooseVersion("v1.9.5"):
+                    expected_num_resources = 9  # Adjust expected number for v1.9.5 and higher
 
                 for key in self.all_obj_keys(manifest):
                     if 'admission' in key:
