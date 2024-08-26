@@ -95,6 +95,7 @@ class SFTPClient(paramiko.SFTPClient):
     def __init__(self, sock: paramiko.Channel):
         super().__init__(sock)
         self.KM_callback: Optional[TransferCallback] = None
+        self.host = ""
 
     def getfo(self, remotepath: Union[bytes, str], fl: IO[bytes],
               callback: Callable[[int, int], object] = None, prefetch: bool = True,
@@ -132,6 +133,11 @@ class SFTPClient(paramiko.SFTPClient):
         sftp_file._prefetch_thread = _prefetch_thread.__get__(sftp_file, paramiko.SFTPFile)  # type: ignore[attr-defined]
         return sftp_file
 
+    def close(self) -> None:
+        try:
+            super().close()
+        except EOFError as e:
+            self.logger.warning("Caught EOFError during closing sftp connection on host %s %s", self.host, e)
 
 class Connection(fabric.Connection):  # type: ignore[misc]
     def __init__(self, host: str, **kwargs: Any):
@@ -149,6 +155,7 @@ class Connection(fabric.Connection):  # type: ignore[misc]
     def sftp(self) -> SFTPClient:
         if self._sftp is None:
             self._sftp = cast(SFTPClient, SFTPClient.from_transport(self.client.get_transport()))
+            self._sftp.host = self.host
         return self._sftp
 
     def get(self, *args: Any, **kwargs: Any) -> fabric.transfer.Result:
