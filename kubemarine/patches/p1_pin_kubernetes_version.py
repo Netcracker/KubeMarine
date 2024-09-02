@@ -25,11 +25,10 @@ class TheAction(Action):
 
     def run(self, res: DynamicResources) -> None:
         logger = res.logger()
-        inventory = res.formatted_inventory()
+        inventory = res.inventory()
         if 'kubernetesVersion' not in inventory.get('services', {}).get('kubeadm', {}):
             logger.debug("Set services.kubeadm.kubernetesVersion = v1.26.11 in the inventory")
             inventory.setdefault('services', {}).setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.26.11'
-            self.recreate_inventory = True
         else:
             logger.info("Skipping the patch as services.kubeadm.kubernetesVersion is explicitly provided.")
 
