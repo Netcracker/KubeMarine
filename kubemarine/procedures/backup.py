@@ -138,6 +138,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
     cluster.log.debug('Backing up the following files: \n' + '  - ' + '\n  - '.join(backup_list))
 
     backup_command = 'cd /tmp && ' \
+                     'sudo rm -f /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo tar -czvf /tmp/kubemarine-backup.tar.gz -P $(sudo readlink -e %s) && ' \
                      'sudo ls -la /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo du -hs /tmp/kubemarine-backup.tar.gz' % (' '.join(backup_list))
