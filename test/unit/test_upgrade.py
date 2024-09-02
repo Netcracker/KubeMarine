@@ -175,8 +175,8 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def test_upgrade_with_default_admission(self):
         # Upgrade PSS->PSS kuber version
-        old_kubernetes_version = 'v1.25.2'
-        new_kubernetes_version = 'v1.25.7'
+        old_kubernetes_version = 'v1.27.1'
+        new_kubernetes_version = 'v1.27.13'
         self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         cluster = self.new_cluster()
         self.assertEqual("pss", cluster.inventory['rbac']['admission'])
@@ -891,7 +891,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.25.7', ['v1.26.11'])
+        self.setUpVersions('v1.27.4', ['v1.28.12'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)

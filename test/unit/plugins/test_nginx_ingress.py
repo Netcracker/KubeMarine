@@ -95,7 +95,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         # Requires ingress-nginx < v1.9.5
         self.k8s_1_28_x = self.get_latest_k8s("v1.28")
         # Requires ingress-nginx < v1.9.0
-        self.k8s_1_25_x = self.get_latest_k8s("v1.25")
+        self.k8s_1_27_x = self.get_latest_k8s("v1.27")
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -189,7 +189,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def test_webhook_resources_difference(self):
         for k8s_version, expected_num_resources in (
-            (self.k8s_1_25_x, 9),
+            (self.k8s_1_27_x, 9),
             (self.k8s_1_28_x, 10),
             (self.k8s_latest, 9)
         ):

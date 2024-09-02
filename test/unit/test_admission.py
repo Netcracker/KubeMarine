@@ -65,7 +65,7 @@ class EnrichmentValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.ALLINONE)
 
         # New kuber version with default pss admission
-        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.25.2'}
+        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.27.1'}
         cluster = demo.new_cluster(inventory)
         self.assertEqual(cluster.inventory['rbac']['admission'], 'pss')
 
