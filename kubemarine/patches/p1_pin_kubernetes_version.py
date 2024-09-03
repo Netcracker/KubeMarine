@@ -21,7 +21,7 @@ from kubemarine.core.resources import DynamicResources
 
 class TheAction(Action):
     def __init__(self) -> None:
-        super().__init__("Set previous default Kubernetes version")
+        super().__init__("Set previous default Kubernetes version", recreate_inventory=True)
 
     def run(self, res: DynamicResources) -> None:
         logger = res.logger()
