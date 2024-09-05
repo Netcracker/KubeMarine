@@ -31,4 +31,4 @@ class KubemarineDefaults:
             self._defaults = YAML.load(stream)
 
     def default_version(self) -> str:
-        return self._defaults['services']['kubeadm']['kubernetesVersion']
+        return str(self._defaults['services']['kubeadm']['kubernetesVersion'])
