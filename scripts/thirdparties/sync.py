@@ -15,8 +15,6 @@
 import os
 import sys
 
-from scripts.thirdparties.src.software.defaults import KubemarineDefaults
-
 # pylint: disable=bad-builtin,wrong-import-position
 
 # Ensure to take Kubemarine modules from the project root.
@@ -34,7 +32,7 @@ from src.software import InternalCompatibility, UpgradeConfig
 from src.software.kubernetes_images import KubernetesImagesResolver
 from src.software.plugins import ManifestResolver, ManifestsEnrichment
 from src.software.thirdparties import ThirdpartyResolver
-
+from src.software.defaults import KubemarineDefaults
 
 if __name__ == '__main__':
     if platform.system() != 'Linux':
