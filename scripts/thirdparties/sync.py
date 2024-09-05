@@ -15,6 +15,8 @@
 import os
 import sys
 
+from scripts.thirdparties.src.software.defaults import KubemarineDefaults
+
 # pylint: disable=bad-builtin,wrong-import-position
 
 # Ensure to take Kubemarine modules from the project root.
@@ -46,6 +48,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     Synchronization(
+        KubemarineDefaults(),
         InternalCompatibility(),
         KubernetesVersions(),
         KubernetesImagesResolver(),

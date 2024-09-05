@@ -1,7 +1,7 @@
 # This section can be changed manually, but it is also synchronized automatically with the 'compatibility_map' section below.
 kubernetes_versions:
   v1.26:
-    supported: true
+    supported: false
   v1.27:
     supported: true
   v1.28:

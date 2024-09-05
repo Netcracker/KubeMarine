@@ -1565,6 +1565,18 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         cluster.log.debug(kube_admission_status)
         tc.success(results='enabled')
 
+def verify_kubernetes_version(cluster: KubernetesCluster) -> None:
+    """
+    The method checks if used kubernetes version is deprecated in kubemarine
+    """
+    with TestCase(cluster, '225', "Kubernetes", "Version") as tc:
+        target_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        if not kubernetes.verify_supported_version(target_version, cluster.log):
+            raise TestWarn(f"Kubernetes version {target_version} is deprecated",
+                           hint=f"Used kubernetes version is deprecated and will be excluded from support "
+                                f"in future kubemarine releases. Please, plan upgrade to newer version")
+
+        tc.success(results='Kubernetes version is OK')
 
 def geo_check(cluster: KubernetesCluster) -> None:
     """
@@ -1789,6 +1801,7 @@ tasks = OrderedDict({
             'policy': kubernetes_audit_policy_configuration,
         },
         'admission': kubernetes_admission_status,
+        'version': verify_kubernetes_version,
     },
     'etcd': {
         "health_status": etcd_health_status
