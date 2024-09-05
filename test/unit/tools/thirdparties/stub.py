@@ -28,6 +28,8 @@ from scripts.thirdparties.src.software import InternalCompatibility, Compatibili
 from scripts.thirdparties.src.software.kubernetes_images import KubernetesImagesResolver
 from scripts.thirdparties.src.software.plugins import ManifestResolver, ManifestsEnrichment
 from scripts.thirdparties.src.software.thirdparties import ThirdpartyResolver
+from scripts.thirdparties.src.software.defaults import KubemarineDefaults
+
 from scripts.thirdparties.src.tracker import SummaryTracker
 
 
@@ -163,6 +165,7 @@ class FakeUpgradeConfig(UpgradeConfig):
 
 class FakeSynchronization(Synchronization):
     def __init__(self,
+                 defaults: KubemarineDefaults,
                  compatibility: FakeInternalCompatibility,
                  kubernetes_versions: FakeKubernetesVersions,
                  images_resolver: FakeKubernetesImagesResolver,
@@ -171,6 +174,7 @@ class FakeSynchronization(Synchronization):
                  upgrade_config=FakeUpgradeConfig(),
                  ):
         super().__init__(
+            defaults,
             compatibility,
             kubernetes_versions,
             images_resolver,
