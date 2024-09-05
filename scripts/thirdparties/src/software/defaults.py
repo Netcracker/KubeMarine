@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
-from typing import Dict
-
-from ruamel.yaml import CommentedMap
-
-from kubemarine.core import utils, static
+from kubemarine.core import utils
 
 # pylint: disable=bad-builtin
 
