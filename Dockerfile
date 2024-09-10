@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build ipip_check binary
-FROM golang:1.22.5 AS go-build
+FROM golang:1.22 AS go-build
 
 WORKDIR /opt
 
@@ -11,7 +11,7 @@ RUN go mod download && \
     GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false && \
     gzip ipip_check
 
-FROM python:3.12.4-slim-bullseye AS python-build
+FROM python:3.12-slim-bullseye AS python-build
 
 ARG BUILD_TYPE
 
@@ -25,6 +25,7 @@ COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scr
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \
+    pip3 install --no-cache-dir setuptools wheel && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
     # In any if branch delete source code, but preserve specific directories for different service aims
