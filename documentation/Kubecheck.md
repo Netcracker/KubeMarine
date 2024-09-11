@@ -82,6 +82,7 @@ This section provides information about the Kubecheck functionality.
     - [229 Audit Policy Configuration](#229-audit-policy-configuration)
     - [231 Audit Daemon Rules](#231-audit-daemon-rules)
     - [232 Kernel Parameters Configuration](#232-kernel-parameters-configuration)
+    - [235 Kubernetes version](#235-kubernetes-version)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -437,6 +438,7 @@ The task tree is as follows:
   * audit
     * policy
   * admission
+  * version
 * etcd
   * health_status
 * control_plane
@@ -777,6 +779,14 @@ If the configured rules are not presented, the test fails.
 This test compares the kernel parameters on the nodes
 with the parameters specified in the inventory or with the default parameters.
 If the configured parameters are not presented, the test fails.
+
+##### 235 Kubernetes version
+
+*Task*: `kubernetes.version`
+
+This test checks if used kubernetes version is deprecated in current kubemarine release.
+It means, that this version is going to be excluded from support in future kubemarine soon.
+So it's recommended to update kubernetes version to new one.
 
 ### Report File Generation
 
