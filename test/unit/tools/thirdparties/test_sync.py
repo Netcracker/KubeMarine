@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Dict, ContextManager
 from unittest import mock
+
 from test.unit import utils as test_utils
 from test.unit.tools.thirdparties.stub import (
     FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
@@ -30,6 +31,7 @@ from kubemarine.core import utils, static
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, Processor, Identity
 from scripts.thirdparties.src.software import thirdparties, plugins, kubernetes_images
+from scripts.thirdparties.src.software.defaults import KubemarineDefaults
 from scripts.thirdparties.src.software.plugins import (
     ManifestResolver, ManifestsEnrichment,
     ERROR_UNEXPECTED_IMAGE, ERROR_SUSPICIOUS_ABA_VERSIONS
@@ -47,6 +49,7 @@ for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml
 
 class SynchronizationTest(unittest.TestCase):
     def setUp(self) -> None:
+        self.defaults = KubemarineDefaults()
         self.compatibility = FakeInternalCompatibility()
         self.kubernetes_versions = FakeKubernetesVersions()
         self.images_resolver = FakeKubernetesImagesResolver()
@@ -580,6 +583,7 @@ class SynchronizationTest(unittest.TestCase):
 
     def run_sync(self) -> SummaryTracker:
         return FakeSynchronization(
+            self.defaults,
             self.compatibility,
             self.kubernetes_versions,
             self.images_resolver,

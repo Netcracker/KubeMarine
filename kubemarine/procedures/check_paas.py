@@ -109,7 +109,7 @@ def _check_same_os(cluster: KubernetesCluster) -> None:
     different_os = set(os_ids.values())
     if len(different_os) > 1:
         cluster.log.warning(
-            f"Nodes have different OS families or versions, packages versions cannot be checked. "
+            f"Nodes have different OS families or versions, packages versions cannot be checked."
             f"List of (OS family, version): {list(different_os)}")
         raise TestFailure(f"Nodes have different OS families or versions")
 
@@ -1021,7 +1021,7 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('invalid',
                               hint=f"Modprobe rules do not match those loaded in modprobe on cluster nodes. Check "
-                                   f"manually what the differences are and make changes on the appropriate nodes.")
+                                   f"the differences manually and make changes on the appropriate nodes.")
 
 
 def verify_sysctl_config(cluster: KubernetesCluster) -> None:
@@ -1042,7 +1042,7 @@ def verify_sysctl_config(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('invalid',
                               hint=f"Some configured kernel parameters are not loaded on the cluster nodes.\n"
-                                   f"Check manually what the differences are, and make changes on the appropriate nodes.")
+                                   f"Check the differences manually and make changes on the appropriate nodes.")
 
 
 def verify_system_audit_rules(cluster: KubernetesCluster) -> None:
@@ -1063,7 +1063,7 @@ def verify_system_audit_rules(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('invalid',
                               hint=f"Some configured Audit rules are not loaded on the cluster nodes.\n"
-                                   f"Check manually what the differences are, and make changes on the appropriate nodes.")
+                                   f"Check the differences manually and make changes on the appropriate nodes.")
 
 
 def etcd_health_status(cluster: KubernetesCluster) -> None:
@@ -1565,6 +1565,18 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         cluster.log.debug(kube_admission_status)
         tc.success(results='enabled')
 
+def verify_kubernetes_version(cluster: KubernetesCluster) -> None:
+    """
+    The method checks if used kubernetes version is deprecated in kubemarine
+    """
+    with TestCase(cluster, '225', "Kubernetes", "Version") as tc:
+        target_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        if not kubernetes.verify_supported_version(target_version, cluster.log):
+            raise TestWarn(f"Kubernetes version {target_version} is deprecated",
+                           hint=f"Used Kubernetes version is deprecated and will be excluded from support "
+                                f"in future Kubemarine releases. Please plan upgrade to the newer version.")
+
+        tc.success(results='Kubernetes version is OK')
 
 def geo_check(cluster: KubernetesCluster) -> None:
     """
@@ -1602,7 +1614,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
 
         peers = yaml.safe_load(io.StringIO(peers_result))
         if len(peers) == 0:
-            raise TestFailure("configuration error", hint="geo-monitor instance has no peers")
+            raise TestFailure("configuration error", hint="geo-monitor instance has no peers.")
 
         for peer in peers:
             status = peer["clusterIpStatus"]
@@ -1632,7 +1644,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
 
     with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
         if not status_collected:
-            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
+            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected.")
 
         if svc_status["failed"]:
             raise TestFailure("found unavailable peer services",
@@ -1643,7 +1655,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
 
     with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
         if not status_collected:
-            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
+            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected.")
 
         if pod_status["failed"]:
             raise TestFailure("found unavailable peer pod",
@@ -1699,7 +1711,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
                 tc.success(results='valid')
             else:
                 raise TestFailure('invalid',
-                        hint=f"Some nodes do not have properly configured Apparmor service")
+                        hint=f"Some nodes do not have properly configured Apparmor service.")
         else:
             tc.success(results='skipped')
 
@@ -1789,6 +1801,7 @@ tasks = OrderedDict({
             'policy': kubernetes_audit_policy_configuration,
         },
         'admission': kubernetes_admission_status,
+        'version': verify_kubernetes_version,
     },
     'etcd': {
         "health_status": etcd_health_status

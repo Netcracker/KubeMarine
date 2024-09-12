@@ -25,6 +25,7 @@ COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scr
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \
+    pip3 install --no-cache-dir setuptools wheel && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
     # In any if branch delete source code, but preserve specific directories for different service aims

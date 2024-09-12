@@ -892,11 +892,13 @@ def verify_allowed_version(version: str) -> str:
     return version
 
 
-def verify_supported_version(target_version: str, logger: log.EnhancedLogger) -> None:
+def verify_supported_version(target_version: str, logger: log.EnhancedLogger) -> bool:
     minor_version = utils.minor_version(target_version)
     supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
     if not supported_versions.get(minor_version, {}).get("supported", False):
-        logger.warning(f"Specified target Kubernetes version {target_version!r} - is not supported!")
+        logger.warning(f"Specified target Kubernetes version {target_version!r} - is deprecated!")
+        return False
+    return True
 
 
 def expect_kubernetes_version(cluster: KubernetesCluster, version: str,
