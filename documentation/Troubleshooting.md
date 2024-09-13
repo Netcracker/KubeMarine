@@ -42,6 +42,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1283-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
+  - [OpenSSH server becomes unavailable during cluster installation on Centos9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos9)
 
 # Kubemarine Errors
 
@@ -1404,3 +1405,27 @@ Error from server: error dialing backend: remote error: tls: internal error
 **Root cause**: The `kubelet` server certificate is not approved, whereas the cluster has been configured not to use self-signed certificates for the `kubelet` server.
 
 **Solution**: Perform CSR approval steps from the maintenance guide. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/internal/Hardening.md#kubelet-server-certificate-approval) section for details.
+
+## OpenSSH server becomes unavailable during cluster installation on Centos9
+
+**Sympthoms**: Installation fails on `kubemarine.system.reboot_nodes`, OpenSSH server becomes unavailable due to OpenSSL version missmatch error.
+
+The following lines can be found in OpenSSH server logs:
+```
+OpenSSL version mismatch. Built against 30000070, you have 30200010
+sshd.service: Main process exited, code=exited, status=255/EXEPTION
+sshd.service: Failed with result 'exit-code'.
+Failed to start OpenSSH server daemon.
+```
+
+**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, a version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070), and after the update version 3.2.0 (30200010) is installed.
+Probably, OpenSSL does not provide backward compatibility.
+
+**Solution**: Add upgrade section for OpenSSH server in `cluster.yaml`
+
+```yaml
+services:
+  packages:
+    upgrade:
+      - openssh-server
+```
