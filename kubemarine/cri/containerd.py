@@ -304,7 +304,7 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
                 f"systemctl status {os_specific_associations['service_name']} && "
-                f"timeout 10 sh -c 'until sudo crictl info 2>&1; do sleep 1; done' ", callback=collector) 
+                f"timeout 10 sh -c 'until sudo ctr version 2>&1; do sleep 1; done' ", callback=collector) 
     return collector.result
 
 
