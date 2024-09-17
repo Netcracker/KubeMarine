@@ -1410,7 +1410,7 @@ Error from server: error dialing backend: remote error: tls: internal error
 
 **Sympthoms**: Installation fails on `kubemarine.system.reboot_nodes`, OpenSSH server becomes unavailable due to OpenSSL version missmatch error.
 
-The following lines can be found in OpenSSH server logs:
+The following lines can be found in the OpenSSH server logs:
 ```
 OpenSSL version mismatch. Built against 30000070, you have 30200010
 sshd.service: Main process exited, code=exited, status=255/EXEPTION
@@ -1418,10 +1418,10 @@ sshd.service: Failed with result 'exit-code'.
 Failed to start OpenSSH server daemon.
 ```
 
-**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, a version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070), and after the update version 3.2.0 (30200010) is installed.
+**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, the version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070) and the update version 3.2.0 (30200010) is installed after that.
 Probably, OpenSSL does not provide backward compatibility.
 
-**Solution**: Add upgrade section for OpenSSH server in `cluster.yaml`
+**Solution**: Add the upgrade section for OpenSSH server in the **cluster.yaml** file.
 
 ```yaml
 services:
