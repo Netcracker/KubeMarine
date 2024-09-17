@@ -1418,7 +1418,7 @@ sshd.service: Failed with result 'exit-code'.
 Failed to start OpenSSH server daemon.
 ```
 
-**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, the version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070) and the update version 3.2.0 (30200010) is installed after that.
+**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, the version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070) and after the update, version 3.2.0 (30200010) is installed.
 Probably, OpenSSL does not provide backward compatibility.
 
 **Solution**: Add the upgrade section for OpenSSH server in the **cluster.yaml** file.
