@@ -299,10 +299,12 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
                              backup=True, sudo=True, mkdir=True)
 
             log.debug("Restarting Containerd on %s node..." % node.get_node_name())
+            # to restart and wait untill containerd is up&running
             node.sudo(
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                f"systemctl status {os_specific_associations['service_name']}", callback=collector)
+                f"systemctl status {os_specific_associations['service_name']} && "
+                f"timeout 10 sh -c 'until sudo ctr version 2>&1; do sleep 1; done' ", callback=collector) 
     return collector.result
 
 
