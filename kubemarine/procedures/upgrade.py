@@ -47,10 +47,25 @@ def prepull_images(cluster: KubernetesCluster) -> None:
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
 
+# Function to manually set kubelet to talk to local apiserver
+def set_local_apiserver_for_kubelet(cluster: KubernetesCluster) -> None:
+    """
+    This function sets the kubelet to talk to the local apiserver instead of using the load balancer.
+    """
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    control_plane_ip = first_control_plane.get_host_ip()
+
+    # Update the kubelet config to point to the local apiserver
+    first_control_plane.sudo(f"kubectl config set-cluster local-apiserver --server=https://{control_plane_ip}:6443")
+    first_control_plane.sudo("kubectl config use-context local-apiserver")
+
+
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     initial_kubernetes_version = kubernetes.get_kubernetes_version(cluster.previous_inventory)
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+    # Set kubelet to talk to the local apiserver before upgrading control plane
+    set_local_apiserver_for_kubelet(cluster)
     preconfigure_components = []
     preconfigure_functions: Dict[str, Callable[[dict], dict]] = {}
     if (admission.is_pod_security_unconditional(cluster)
