@@ -47,43 +47,37 @@ def prepull_images(cluster: KubernetesCluster) -> None:
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
 
-# Function to manually set kubelet to talk to local apiserver
-def set_local_apiserver_for_kubelet(cluster: KubernetesCluster) -> None:
-    """
-    This function sets the kubelet to talk to the local apiserver instead of using the load balancer.
-    """
-    first_control_plane = cluster.nodes['control-plane'].get_first_member()
-    control_plane_ip = first_control_plane.get_host_ip()
-
-    # Update the kubelet config to point to the local apiserver
-    first_control_plane.sudo(f"kubectl config set-cluster local-apiserver --server=https://{control_plane_ip}:6443")
-    first_control_plane.sudo("kubectl config use-context local-apiserver")
-
-
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     initial_kubernetes_version = kubernetes.get_kubernetes_version(cluster.previous_inventory)
-
+    # target_kubernetes_version = kubernetes.get_kubernetes_version(cluster.inventory)
+    # print(f"Target Kubernetes Version: {target_kubernetes_version}")
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-    # Set kubelet to talk to the local apiserver before upgrading control plane
-    set_local_apiserver_for_kubelet(cluster)
     preconfigure_components = []
     preconfigure_functions: Dict[str, Callable[[dict], dict]] = {}
+
     if (admission.is_pod_security_unconditional(cluster)
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.28")
             and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
 
-        # Extra args of API server have changed, need to reconfigure the API server.
-        # See admission.enrich_inventory()
-        # Still, should not reconfigure using generated ConfigMaps from inventory,
-        # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
-        # Instead, change only necessary apiServer args.
+        # Reconfigure the API server's feature-gates based on PodSecurity changes
         def reconfigure_feature_gates(cluster_config: dict) -> dict:
-            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
-            if feature_gates is not None:
+            # Get the current feature-gates configuration from the inventory
+            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates", "")
+            
+            # Ensure ControlPlaneKubeletLocalMode is added for Kubernetes 1.31.0+
+            if utils.version_key(cluster.inventory['services']['kubeadm']['kubernetesVersion'])[0:2] >= utils.minor_version_key("v1.31"):
+                if "ControlPlaneKubeletLocalMode=true" not in feature_gates:
+                    if feature_gates:
+                        feature_gates += ",ControlPlaneKubeletLocalMode=true"
+                    else:
+                        feature_gates = "ControlPlaneKubeletLocalMode=true"
+        
+            # Apply the modified feature gates to the apiServer extraArgs
+            if feature_gates:
                 cluster_config["apiServer"]["extraArgs"]["feature-gates"] = feature_gates
             else:
                 del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
-
+        
             return cluster_config
 
         preconfigure_components.append('kube-apiserver')
@@ -92,17 +86,14 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     if (kubernetes.components.kube_proxy_overwrites_higher_system_values(cluster)
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.29")):
 
-        # Defaults of KubeProxyConfiguration have changed.
-        # See kubernetes.enrich_kube_proxy()
+        # Modify KubeProxy conntrack min value if necessary
         def edit_kube_proxy_conntrack_min(kube_proxy_cm: dict) -> dict:
             expected_conntrack: dict = cluster.inventory['services']['kubeadm_kube-proxy']['conntrack']
             if 'min' not in expected_conntrack:
                 return kube_proxy_cm
-
             actual_conntrack = kube_proxy_cm['conntrack']
             if expected_conntrack['min'] != actual_conntrack.get('min'):
                 actual_conntrack['min'] = expected_conntrack['min']
-
             return kube_proxy_cm
 
         preconfigure_components.append('kube-proxy')
@@ -122,7 +113,7 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     kubernetes.upgrade_first_control_plane(upgrade_group, cluster, **drain_kwargs)
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
-    # After first control-plane upgrade is finished we may loose our CoreDNS changes.
+    # After first control-plane upgrade is finished we may lose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
