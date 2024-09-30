@@ -17,6 +17,7 @@ import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
 import uuid
+import yaml
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
@@ -45,6 +46,75 @@ def prepull_images(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Prepulling Kubernetes images...")
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
+
+
+def enable_control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> None:
+    """
+    Enable ControlPlaneKubeletLocalMode feature gate to ensure the kubelet communicates
+    with the local API server on control-plane nodes, but only for Kubernetes v1.31.x and above.
+    """
+    # Check if the target version is v1.31.x or above
+    target_version = kubernetes.get_procedure_upgrade_version(cluster)
+    if not target_version.startswith("v1.31"):
+        cluster.log.debug(f"Skipping ControlPlaneKubeletLocalMode feature gate. Target version is {target_version}.")
+        return
+
+    cluster.log.debug("Enabling ControlPlaneKubeletLocalMode feature gate in kubeadm config for v1.31.x or above.")
+
+    # Fetch the existing kubeadm-config ConfigMap
+    control_plane_group = cluster.nodes['control-plane']
+    config_map_result = control_plane_group.sudo("kubectl get configmap kubeadm-config -n kube-system -o yaml")
+
+    # Extract the stdout from the RunnersGroupResult object
+    config_map_yaml = config_map_result.get_simple_out()
+
+    # Log the output to ensure the ConfigMap is fetched correctly
+    cluster.log.debug(f"Fetched kubeadm-config ConfigMap: {config_map_yaml}")
+
+    # Convert the yaml string into a Python dictionary
+    config_map = yaml.safe_load(config_map_yaml)
+
+    # Extract the ClusterConfiguration field
+    cluster_configuration = config_map['data'].get('ClusterConfiguration', "")
+
+    # Parse the ClusterConfiguration to modify it
+    cluster_config_dict = yaml.safe_load(cluster_configuration)
+
+    # Ensure apiServer.extraArgs exists and is a list
+    if 'apiServer' not in cluster_config_dict:
+        cluster_config_dict['apiServer'] = {}
+
+    if 'extraArgs' not in cluster_config_dict['apiServer']:
+        cluster_config_dict['apiServer']['extraArgs'] = []
+
+    # Check if feature-gates already exists, and update or add it
+    feature_gates_exists = False
+    for arg in cluster_config_dict['apiServer']['extraArgs']:
+        if arg.get('name') == 'feature-gates':
+            arg['value'] = 'ControlPlaneKubeletLocalMode=true'
+            feature_gates_exists = True
+            break
+
+    if not feature_gates_exists:
+        # Add the feature-gates setting
+        cluster_config_dict['apiServer']['extraArgs'].append({
+            'name': 'feature-gates',
+            'value': 'ControlPlaneKubeletLocalMode=true'
+        })
+
+    # Convert the modified ClusterConfiguration back to a string
+    updated_cluster_config_yaml = yaml.dump(cluster_config_dict)
+
+    # Update the ConfigMap with the new ClusterConfiguration
+    config_map['data']['ClusterConfiguration'] = updated_cluster_config_yaml
+
+    # Convert the entire ConfigMap back to yaml for patching
+    updated_config_map_yaml = yaml.dump(config_map)
+
+    # Apply the updated ConfigMap
+    control_plane_group.sudo(f"kubectl apply -f - <<EOF\n{updated_config_map_yaml}\nEOF")
+
+    cluster.log.debug("ControlPlaneKubeletLocalMode feature gate enabled on control-plane nodes.")
 
 
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
