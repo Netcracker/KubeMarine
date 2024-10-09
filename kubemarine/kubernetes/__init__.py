@@ -188,6 +188,18 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     enrich_kube_proxy(cluster)
 
 
+@enrichment(EnrichmentStage.FULL)
+def enrich_control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
+    kubeadm = inventory["services"]["kubeadm"]
+    if components.control_plane_kubelet_local_mode(cluster):
+        feature_gates = kubeadm.get("featureGates", {})
+        if 'ControlPlaneKubeletLocalMode' not in feature_gates:
+            feature_gates['ControlPlaneKubeletLocalMode'] = True
+        kubeadm["featureGates"] = feature_gates
+
+
 def enrich_kube_proxy(cluster: KubernetesCluster) -> None:
     inventory = cluster.inventory
 

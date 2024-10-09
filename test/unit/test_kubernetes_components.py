@@ -123,6 +123,40 @@ class KubeadmConfigTest(unittest.TestCase):
         self.assertEqual(True, config.get('nested', {}).get('untouched'))
         self.assertEqual([2], config.get('array'))
 
+    def test_kubelet_local_mode_enrichment(self):
+        # No featureGates for kubernetes <= 1.30
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] =  'v1.30.3'
+        cluster = demo.new_cluster(inventory)
+        kubeadm = cluster.inventory['services']['kubeadm']
+        self.assertIsNone(kubeadm.get('featureGates'))
+
+        # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.0'
+        cluster = demo.new_cluster(inventory)
+        kubeadm = cluster.inventory['services']['kubeadm']
+        self.assertIsNotNone(kubeadm.get('featureGates'))
+        self.assertTrue(kubeadm['featureGates'].get('ControlPlaneKubeletLocalMode'))
+
+        # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ with not empty featureGates
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.0'
+        inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['foo'] = 'bar'
+        cluster = demo.new_cluster(inventory)
+        kubeadm = cluster.inventory['services']['kubeadm']
+        self.assertIsNotNone(kubeadm.get('featureGates'))
+        self.assertEqual('bar', kubeadm['featureGates'].get('foo'))
+        self.assertTrue(kubeadm['featureGates'].get('ControlPlaneKubeletLocalMode'))
+
+        # Do not change featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ if value is overridden
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.0'
+        inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['ControlPlaneKubeletLocalMode'] = False
+        cluster = demo.new_cluster(inventory)
+        kubeadm = cluster.inventory['services']['kubeadm']
+        self.assertIsNotNone(kubeadm.get('featureGates'))
+        self.assertFalse(kubeadm['featureGates'].get('ControlPlaneKubeletLocalMode'))
 
 class WaitForPodsTest(unittest.TestCase):
     def setUp(self):

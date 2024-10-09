@@ -1092,25 +1092,26 @@ In the `services.kubeadm` section, you can override the original settings for ku
 For more information about these settings, refer to the official Kubernetes documentation at [https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
-| Parameter                                             | Default Value                                            | Description                                                                                      |
-|-------------------------------------------------------|----------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-|kubernetesVersion                                      | `v1.28.12`                                               |                                                                                                  |
-|controlPlaneEndpoint                                   | `{{ cluster_name }}:6443`                                |                                                                                                  |
-|networking.podSubnet                                   | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                                  |
-|networking.serviceSubnet                               | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                                  |
-|apiServer.certSANs                                     | List with all nodes internal IPs, external IPs and names | Custom SANs are only appended to, but do not override the default list                           |
-|apiServer.extraArgs.enable-admission-plugins           | `NodeRestriction`                                        |                                                                                                  |
-|apiServer.extraArgs.feature-gates                      |                                                          | `PodSecurity=true` is added for Kubernetes < v1.28 if [RBAC pss](#rbac-pss) is enabled           |
-|apiServer.extraArgs.admission-control-config-file      | `/etc/kubernetes/pki/admission.yaml`                     | Provided default value **overrides** custom value if [RBAC pss](#rbac-pss) is enabled.           |
-|apiServer.extraArgs.profiling                          | `false`                                                  |                                                                                                  |
-|apiServer.extraArgs.audit-log-path                     | `/var/log/kubernetes/audit/audit.log`                    |                                                                                                  |
-|apiServer.extraArgs.audit-policy-file                  | `/etc/kubernetes/audit-policy.yaml`                      |                                                                                                  |
-|apiServer.extraArgs.audit-log-maxage                   | `30`                                                     |                                                                                                  |
-|apiServer.extraArgs.audit-log-maxbackup                | `10`                                                     |                                                                                                  |
-|apiServer.extraArgs.audit-log-maxsize                  | `100`                                                    |                                                                                                  |
-|scheduler.extraArgs.profiling                          | `false`                                                  |                                                                                                  |
-|controllerManager.extraArgs.profiling                  | `false`                                                  |                                                                                                  |
-|controllerManager.extraArgs.terminated-pod-gc-threshold| `1000`                                                   |                                                                                                  |
+| Parameter                                               | Default Value                                            | Description                                                                            |
+|---------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------------------------------------|
+| kubernetesVersion                                       | `v1.28.12`                                               |                                                                                        |
+| controlPlaneEndpoint                                    | `{{ cluster_name }}:6443`                                |                                                                                        |
+| networking.podSubnet                                    | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                        |
+| networking.serviceSubnet                                | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                        |
+| apiServer.certSANs                                      | List with all nodes internal IPs, external IPs and names | Custom SANs are only appended to, but do not override the default list                 |
+| apiServer.extraArgs.enable-admission-plugins            | `NodeRestriction`                                        |                                                                                        |
+| apiServer.extraArgs.feature-gates                       |                                                          | `PodSecurity=true` is added for Kubernetes < v1.28 if [RBAC pss](#rbac-pss) is enabled |
+| apiServer.extraArgs.admission-control-config-file       | `/etc/kubernetes/pki/admission.yaml`                     | Provided default value **overrides** custom value if [RBAC pss](#rbac-pss) is enabled. |
+| apiServer.extraArgs.profiling                           | `false`                                                  |                                                                                        |
+| apiServer.extraArgs.audit-log-path                      | `/var/log/kubernetes/audit/audit.log`                    |                                                                                        |
+| apiServer.extraArgs.audit-policy-file                   | `/etc/kubernetes/audit-policy.yaml`                      |                                                                                        |
+| apiServer.extraArgs.audit-log-maxage                    | `30`                                                     |                                                                                        |
+| apiServer.extraArgs.audit-log-maxbackup                 | `10`                                                     |                                                                                        |
+| apiServer.extraArgs.audit-log-maxsize                   | `100`                                                    |                                                                                        |
+| scheduler.extraArgs.profiling                           | `false`                                                  |                                                                                        |
+| controllerManager.extraArgs.profiling                   | `false`                                                  |                                                                                        |
+| controllerManager.extraArgs.terminated-pod-gc-threshold | `1000`                                                   |                                                                                        |
+| featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes version >= 1.31                                                |
 
 The following is an example of kubeadm defaults override:
 

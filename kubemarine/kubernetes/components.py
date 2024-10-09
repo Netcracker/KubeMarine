@@ -208,6 +208,10 @@ def kube_proxy_overwrites_higher_system_values(cluster: KubernetesCluster) -> bo
     return kubernetes_minor_release_at_least(cluster.inventory, "v1.29")
 
 
+def control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> bool:
+    return kubernetes_minor_release_at_least(cluster.inventory, "v1.31")
+
+
 def kubernetes_minor_release_at_least(inventory: dict, minor_version: str) -> bool:
     kubernetes_version = inventory["services"]["kubeadm"]["kubernetesVersion"]
     return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key(minor_version)
