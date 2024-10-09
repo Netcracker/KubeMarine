@@ -23,7 +23,7 @@ import yaml
 from jinja2 import Template
 from ordered_set import OrderedSet
 
-from kubemarine import system, admission, etcd, packages, jinja, sysctl, kubernetes
+from kubemarine import system, admission, etcd, packages, jinja, sysctl
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import Token
@@ -193,7 +193,7 @@ def enrich_control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> None:
     inventory = cluster.inventory
 
     kubeadm = inventory["services"]["kubeadm"]
-    if kubernetes.components.control_plane_kubelet_local_mode(cluster):
+    if components.control_plane_kubelet_local_mode(cluster):
         feature_gates = kubeadm.get("featureGates", {})
         if 'ControlPlaneKubeletLocalMode' not in feature_gates:
             feature_gates['ControlPlaneKubeletLocalMode'] = True

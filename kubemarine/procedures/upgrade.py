@@ -17,7 +17,6 @@ import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
 import uuid
-import yaml
 from kubemarine import kubernetes, plugins, admission, jinja
 from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
