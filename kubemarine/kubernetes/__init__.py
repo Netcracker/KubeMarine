@@ -23,7 +23,7 @@ import yaml
 from jinja2 import Template
 from ordered_set import OrderedSet
 
-from kubemarine import system, admission, etcd, packages, jinja, sysctl
+from kubemarine import system, admission, etcd, packages, jinja, sysctl, kubernetes
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import Token
@@ -186,6 +186,18 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
     enrich_kube_proxy(cluster)
+
+
+@enrichment(EnrichmentStage.FULL)
+def enrich_control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
+    kubeadm = inventory["services"]["kubeadm"]
+    if kubernetes.components.control_plane_kubelet_local_mode(cluster):
+        feature_gates = kubeadm.get("featureGates", {})
+        if 'ControlPlaneKubeletLocalMode' not in feature_gates:
+            feature_gates['ControlPlaneKubeletLocalMode'] = True
+        kubeadm["featureGates"] = feature_gates
 
 
 def enrich_kube_proxy(cluster: KubernetesCluster) -> None:
