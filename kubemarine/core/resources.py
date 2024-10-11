@@ -462,6 +462,7 @@ class DynamicResources:
             # * kubemarine.sysctl.enrich_inventory
             kubemarine.kubernetes.enrich_inventory,
             kubemarine.admission.enrich_inventory,
+            kubemarine.kubernetes.enrich_control_plane_kubelet_local_mode,
             # Depends on kubemarine.core.defaults.apply_defaults
             kubemarine.kubernetes_accounts.enrich_inventory,
             # Depends on kubemarine.kubernetes.enrich_inventory

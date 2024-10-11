@@ -48,7 +48,10 @@
       "$ref": "#/definitions/Etcd"
     },
     "apiVersion": {"type": ["string"], "default": "kubeadm.k8s.io/v1beta2"},
-    "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"}
+    "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"},
+    "featureGates": {
+      "$ref": "#/definitions/FeatureGates"
+    }
   },
   "definitions": {
     "ApiServer": {
@@ -172,6 +175,15 @@
       },
       "required": ["name", "hostPath", "mountPath"],
       "additionalProperties": false
+    },
+    "FeatureGates": {
+      "type": "object",
+      "properties": {
+        "ControlPlaneKubeletLocalMode": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }
