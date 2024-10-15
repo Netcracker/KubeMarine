@@ -45,8 +45,6 @@ containerd:
     version_debian: 1.6.*
   v1.30.3:
     version_debian: 1.6.*
-  v1.31.0:
-    version_debian: 1.6.*
   v1.31.1:
     version_debian: 1.6.*
 containerdio:
@@ -127,10 +125,6 @@ containerdio:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.30.3:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.31.0:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
