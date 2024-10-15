@@ -16,6 +16,7 @@ from typing import List
 from kubemarine.core import static
 from .compatibility import KubernetesVersions
 from .software import InternalCompatibility, UpgradeConfig, CompatibilityMap, SoftwareType
+from .software.defaults import KubemarineDefaults
 from .software.kubernetes_images import KubernetesImagesResolver, KubernetesImages
 from .software.packages import Packages
 from .software.plugins import ManifestResolver, Plugins, ManifestsEnrichment
@@ -27,6 +28,7 @@ from .tracker import SummaryTracker
 
 class Synchronization:
     def __init__(self,
+                 defaults: KubemarineDefaults,
                  compatibility: InternalCompatibility,
                  kubernetes_versions: KubernetesVersions,
                  images_resolver: KubernetesImagesResolver,
@@ -35,6 +37,7 @@ class Synchronization:
                  manifests_enrichment: ManifestsEnrichment,
                  upgrade_config: UpgradeConfig,
                  ):
+        self.defaults = defaults
         self.compatibility = compatibility
         self.kubernetes_versions = kubernetes_versions
         self.images_resolver = images_resolver
@@ -44,6 +47,8 @@ class Synchronization:
         self.upgrade_config = upgrade_config
 
     def run(self) -> SummaryTracker:
+        self.validate()
+
         tracker = SummaryTracker(self.kubernetes_versions.compatibility_map)
 
         software: List[SoftwareType] = [
@@ -75,3 +80,12 @@ class Synchronization:
 
         tracker.print()
         return tracker
+
+    def validate(self) -> None:
+        # Validate version
+        default_version = self.defaults.default_version()
+        if default_version not in self.kubernetes_versions.compatibility_map:
+            raise Exception(f"Kubemarine default version {default_version} "
+                            f"does not exist in compatibility map. "
+                            f"Default version should be updated before excluding it from support."
+            )

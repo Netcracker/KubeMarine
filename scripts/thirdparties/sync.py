@@ -32,7 +32,7 @@ from src.software import InternalCompatibility, UpgradeConfig
 from src.software.kubernetes_images import KubernetesImagesResolver
 from src.software.plugins import ManifestResolver, ManifestsEnrichment
 from src.software.thirdparties import ThirdpartyResolver
-
+from src.software.defaults import KubemarineDefaults
 
 if __name__ == '__main__':
     if platform.system() != 'Linux':
@@ -46,6 +46,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     Synchronization(
+        KubemarineDefaults(),
         InternalCompatibility(),
         KubernetesVersions(),
         KubernetesImagesResolver(),

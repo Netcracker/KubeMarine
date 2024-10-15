@@ -12,10 +12,10 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
-      - name: Set up Python 3.9
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Install software
         run: pip3 install yq
       - name: Parse kubernetes versions
@@ -48,10 +48,10 @@ jobs:
           ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
-      - name: Set up Python 3.9
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Install Kubemarine with dependencies
         run: |
           python -m pip install --upgrade pip
@@ -110,10 +110,10 @@ jobs:
         run: sudo ifconfig docker0:0 172.17.1.1 up
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
-      - name: Set up Python 3.9
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Install Kubemarine with dependencies
         run: |
           python -m pip install --upgrade pip
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Install dependencies
         run: pip install . && pip uninstall -y kubemarine
       - name: Run scripts/thirdparties/sync.py
