@@ -156,7 +156,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
 
         inventory = self.resources.working_inventory
         self.assertEqual(kubernetes_version, inventory['services']['kubeadm']['kubernetesVersion'])
-        expected_source = (f'https://storage.googleapis.com/kubernetes-release/release/'
+        expected_source = (f'https://dl.k8s.io/'
                            f'{kubernetes_version}/bin/linux/amd64/kubeadm')
         self.assertEqual(expected_source,
                          inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
@@ -183,7 +183,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
 
         inventory = self.resources.working_inventory
         self.assertEqual(after, inventory['services']['kubeadm']['kubernetesVersion'])
-        self.assertEqual(f'https://storage.googleapis.com/kubernetes-release/release/{after}/bin/linux/amd64/kubeadm',
+        self.assertEqual(f'https://dl.k8s.io/{after}/bin/linux/amd64/kubeadm',
                          inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
         self.assertEqual('containerd_new',
                          inventory['services']['packages']['associations']['rhel']['containerd']['package_name'])

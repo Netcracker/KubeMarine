@@ -2094,11 +2094,11 @@ By default, the installer installs the following thirdparties with the following
 services:
   thirdparties:
     /usr/bin/kubeadm:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubeadm'
+      source: 'https://dl.k8s.io/{{k8s-version}}/bin/linux/amd64/kubeadm'
     /usr/bin/kubelet:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubelet'
+      source: 'https://dl.k8s.io/{{k8s-version}}/bin/linux/amd64/kubelet'
     /usr/bin/kubectl:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubectl'
+      source: 'https://dl.k8s.io/{{k8s-version}}/bin/linux/amd64/kubectl'
       group: control-plane
     /usr/bin/calicoctl:
       source: 'https://github.com/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
