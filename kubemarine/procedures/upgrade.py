@@ -93,6 +93,20 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         preconfigure_components.append('kube-proxy')
         preconfigure_functions['kube-proxy'] = edit_kube_proxy_conntrack_min
 
+    if kubernetes.components.control_plane_kubelet_local_mode(cluster):
+
+        # featureGates field is changed for kubernetes >= 1.31
+        # See kubernetes.enrich_control_plane_kubelet_local_mode() for details
+        def apply_kubelet_local_mode(cluster_config: dict) -> dict:
+            feature_gates = cluster.inventory["services"]["kubeadm"].get("featureGates")
+            if feature_gates is not None:
+                cluster_config["featureGates"] = feature_gates
+
+            return cluster_config
+
+        preconfigure_components.append('kube-apiserver')
+        preconfigure_functions['kubeadm-config'] = apply_kubelet_local_mode
+
     if preconfigure_components:
         upgrade_group.call(kubernetes.components.reconfigure_components,
                            components=preconfigure_components, edit_functions=preconfigure_functions)

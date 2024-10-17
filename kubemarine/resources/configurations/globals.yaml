@@ -128,19 +128,19 @@ thirdparties:
   /usr/bin/kubeadm:
     software_name: kubeadm
     source_prefix:
-      public: https://storage.googleapis.com/kubernetes-release/release
+      public: https://dl.k8s.io
       private: '{registry}/kubernetes/kubeadm'
     relative_path: '{version}/bin/linux/amd64/kubeadm'
   /usr/bin/kubelet:
     software_name: kubelet
     source_prefix:
-      public: https://storage.googleapis.com/kubernetes-release/release
+      public: https://dl.k8s.io
       private: '{registry}/kubernetes/kubelet'
     relative_path: '{version}/bin/linux/amd64/kubelet'
   /usr/bin/kubectl:
     software_name: kubectl
     source_prefix:
-      public: https://storage.googleapis.com/kubernetes-release/release
+      public: https://dl.k8s.io
       private: '{registry}/kubernetes/kubectl'
     relative_path: '{version}/bin/linux/amd64/kubectl'
   /usr/bin/calicoctl:

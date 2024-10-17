@@ -12,11 +12,11 @@ restore_plan:
       peer_cacert: /etc/kubernetes/pki/etcd/ca.crt
   thirdparties:
     /usr/bin/kubeadm:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubeadm
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubeadm
     /usr/bin/kubelet:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubelet
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubelet
     /usr/bin/kubectl:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubectl
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubectl
     /opt/cni/cni-plugins-linux.tgz:
       source: https://github.com/containernetworking/plugins/releases/download/v0.8.6/cni-plugins-linux-amd64-v0.8.6.tgz
     /usr/bin/calicoctl:

@@ -752,11 +752,11 @@ The procedure recovers thirdparties based on the `cluster.yaml`. If rpm thirdpar
 restore_plan:
   thirdparties:
     /usr/bin/kubeadm:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubeadm
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubeadm
     /usr/bin/kubelet:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubelet
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubelet
     /usr/bin/kubectl:
-      source: https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubectl
+      source: https://dl.k8s.io/v1.18.8/bin/linux/amd64/kubectl
     /usr/bin/calicoctl:
       source: https://github.com/projectcalico/calicoctl/releases/download/v3.14.1/calicoctl-linux-amd64
 ```

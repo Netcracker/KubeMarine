@@ -1511,7 +1511,11 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
 
         kubeadm_config = components.KubeadmConfig(cluster)
         cluster_config = kubeadm_config.load('kubeadm-config', first_control_plane)
+        # Check if extraArgs is a list of dictionaries or a dictionary
         apiserver_actual_args = cluster_config["apiServer"]["extraArgs"]
+        if isinstance(apiserver_actual_args, list):
+            # Convert list of dictionaries to a single dictionary
+            apiserver_actual_args = {arg['name']: arg['value'] for arg in apiserver_actual_args}
 
         actual_state = "disabled"
         if "admission-control-config-file" in apiserver_actual_args and (
