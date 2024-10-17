@@ -1,3 +1,6 @@
+
+# Kubemarine and Kubernetes Troubleshooting Guide
+
 This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
 
 - [Kubemarine Errors](#kubemarine-errors)
@@ -49,10 +52,16 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
 This section lists all known errors with explanations and recommendations for their fixing. If an 
 error occurs during the execution of any of these procedures, you can find it here.
 
-
 ## KME0001: Unexpected exception
 
-```
+### Description
+This error occurs when an unexpected exception is encountered during runtime and has not yet been assigned a classifying code.
+
+### Alerts
+- **Alert:** TASK FAILED - `KME001: Unexpected exception`
+
+### Stack trace(s)
+```text
 FAILURE - TASK FAILED xxx
 Reason: KME001: Unexpected exception
 Traceback (most recent call last):
@@ -83,158 +92,191 @@ Traceback (most recent call last):
 ValueError: max_workers must be greater than 0
 ```
 
-This error occurs in case of an unexpected exception at runtime and does not yet have a classifying 
-code.
 
-To fix it, first try checking the nodes and the cluster with 
-[IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
-see failed tests, try fixing the cause of the failure. If the error persists, try to inspect the 
-stacktrace and come to a solution yourself as much as possible. 
 
-If you still can't resolve this error yourself, start 
-[a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and attach a description of the 
-error with its stacktrace. We will try to help as soon as possible.
+### How to solve
+1. Run the [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure) to identify potential issues with the nodes or the cluster.
+2. If the checker reports failed tests, fix the cause of the failure and rerun the task.
+3. Adjust the number of workers to ensure `max_workers` is greater than 0.
+4. If you are unable to resolve the issue, [start a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and provide the error details along with the stack trace for further assistance.
 
-If you were able to solve the problem yourself, let us know about it and your solution by 
-[opening a new PR](https://github.com/Netcracker/KubeMarine/pulls). Our team will appreciate it!
+### Recommendations
+To avoid this issue in the future:
+- Validate the cluster's node configuration before deployment to ensure the number of workers is correctly set.
+- Regularly check the system's configuration and update it as necessary.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, Our team will appreciate it!
 
 
 ## KME0002: Remote group exception
 
-Shell error:
+### Description
+This error occurs when a bash command executed on a remote cluster host terminates unexpectedly with a non-zero exit code. In this case, the command `'apt install bad-package-name'` failed with exit code 127, indicating that the `apt` command was not found on the remote node.
 
-```
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 FAILURE!
 TASK FAILED xxx
 KME0002: Remote group exception
 10.101.10.1:
-	Encountered a bad command exit code!
-	
-	Command: 'apt install bad-package-name'
-	
-	Exit code: 127
-	
-	=== stderr ===
-	bash: apt: command not found
+  Encountered a bad command exit code!
+  
+  Command: 'apt install bad-package-name'
+  
+  Exit code: 127
+  
+  === stderr ===
+  bash: apt: command not found
 ```
 
-An error indicating an unexpected runtime bash command exit on a remote cluster host. This error 
-occurs when a command is terminated unexpectedly with a non-zero error code.
+### How to solve
+1. Run the [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure) to ensure that the infrastructure and platform are functioning properly.
+2. Inspect the node where the error occurred and verify the presence of the required package manager. 
+3. If the package manager is not available, ensure that the correct package management tool is installed on the node or adjust the command to use the appropriate tool (e.g., `yum` for RHEL-based systems).
+4. Verify that all necessary dependencies are correctly installed on the node, and reattempt the task.
+5. Ensure that the inventory and configuration files are correctly set up, following the proper sequence of commands.
+6. If the issue persists, [start a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and provide a description of the error with its stack trace for further assistance.
 
-The error prints the status of the command execution for each node in the group on which the bash command 
-was executed. The status can be a correct result (shell results), a result with an error 
-(shell error), as well as a [timeout](#command-did-not-complete-within-a-number-of-seconds) error.
+### Recommendations
+To avoid this issue in the future:
+- Validate the remote node’s environment to ensure that the required package management tools are available before running any package installation commands.
+- Always verify the compatibility of commands with the system type (e.g., Debian vs. RHEL-based distributions).
 
-To fix it, first try checking the nodes and the cluster with 
-[IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
-see failed tests, try fixing the cause of the failure. Make sure that you do everything according to 
-the instructions in the correct sequence and correctly fill the inventory and other dependent
-files. If the error persists, try to figure out what might be causing the command to fail on remote 
-nodes and fix by yourself as much as possible.
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
 
-If you still can't resolve this error yourself, start 
-[a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and attach a description of the 
-error with its stacktrace. We will try to help as soon as possible.
+## Command did not complete within a number of seconds
 
+### Description
+This error occurs when a command does not complete within the allowed execution time of 2700 seconds (45 minutes). In the provided example, the command `'echo "sleeping..." && sleep 3000'` exceeded the timeout, causing the task to fail. This issue could arise due to a hanging command, a problem with the remote hypervisor, or network issues between the deployer node and the cluster.
 
-### Command did not complete within a number of seconds
+### Alerts
+Not applicable.
 
-```
+### Stack trace(s)
+```text
 FAILURE!
 TASK FAILED xxx
 KME0002: Remote group exception
 10.101.10.1:
- 	Command did not complete within 2700 seconds!
- 	
- 	Command: 'echo "sleeping..." && sleep 3000'
- 	
- 	=== stdout ===
- 	sleeping...
-	
+  Command did not complete within 2700 seconds!
+  
+  Command: 'echo "sleeping..." && sleep 3000'
+  
+  === stdout ===
+  sleeping...
 ```
 
-An error that occurs when a command did not have time to execute at the specified time.
+### How to solve
+1. Inspect the remote node for potential issues causing the hang. This could include a malfunctioning hypervisor or a hung process.
+2. Reboot the hypervisor or node if it is not responding, or manually terminate any hanging processes.
+3. Check for SSH connectivity issues between the deployer node and the cluster, and verify the network stability.
+4. Investigate the environment or settings of the executable command for any misconfigurations or issues causing the prolonged execution.
+5. Run the [IAAS checker](Kubecheck.md#iaas-procedure) to detect any network connectivity issues between the nodes.
+6. If the problem persists, update the executable or make other environment changes to resolve the hanging command.
 
-The error can occur if there is a problem with the remote hypervisor or host hanging, if the 
-command executable hangs, or if the SSH-connection is unexpectedly disconnected or other network 
-problems between the deployer node and the cluster.
+### Recommendations
+To prevent this issue in the future:
+- Ensure that time-sensitive commands are optimized to complete within the allowed time limit.
+- Regularly monitor the network connection between the deployer and cluster nodes to identify and resolve any latency or connectivity issues early.
+- Configure appropriate timeout settings for long-running commands to avoid task failures.
 
-The longest possible timeout for the command is 2700 seconds (45 minutes).
-
-To resolve this error, check all of the listed items that may hang and manually fix the hang by 
-rebooting the hypervisor or node, fixing the environment or settings of the executable, updating it,
-fixing the network channel, as well as any other actions that, in your opinion, should fix the 
-frozen stage of the procedure. It will be useful to check the cluster with 
-[IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity.
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
 
 
 ## KME0004: There are no control planes defined in the cluster scheme
 
-```
+### Description
+This error occurs when there are no nodes with the `control-plane` role defined in the cluster's inventory file. The error happens before the payload is executed on the cluster, indicating a misconfiguration in the cluster setup.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 FAILURE!
 KME0004: There are no control planes defined in the cluster scheme
 ```
 
-An error related with the absence of any control plane role in the inventory file. The error occurs before
-the payload is executed on the cluster.
+### How to solve
+1. Check the cluster's inventory file to ensure that there is at least one node assigned with the `control-plane` role.
+2. If no control plane nodes are defined, add new nodes with the `control-plane` role to the cluster inventory. 
+   
+   Example of defining separate control-plane and worker nodes:
+   ```yaml
+   - address: 10.101.1.1
+     internal_address: 192.168.101.1
+     name: control-plane-1
+     roles:
+     - control-plane
+   - address: 10.101.1.2
+     internal_address: 192.168.101.2
+     name: worker-1
+     roles:
+     - worker
+   ```
+3. Alternatively, you can assign both the `control-plane` and `worker` roles to existing worker nodes.
 
-To fix it, you need to either specify new nodes with the `control-plane` role, or add the `control-plane` role to 
-the existing worker nodes.
+   Example of a node with both control-plane and worker roles:
+   ```yaml
+   - address: 10.101.1.1
+     internal_address: 192.168.101.1
+     name: control-plane-1
+     roles:
+     - control-plane
+     - worker
+   ```
+4. Once the roles are properly configured, reapply the changes and rerun the task.
 
-An example of specifying different nodes with separate `control-plane` and `worker` roles is as follows.
+### Recommendations
+To avoid this issue in the future:
+- Double-check the inventory file to ensure the correct roles are assigned to nodes, particularly ensuring there is always at least one control-plane node.
+- For environments where nodes serve both control-plane and worker roles, monitor their resource usage to avoid overloading them.
 
-```yaml
-- address: 10.101.1.1
-  internal_address: 192.168.101.1
-  name: control-plane-1
-  roles:
-  - control-plane
-- address: 10.101.1.2
-  internal_address: 192.168.101.2
-  name: worker-1
-  roles:
-  - worker
-```
-
-An example of specifying multiple `control-plane` and `worker` roles for a single node is as follows.
-
-```yaml
-- address: 10.101.1.1
-  internal_address: 192.168.101.1
-  name: control-plane-1
-  roles:
-  - control-plane
-  - worker
-```
-
-**Note**: Control-planes with a `worker` role remain as control planes, however, they start scheduling
-applications pods.
+>**Note**  
+>Control-planes with a worker role remain as control planes, however, they start scheduling applications pods.
 
 
 ## KME0005: {hostnames} are not sudoers
 
-```
+### Description
+This error occurs when the connection users on the specified nodes do not have superuser (sudo) privileges or are required to enter a password to run `sudo` commands. The error is raised before the payload is executed on the cluster, typically during the `install` or `add_node` procedures.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 FAILURE!
 TASK FAILED prepare.check.sudoer
 KME0005: ['10.101.1.1'] are not sudoers
 ```
 
-The error reports that connection users in the specified nodes either do not have superuser rights, or require passwords to run `sudo` commands.
-The error occurs before the payload is executed on the cluster when running the `install` or `add_node` procedure.
+### How to solve
+1. Add the connection user to the sudoers group on the affected cluster nodes. For example, on Ubuntu, use the following command (note that a reboot is required):
+   ```bash
+   sudo adduser <username> sudo
+   ```
+2. To allow the connection user to run `sudo` commands without requiring a password, edit the `/etc/sudoers` file and add the following line at the end:
+   ```bash
+   username  ALL=(ALL) NOPASSWD:ALL
+   ```
+   Replace `username` with the actual username of the connection user.
+3. Reboot the affected nodes and verify that the user has the required sudo privileges.
+4. Retry the `install` or `add_node` procedure.
 
-To fix this, add a connection user to the sudoer group on the cluster node. 
+### Recommendations
+To prevent this issue in the future:
+- Ensure all connection users are properly configured with sudo privileges on all nodes before running any procedures.
+- Regularly audit the sudoer configurations to avoid permission issues during deployments or node additions.
 
-An example for Ubuntu (reboot required) is as given below.
-
-```bash
-sudo adduser <username> sudo
-```
-
-To run `sudo` commands without being asked for a password, add
-```bash
-username  ALL=(ALL) NOPASSWD:ALL
-```
-in the end of `/etc/sudoers` file, where `username` is a name of the connection user.
+>**Note**  
+>Not applicable.
 
 # Troubleshooting Tools
 
@@ -242,34 +284,43 @@ This section describes the additional tools that Kubemarine provides for conveni
 
 ## Etcdctl Script
 
-This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
+### Description
+This script allows you to execute `etcdctl` queries without the need for additional binary installations or manual connection setup. The script is installed during the `prepare.thirdparties` task on all control-plane nodes and requires root privileges to execute commands.
 
-To execute a command through this script, make sure you meet all the following prerequisites:
+### Alerts
+Not applicable.
 
-* You run the command from the control-plane node with root privileges.
-* You have configured `admin.conf` on node.
-* The node with which you are running has all the necessary ETCD certificates and they are located in the correct paths.
+### Stack trace(s)
+Not applicable.
 
-If all prerequisites are achieved, you can execute almost any `etcdctl` command.
-For example:
+### How to solve
+To use the `etcdctl` script, ensure the following prerequisites are met:
+1. You are running the command from a control-plane node with root privileges.
+2. The `admin.conf` is configured on the node.
+3. The node has the necessary ETCD certificates located in the correct paths.
 
+Once the prerequisites are satisfied, you can execute most `etcdctl` commands. Examples include:
+```bash
+etcdctl member list
+etcdctl endpoint health --cluster -w table
+etcdctl endpoint status --cluster -w table
 ```
-# etcdctl member list
-# etcdctl endpoint health --cluster -w table
-# etcdctl endpoint status --cluster -w table
-```
+If you encounter issues, consult the official ETCD documentation for additional options and features.
 
-To find out all the available `etcdctl` options and features, use the original ETCD documentation.
+The script follows this algorithm to launch the `etcdctl` container:
+1. It detects the already running ETCD instance in the Kubernetes cluster, parses its parameters, and launches the ETCD container with the same parameters on the current node.
+2. If the Kubernetes cluster is unavailable, the script parses the `/etc/kubernetes/manifests/etcd.yaml` file and launches the ETCD container with the corresponding parameters.
 
-To execute the command, the script tries to launch the container using the following algorithm:
+### Recommendations
+To avoid issues with the `etcdctl` script:
+- Ensure all necessary certificates are correctly configured and paths are accurate.
+- Always run the script with the appropriate permissions and from a control-plane node.
+- Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
+  - `/var/lib/etcd` : `/var/lib/etcd`
+  - `/etc/kubernetes/pki` : `/etc/kubernetes/pki`
 
-1. Detect already running ETCD in Kubernetes cluster, parse its parameters, and launch the ETCD container with the same parameters on the current node.
-2. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
-
-Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
-
-* `/var/lib/etcd`:`/var/lib/etcd`
-* `/etc/kubernetes/pki`:`/etc/kubernetes/pki`
+>**Note**  
+>Not applicable.
 
 # Troubleshooting Kubernetes Generic Issues
 
@@ -277,91 +328,155 @@ This section provides troubleshooting information for generic Kubernetes solutio
 
 ## CoreDNS Responds With High Latency
 
-**Symptoms**: CoreDNS responds with some delay.
+### Description
+CoreDNS may respond with delays when there is a high load due to a large volume of applications or nodes in the cluster. This increased load can cause CoreDNS to slow down its response times.
 
-**Root Cause**: With a large volume of the cluster or applications in it, the load on the CoreDNS can increase.
+### Alerts
+Not applicable.
 
-**Solution**: To fix this problem, it is recommended to increase the number of replicas using the following command:
- 
-```
-# kubectl scale deployments.apps -n kube-system coredns --replicas=4
-```
- 
-Choose the number of replicas at your discretion. In addition to increasing the replicas, it is recommended to use anti-affinity rules to reassign all CoreDNS pods to each node without any duplicates.
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Increase the number of CoreDNS replicas to handle the higher load. Use the following command to scale up the replicas:
+   ```bash
+   kubectl scale deployments.apps -n kube-system coredns --replicas=4
+   ```
+   You can choose the number of replicas based on the cluster's size and load.
+2. Additionally, configure anti-affinity rules to ensure that all CoreDNS pods are distributed across different nodes without duplicates. This helps prevent overloading individual nodes.
+
+### Recommendations
+To avoid high latency in CoreDNS in the future:
+- Monitor the load on CoreDNS regularly and adjust the number of replicas as needed.
+- Use anti-affinity rules to distribute CoreDNS pods evenly across the cluster to balance the load.
+
+>**Note**  
+>Not applicable.
 
 ## Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted
 
-**Symptoms**: A namespace containing a terminating `CustomResource` cannot be deleted, or simply `CustomResource` in some namespace hangs infinitely in the terminating status and cannot be deleted.
+### Description
+A namespace containing a terminating CustomResource cannot be deleted, or simply CustomResource in some namespace hangs infinitely in the terminating status and cannot be deleted. 
 
-**Root Cause**: This issue occurs when `CustomResource` has finalizers that are not deleted. This could happen because the controller that manages the `CustomResource` is not operational, for example, if the controller is deleted. As a result, the controller cannot handle and remove finalizers.
+### Alerts
+Not applicable.
 
-`CustomResources` with non-empty finalizers are never deleted.
+### Stack trace(s)
+Not applicable.
 
-**Solution**: There are two possible solutions to this issue:
+### How to solve
+The issue occurs due to the presence of non-deleted finalizers in the `CustomResource`. These finalizers prevent the resource from being deleted, typically because the controller responsible for managing the `CustomResource` is not operational (e.g., if the controller is deleted or unavailable).
 
-* If the controller is just temporarily unavailable, then `CustomResource` is deleted as soon as the controller starts running. You just have to make the controller operational. This is the recommended approach as the controller is able to perform on-delete logic.
-* If the controller is removed, or you do not want to deal with an unavailable controller, remove `CustomResource` by manually deleting its finalizers. This approach is not recommended as the required on-delete logic for `CustomResource` is not executed by the controller.
+There are two potential solutions:
 
-To manually delete a finalizer for `CustomResource`, execute the following command on one of the control-plane nodes:
+1. **Restart the Controller:**
+   - If the controller is temporarily unavailable, the `CustomResource` will be deleted once the controller becomes operational again. This is the recommended solution since it allows the controller to execute the required on-delete logic for the `CustomResource`.
+   
+2. **Manually Remove Finalizers:**
+   - If the controller has been permanently removed or is not desired, you can manually delete the finalizers from the `CustomResource`. However, this is not recommended as it bypasses the on-delete logic typically handled by the controller.
 
+To manually remove finalizers, execute the following command:
 ```bash
 kubectl patch <cr-singular-alias/cr-name> -p '{"metadata":{"finalizers":[]}}' --type=merge
 ```
-
 For example:
-
 ```bash
 kubectl patch crontab/my-new-cron-object -p '{"metadata":{"finalizers":[]}}' --type=merge
 ```
 
+### Recommendations
+To avoid this issue in the future:
+- Ensure that controllers managing `CustomResources` are kept operational and healthy to handle resource finalization.
+- Avoid manually deleting finalizers unless absolutely necessary, as this skips important cleanup logic provided by the controller.
+
+>**Note**  
+>CustomResources with non-empty finalizers are never deleted.
+
+
 ## Packets Between Nodes in Different Networks Are Lost
 
-**Symptoms**: Some packets between pods running on nodes in different networks are lost. DNS requests are also lost on the network. 
+### Description
+Some packets between pods running on nodes in different networks are lost, including DNS requests on the network. This issue affects communication between pods across different networks.
 
-**Root Cause**: Default Kubernetes installation uses calico network plugin and set ipip mode with CrossSubnet. In that case all packets between pods running on nodes in one networks go to each other directly, but packets between pods running on nodes in two or more networks go to each other by tunnel. As described in [calico documentation](https://docs.projectcalico.org/networking/mtu) MTU on calico tunnel interfaces should be less by 20 than MTU on main network interface.
+### Alerts
+Not applicable.
 
-**Solution**: To change MTU size to required value run following command on any control-plane node:
+### Stack trace(s)
+Not applicable.
 
-```
-# kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1430"}}'
-```
+### How to solve
+The default Kubernetes installation uses the Calico network plugin with IP-in-IP (ipip) mode set to CrossSubnet. In this configuration, packets between pods on nodes in the same network are sent directly, but packets between pods on nodes in different networks are routed through a tunnel. According to the [Calico documentation](https://docs.projectcalico.org/networking/mtu), the MTU on Calico tunnel interfaces should be 20 bytes less than the MTU on the main network interface.
 
-where:
-  - **1430** is the size of MTU. For MTU 1450 on interface eth0 you should set MTU size 1430 for calico-config.
+To adjust the MTU size, run the following command on any control-plane node:
 
-
-After updating the ConfigMap, perform a rolling restart of all calico/node pods. For example:
-
-```
-# kubectl rollout restart daemonset calico-node -n kube-system
+```bash
+kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1430"}}'
 ```
 
-It changes MTU value only for new pods. To apply new MTU value for all pods in the cluster you should restart all pods or nodes one by one.
+Where:
+  - **1430** is the size of the MTU. For example, if the MTU on `eth0` is 1450, you should set the Calico MTU size to 1430.
+
+After updating the ConfigMap, perform a rolling restart of all `calico/node` pods to apply the changes:
+
+```bash
+kubectl rollout restart daemonset calico-node -n kube-system
+```
+
+This change only affects new pods. To apply the new MTU value to all pods in the cluster, you must either restart all pods or reboot the nodes one by one.
+
+### Recommendations
+To avoid packet loss in the future:
+- Ensure that the MTU size is correctly configured for the Calico tunnel interfaces to match the main network interface, with a 20-byte reduction as per the Calico documentation.
+- Regularly monitor the network performance between nodes in different networks and make adjustments as needed.
+
+>**Note**  
+>If the MTU values are updated, be sure to restart all pods or nodes to ensure the new settings take effect across the cluster.
 
 ## `kubectl apply` Fails With Error "metadata annotations: Too long"
 
-**Symptoms**: The `kubectl apply` command fails with an error having "metadata annotations: Too long" message. 
+### Description
+The `kubectl apply` command fails with the error message "metadata annotations: Too long" when trying to apply a resource with a very large configuration. This prevents the resource from being successfully applied.
 
-**Root Cause**: This issue happens when you try to apply a resource with a very large configuration.
-The problem is that `kubectl apply` tries to save the new configuration to the `kubectl.kubernetes.io/last-applied-configuration` annotation. If the new configuration is too big, it cannot fit the annotation's size limit.
-The maximum size cannot be changed, so `kubectl apply` is unable to apply large resources.
+### Alerts
+Not applicable.
 
-**Solution**: Use `kubectl create` instead of `kubectl apply` for large resources.
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+This issue occurs when you attempt to apply a resource with a large configuration. The error happens because `kubectl apply` tries to save the new configuration to the `kubectl.kubernetes.io/last-applied-configuration` annotation. If the new configuration is too large, it exceeds the annotation's size limit, and `kubectl apply` cannot proceed. The maximum size of annotations cannot be changed, so large resources cannot be applied using `kubectl apply`.
+
+To resolve this issue, use `kubectl create` instead of `kubectl apply` for large resources.
+
+### Recommendations
+To avoid this issue in the future:
+- Use `kubectl create` for resources with large configurations, as it bypasses the size limit on annotations.
+- Break down large resource configurations into smaller, more manageable parts if possible, to prevent exceeding the annotation limit.
+
+>**Note**  
+>The maximum size for annotations is fixed and cannot be modified.
 
 ## `kube-apiserver` Requests Throttling
 
-**Symptoms**: Different services start receiving “429 Too Many Requests” HTTP error even though kube-apiservers can take more load.
- 
-**Root Cause**: Low rate limit for `kube-apiserver`.
+### Description
+Different services may start receiving “429 Too Many Requests” HTTP errors, even though the `kube-apiserver` can handle more load. This issue occurs when the request rate limits for the `kube-apiserver` are too low, leading to throttling of requests.
 
-**Solution**: Raise the rate limit for the `kube-apiserver` process using `--max-requests-inflight` and `--max-mutating-requests-inflight` options.
-* `--max-requests-inflight` is the maximum number of non-mutating requests. The default value is 400.
-* `--max-mutating-requests-inflight` is the maximum number of mutating requests. The default value is 200.
+### Alerts
+Not applicable.
 
-`kube-apiserver` configuration file is stored in /etc/kubernetes/manifests/kube-apiserver.yaml. This file should be changed 
-on all control-planes. Also, the configuration map `kubeadm-config` from kube-system namespace should have the same values 
-in `apiServer` section.
+### Stack trace(s)
+Not applicable.
 
+### How to solve
+The root cause of this issue is the low rate limit for the `kube-apiserver`. To fix it, increase the rate limits by adjusting the `--max-requests-inflight` and `--max-mutating-requests-inflight` options in the `kube-apiserver` configuration:
+- `--max-requests-inflight`: Defines the maximum number of non-mutating requests. The default value is 400.
+- `--max-mutating-requests-inflight`: Defines the maximum number of mutating requests. The default value is 200.
+
+Follow these steps to increase the rate limits:
+1. Modify the `kube-apiserver` configuration file, which is located at `/etc/kubernetes/manifests/kube-apiserver.yaml` on all control-plane nodes.
+2. Update the `kubeadm-config` ConfigMap in the `kube-system` namespace to ensure that the values match in the `apiServer` section.
+
+Example configuration:
 ```yaml
 apiVersion: v1
 data:
@@ -373,26 +488,39 @@ data:
         max-requests-inflight: "400"
         max-mutating-requests-inflight: "200"
         ...
-
 ```
+
+### Recommendations
+To avoid request throttling issues in the future:
+- Regularly monitor the load on the `kube-apiserver` and adjust the rate limits accordingly.
+- Ensure that rate limit settings are consistent across all control-plane nodes and in the `kubeadm-config` ConfigMap.
+
+>**Note**  
+>Be sure to apply these changes on all control-plane nodes for consistency.
+
 
 ## Long Recovery After a Node Goes Offline
 
-**Symptoms**: If for any reason, a cluster node goes offline, the pods from that node are redeployed in almost 6 minutes. For some installations, it might be too long and this time needs to be reduced.
+### Description
+When a cluster node goes offline, it may take up to 6 minutes for the pods running on that node to be redeployed to healthy nodes. For some installations, this delay is too long, and the recovery time needs to be reduced.
 
-**Root Cause**: When a node goes offline, Kubernetes takes time to discover that the node is unavailable (up to 10 seconds). It then waits till the node returns or the timeout expires (40 seconds), then marks the pods at this node to be deleted, and waits for the situation to recover or for the timeout to expire (5 minutes). After that, the pods are redeployed to healthy nodes.
+### Alerts
+Not applicable.
 
-**Solution**: Reduce the timeouts related to the node status discovery and pods eviction.
+### Stack trace(s)
+Not applicable.
 
-It can be done by tuning the following variables:
-- `nodeStatusUpdateFrequency` - A kubelet's variable that specifies the frequency kubelet computes the node status and posts it to control-plane. The default value is 10s. It should be twice the value of `node-monitor-period`.
-- `node-monitor-period` - A kube-controller-manager's variable that specifies the period for syncing NodeStatus in NodeController. The default value is 5s. It should be half the value of `nodeStatusUpdateFrequency`.
-- `node-monitor-grace-period` - A kube-controller-manager's variable that specifies the amount of time that a running node is allowed to be unresponsive before marking it unhealthy. The default value is 40s. It must be (N-1) times more than kubelet's `nodeStatusUpdateFrequency`, where N is the number of retries allowed for kubelet to post the node status. Currently N is hardcoded to 5. 
-- `pod-eviction-timeout` - A kube-controller-manager's variable that specifies the grace period for deleting pods on failed nodes. The default value is 5 min.
+### How to solve
+The root cause of this issue is the series of timeouts and delays that occur when Kubernetes detects an offline node. Kubernetes first takes time to discover that a node is unavailable (up to 10 seconds). It then waits for the node to either recover or time out (40 seconds), and finally, it marks the pods on that node for deletion and waits another 5 minutes before redeploying them to healthy nodes.
 
-These variables can be redefined in cluster.yaml during the cluster deployment or upgrade. For example:
+To reduce this recovery time, you can adjust the following variables:
+- `nodeStatusUpdateFrequency`: Kubelet's variable that determines how frequently kubelet computes the node status and sends it to the control-plane. The default is 10s, but it should be twice the value of `node-monitor-period`.
+- `node-monitor-period`: Kube-controller-manager's variable that defines the period for syncing NodeStatus. The default is 5s and should be half the value of `nodeStatusUpdateFrequency`.
+- `node-monitor-grace-period`: Kube-controller-manager's variable that sets the time a node can be unresponsive before being marked as unhealthy. The default is 40s and should be (N-1) times more than kubelet's `nodeStatusUpdateFrequency`, where N is hardcoded to 5 retries.
+- `pod-eviction-timeout`: Kube-controller-manager's variable specifying the grace period before pods on failed nodes are deleted. The default is 5 minutes.
 
-```
+These values can be modified in the `cluster.yaml` during deployment or upgrades. Example configuration:
+```yaml
 services:
   kubeadm_kubelet:
     nodeStatusUpdateFrequency: 4s
@@ -400,102 +528,146 @@ services:
     controllerManager:
       extraArgs:
         node-monitor-period: "2s"
-        node-monitor-grace-period: "16s" 
+        node-monitor-grace-period: "16s"
         pod-eviction-timeout: "30s"
 ```
 
-The exact numbers should be chosen according to the environment state. If the network or hosts are unstable, these values should cover short nodes unavailability without redeployment of the pods. Often redeployment may cause significant load increase and cluster instability.
+Choose the appropriate values according to your environment's stability. If the network or hosts are unstable, adjust these values to avoid unnecessary pod redeployments, as frequent redeployments can increase load and cause instability.
 
-At working clusters, these variables can be adjusted manually by updating `/var/lib/kubelet/config.yaml` (for kubelet, at all the nodes) and `/etc/kubernetes/manifests/kube-controller-manager.yaml` (for controller-manager, at the control-planes).
+In existing clusters, these variables can be manually updated by modifying `/var/lib/kubelet/config.yaml` for kubelet on all nodes, and `/etc/kubernetes/manifests/kube-controller-manager.yaml` for the controller-manager on the control-plane nodes.
 
+### Recommendations
+To avoid long recovery times in the future:
+- Regularly monitor the health of your nodes and network, and tune the relevant variables to reduce recovery time in case of node failure.
+- Choose timeout values that reflect the stability of your environment to prevent unnecessary pod redeployments, which can lead to additional load and instability.
+
+>**Note**  
+>Adjusting these variables can significantly reduce the time it takes for Kubernetes to recover from a node failure.
 
 ## `kube-controller-manager` Unable to Sync Caches for Garbage Collector
 
-**Symptoms**: The following errors in the `kube-controller-manager` logs:
-```
+### Description
+The `kube-controller-manager` logs show errors indicating that it is unable to sync caches for the garbage collector. These errors prevent the garbage collector from functioning properly, leading to delays in cleaning up resources.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 E0402 10:52:00.858591 8 shared_informer.go:226] unable to sync caches for garbage collector
 E0402 10:52:00.858600 8 garbagecollector.go:233] timed out waiting for dependency graph builder sync during GC sync (attempt 16)
 I0402 10:52:00.883519 8 graph_builder.go:272] garbage controller monitor not yet synced 
 ```
- 
-**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (Kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects control-plane API and etcd cluster and it also affects the garbage collector of the control-plane controller manager tasks due to sync failure. 
 
-**Solution**: Increase resources for control-plane nodes to match the load on the kube-api or reduce the load on the kube-api.
+### How to solve
+The root cause of this issue may be related to etcd I/O performance and a lack of CPU resources for both `kube-apiserver` and etcd. High CPU resource usage by the Kubernetes API affects the control-plane API, the etcd cluster, and the garbage collector's ability to sync.
+
+To resolve this issue, you have two options:
+1. **Increase resources** for control-plane nodes to match the current load on the Kubernetes API (`kube-apiserver`).
+2. **Reduce the load** on the Kubernetes API if resource scaling is not feasible.
+
+### Recommendations
+To avoid this issue in the future:
+- Monitor CPU and I/O performance of the control-plane nodes, especially the `kube-apiserver` and etcd.
+- Consider resource scaling for the control-plane nodes when the cluster load increases.
+
+>**Note**  
+>Proper resource allocation for the control-plane is critical for ensuring that the garbage collector and other control-plane components function smoothly.
 
 ## Etcdctl Compaction and Defragmentation
 
-**Symptoms**: The following error in the `etcd` pod logs:
-```
+### Description
+Errors related to etcd disk space can occur, such as the following messages in the `etcd` pod logs:
+```text
 etcdserver: mvcc: database space exceeded
 etcdserver: no space
 ```
+Additionally, if the etcd database reaches 70% of the default storage size (2GB by default), defragmentation may be required.
 
-Also note that if the etcd database is 70% of the default storage size, the etcd database require defragmentation. The [default storage size](https://etcd.io/docs/v3.5/dev-guide/limit/#storage-size-limit) limit is 2GB.
+### Alerts
+Not applicable.
 
-**Root Cause**: After the compacting procedure leaves gaps in the etcd database. This fragmented space is available for use by etcd, but is not available to the host file system. You must defragment the etcd database to make this space available to the filesystem.
-After the compacting procedure leaves gaps in the etcd database. This fragmented space is available for use by etcd, but is not available to the host file system. You must defragment the etcd database to make this space available to the filesystem.
+### Stack trace(s)
+Not applicable.
 
-Compaction is performed automatically every 5 minutes. This value can be overridden using the `--etcd-compaction-interval` flag for kube-apiserver.
+### How to solve
+The root cause of this issue is fragmented space left after the compaction procedure. While this space is available for etcd, it is not available to the host filesystem. You must defragment the etcd database to make this space available to the filesystem.
 
-**Solution**: To fix this problem, it is recommended to run defragmentation for etcd database sequentially for each cluster member. Defragmentation is issued on a per-member so that cluster-wide latency spikes may be avoided.
-To run defragmentation for etcd member use the following command:
+Compaction is performed automatically every 5 minutes, and this interval can be adjusted using the `--etcd-compaction-interval` flag for the `kube-apiserver`.
+
+To fix this problem, defragment the etcd database for each cluster member sequentially to avoid cluster-wide latency spikes. Use the following command to defragment an etcd member:
+```bash
+etcdctl defrag --endpoints=ENDPOINT_IP:2379
 ```
-# etcdctl defrag --endpoints=ENDPOINT_IP:2379
-```
 
-To run defragmentation for all cluster members list all endpoints sequentially
+To defragment all cluster members sequentially, use:
+```bash
+etcdctl defrag --endpoints=ENDPOINT_IP1:2379, --endpoints=ENDPOINT_IP2:2379, --endpoints=ENDPOINT_IP3:2379
 ```
-# etcdctl defrag --endpoints=ENDPOINT_IP1:2379, --endpoints=ENDPOINT_IP2:2379, --endpoints=ENDPOINT_IP3:2379
-```
-`ENDPOINT_IP` is the internal IP address of the etcd endpoint.
+Where `ENDPOINT_IP` is the internal IP address of the etcd endpoint.
 
-> **Note**: The defragmentation to a live member blocks the system from reading and writing data while rebuilding its states. It is not recommended to run defragmentation for all etcd members at the same time.
+### Recommendations
+Monitor the etcd database regularly to ensure it does not reach the 70% storage limit. Run defragmentation when needed and avoid simultaneous defragmentation of all cluster members.
+
+> **Note**: Defragmentation of a live member blocks the system from reading and writing data while rebuilding its states. Avoid running defragmentation on all etcd members simultaneously.
 
 ## Etcdctl Defrag Return Context Deadline Exceeded
 
-**Symptoms**: After running the defrag procedure for etcd database the following error may occur:
-```
+### Description
+When running the defrag procedure for the etcd database, the following error may occur:
+```text
 "error":"rpc error: code = DeadlineExceeded desc = context deadline exceeded"}
 Failed to defragment etcd member
 ```
 
-**Root Cause**: The default timeout for short running command is 5 seconds, and this is not enough.
+### Alerts
+Not applicable.
 
-**Solution**: If you get a similar error then use an additional `--command-timeout` flag to run the command:
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of this issue is the default timeout for short-running commands, which is 5 seconds. This timeout may not be enough for defragmentation.
+
+To resolve this issue, use the `--command-timeout` flag to increase the timeout when running the defrag command:
+```bash
+etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
-# etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
-```
+
+### Recommendations
+Ensure the command timeout is set appropriately to prevent timeouts during defragmentation of large etcd databases.
+
+> **Note**: Not applicable.
 
 ## Etcdserver Request Timeout
 
-**Symptoms**: there are such error messages in the `kubelet` logs:
-
+### Description
+You may encounter error messages like the following in the `kubelet` logs:
 ```bash
 Apr 23 06:32:33 node-9 kubelet: 2023-04-23 06:32:33.378 [ERROR][9428] ipam_plugin.go 309: Failed to release address ContainerID="8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" HandleID="k8s-pod-network.8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" Workload="example-workload-name" error=etcdserver: request timed out
 ```
 
-In etcd logs there are such messages:
-
+Additionally, in the etcd logs, you may see:
 ```bash
 2023-04-29 06:06:16.087641 W | etcdserver: failed to send out heartbeat on time (exceeded the 100ms timeout for 6.102899ms, to fa4ddfec63d549fc)
 ```
 
-**Root Cause**: Etcd database treats requests too slowly.
+### Alerts
+Not applicable.
 
-**Solution**: To improve etcd performance.
+### Stack trace(s)
+Not applicable.
 
-First of all it is necessary to check that the disk under `/var/lib/etcd` satisfies [the recommendations](/documentation/Installation.md#etcd-recommendation).
+### How to solve
+The root cause is that the etcd database processes requests too slowly. To improve etcd performance, first check that the disk under `/var/lib/etcd` meets the performance recommendations outlined in [the etcd documentation](https://etcd.io/docs/v3.5/tuning/).
 
-Then add the following flags to the `/etc/kubernetes/manifests/etcd.yaml` manifest at all the control-plane nodes:
-
-```
+Then, adjust the following settings in the `/etc/kubernetes/manifests/etcd.yaml` manifest on all control-plane nodes:
+```bash
 --heartbeat-interval=1000
 --election-timeout=5000
 ```
 
-Also it is recommended to set different `snapshot-count` values at different control-plane nodes so they persist snapshots to the disk not simultaneously.
-Default value of `snapshot-count` is `10000`, so set it to a different value at the second and the third control-plane nodes in the `/etc/kubernetes/manifests/etcd.yaml` manifest, for example:
-
+It is also recommended to set different `snapshot-count` values on different control-plane nodes so that snapshots are persisted to disk at different times. The default value is `10000`. Set different values for each control-plane node:
 ```bash
 # second master: 
 --snapshot-count=11210
@@ -503,37 +675,51 @@ Default value of `snapshot-count` is `10000`, so set it to a different value at 
 --snapshot-count=12210
 ```
 
-Other general etcd tuning recommendations can be found in the [official etcd documentation](https://etcd.io/docs/v3.5/tuning/). 
+### Recommendations
+Follow the etcd tuning recommendations in the [official etcd documentation](https://etcd.io/docs/v3.5/tuning/) to ensure optimal performance and avoid request timeouts.
+
+> **Note**: Not applicable.
 
 ## Etcd Database Corruption
 
-**Symptoms**: The etcd cluster is not healthy, some etcd pods cannot start with errors like:
-
-```
+### Description
+The etcd cluster is unhealthy, and some etcd pods fail to start with errors such as:
+```text
 {"level":"panic","ts":"2023-07-30T19:23:07.931Z","caller":"membership/cluster.go:506","msg":"failed to update; member unknown","cluster-id":"61ceb51871c06748","local-member-id":"8a3ba0c8a6fd8c57","unknown-remote-peer-id":"7ed870910216f160","stacktrace":"go.etcd.io/etcd/server/v3/etcdserver/api/membership.(*RaftCluster).UpdateAttributes\n\tgo.etcd.io/etcd/server/v3/etcdserver/api/membership/cluster.go:506\ngo.etcd.io/etcd/server/v3/etcdserver.(*applierV2store).Put\n\tgo.etcd.io/etcd/server/v3/etcdserver/apply_v2.go:92\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).applyV2Request\n\tgo.etcd.io/etcd/server/v3/etcdserver/apply_v2.go:135\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).applyEntryNormal\n\tgo.etcd.io/etcd/server/v3/etcdserver/server.go:2220\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).apply\n\tgo.etcd.io/etcd/server/v3/etcdserver/server.go:2143\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).applyEntries\n\tgo.etcd.io/etcd/server/v3/etcdserver/server.go:1384\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).applyAll\n\tgo.etcd.io/etcd/server/v3/etcdserver/server.go:1199\ngo.etcd.io/etcd/server/v3/etcdserver.(*EtcdServer).run.func8\n\tgo.etcd.io/etcd/server/v3/etcdserver/server.go:1122\ngo.etcd.io/etcd/pkg/v3/schedule.(*fifo).run\n\tgo.etcd.io/etcd/pkg/v3@v3.5.6/schedule/schedule.go:157"}
 panic: failed to update; member unknown
 ```
+Other etcd pods fail to start due to the lack of connection to the failed cluster members.
 
-Other etcd pods do not start due to no connection to the failed cluster members.
+### Alerts
+Not applicable.
 
-**Root cause**: The etcd database is corrupted.
+### Stack trace(s)
+Not applicable.
 
-**Solution**: If you have relevant backup created by [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster from it, you can use [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
+### How to solve
+The root cause of the issue is a corrupted etcd database. 
 
-If you want to restore not the whole cluster, but etcd database only, you can use `kubemarine restore` procedure with the list of required tasks:
+If you have a relevant backup created by the [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster, you can use the [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
 
-```
+If you prefer to restore only the etcd database rather than the entire cluster, you can use the `kubemarine restore` procedure with a list of required tasks:
+```bash
 kubemarine restore --config=${CLUSTER_YAML} --tasks="prepare,import.etcd,reboot ${PROCEDURE_YAML}"
-
 ```
 
-**Note**: `reboot` task will reboot all the cluster nodes.
+## Manual Restoration of Etcd Database
 
+If it is not possible to use the standard Kubemarine procedure to restore etcd, you can manually restore the etcd database.
 
-### Manual Restoration of Etcd Database
+### Description
+If it is not possible to use the standard Kubemarine procedure to restore etcd, it can be done manually. This involves either restoring etcd from a snapshot or recovering it without one.
 
-If it is not possible to use standard Kubemarine procedure to restore etcd, you can do that manually.
+### Alerts
+Not applicable.
 
+### Stack trace(s)
+Not applicable.
+
+### How to solve
 #### Manual Etcd Restoration from a Snapshot
 
 The community recommends to use snapshots to restore etcd database.
@@ -753,14 +939,27 @@ and restart etcd:
 
 13. If necessary, remove backup files create at the step 3.
 
+### Recommendations
+If only etcd is corrupted and the rest of the cluster is healthy, it is advised to restore just the etcd database. 
+
+> **Note**: The `reboot` task will reboot all the cluster nodes.
+
 
 ## HTTPS Ingress Doesn't Work
 
-**Symptoms**: The secure connection is not being established, the ciphers are not supported by server.
+### Description
+The secure connection is not being established, and the server does not support the required ciphers. This issue occurs when the `ingress-nginx-controller` does not support certain ciphers from TLSv1.2 and TLSv1.3 by default.
 
-**Root cause**: `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. Those settings may be customized during the installation procedure. For more information, see the `config_map` section in the Installation documentation, [nginx-ingress-controller plugin](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#nginx-ingress-controller).
+### Alerts
+Not applicable.
 
-**Solution**: Change the `ingress` annotation that manages the ciphers list. The following example of the `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of the issue is that `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. These settings can be customized during the installation process by modifying the `config_map` section, as described in the [nginx-ingress-controller plugin documentation](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#nginx-ingress-controller).
+
+To resolve this issue, update the `Ingress` resource by adding an annotation that manages the list of supported ciphers. The following example adds the `AES128-SHA256` cipher, which is not supported by default:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -769,112 +968,227 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-ciphers: "AES128-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
 ...
-
 ```
+
+### Recommendations
+To avoid this issue in the future:
+- Customize the cipher list during the installation of `ingress-nginx-controller` if your environment requires specific ciphers.
+- Review and update the `Ingress` resource annotations to include necessary ciphers based on your security requirements.
+
+>**Note**  
+>For more information on configuring ciphers, see the `config_map` section in the nginx-ingress-controller documentation.
 
 ## Garbage Collector Does Not Initialize If Convert Webhook Is Broken
 
-**Symptoms**: If the pod deletion process is in the background (which is the default setting), the namespace quota is not updated. If pod deletion is in the foreground, the pod freezes in `Terminating` state. If you create new quota then the REQUEST and LIMIT fields are empty:
-```
+### Description
+If the pod deletion process is running in the background (the default setting), the namespace quota is not updated. When pod deletion is in the foreground, pods may freeze in the `Terminating` state. Additionally, if a new quota is created, the REQUEST and LIMIT fields remain empty:
+```bash
 # kubectl get quota -n test
 NAME            AGE    REQUEST   LIMIT
 default-quota   79m
 ```
 
-**Root cause**: Creating a custom resource definition (CRD) with a broken converter webhook prevents garbage collector (GC) controller from initialization, which breaks on informer sync. Further, this issue is not visible until the GC controller restarts, because dynamically added CRD resources with non-working converter webhook do not break GC run, only GC initialization.
+### Alerts
+Not applicable.
 
-This is a known issue in the Kubernetes community (https://github.com/kubernetes/kubernetes/issues/101078), but it has not been fixed yet.
+### Stack trace(s)
+Not applicable.
 
-**Solution**: In the `kube-controller-manager` pod logs, messages of the following type can be found:
-```
-E1202 03:28:26.861927       1 reflector.go:138] k8s.io/client-go/metadata/metadatainformer/informer.go:90: Failed to watch *v1.PartialObjectMetadata: failed to list *v1.PartialObjectMetadata: conversion webhook for deployment.example.com/v1alpha22, Kind=example_kind failed: Post "https://example.svc:443/convertv1-96-0-rc3?timeout=30s": service "example-deployments-webhook-service" not found
+### How to solve
+The root cause of this issue is a broken converter webhook associated with a Custom Resource Definition (CRD). This prevents the garbage collector (GC) controller from initializing due to a failure during the informer sync process. The issue remains hidden until the GC controller restarts, as CRDs with non-working converter webhooks do not affect ongoing GC operations but break GC initialization.
 
-```
-From this message you can find kind of CR. Use it to find broken CRD:
-```
-# kubectl get crd -o custom-columns=CRD_Name:.metadata.name,CR_Kind:.spec.names.kind | grep example_kind
-crd_example.com                               example_kind
-```
-Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
+This is a known issue in the Kubernetes community (see [GitHub issue](https://github.com/kubernetes/kubernetes/issues/101078)), but no fix has been implemented yet.
+
+To resolve the issue:
+1. Check the `kube-controller-manager` pod logs for messages similar to the following:
+   ```bash
+   E1202 03:28:26.861927       1 reflector.go:138] k8s.io/client-go/metadata/metadatainformer/informer.go:90: Failed to watch *v1.PartialObjectMetadata: failed to list *v1.PartialObjectMetadata: conversion webhook for deployment.example.com/v1alpha22, Kind=example_kind failed: Post "https://example.svc:443/convertv1-96-0-rc3?timeout=30s": service "example-deployments-webhook-service" not found
+   ```
+
+2. From this log, identify the CR kind (in this example, `example_kind`). Use it to locate the broken CRD:
+   ```bash
+   # kubectl get crd -o custom-columns=CRD_Name:.metadata.name,CR_Kind:.spec.names.kind | grep example_kind
+   crd_example.com                               example_kind
+   ```
+
+3. Restore the broken webhook if possible. If restoring the webhook is not feasible, delete the problematic CRD. This action should restore the garbage collector's functionality.
+
+### Recommendations
+To avoid this issue in the future:
+- Ensure that custom converter webhooks are thoroughly tested before being used in production.
+- Regularly monitor the `kube-controller-manager` logs for early signs of webhook-related issues.
+
+>**Note**  
+>This issue is currently unresolved in the Kubernetes community, so carefully manage CRDs and associated webhooks to prevent similar disruptions.
+
 
 ## Pods Stuck in "Terminating" Status During Deletion
 
-Intended only for RHEL, Centos 7.x versions starting from 7.4 and should be enabled on hosts where containerd container runtime is being used:
+### Description
+This issue occurs when pods get stuck in the "Terminating" status and are not deleted properly. It is specifically applicable to hosts running RHEL or CentOS 7.x versions (starting from 7.4) where the `containerd` container runtime is used.
 
-**Solution**: Add parameter `fs.may_detach_mounts=1` in `/etc/sysctl.conf`and apply it:
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+To resolve the issue, add the following parameter to the `/etc/sysctl.conf` file:
+```bash
+fs.may_detach_mounts=1
 ```
-# sysctl -p
-``` 
+After adding the parameter, apply the changes by running:
+```bash
+sysctl -p
+```
+
+### Recommendations
+Ensure that this setting is only applied on RHEL or CentOS 7.x systems (starting from 7.4) where the `containerd` container runtime is being used.
+
+>**Note**  
+>This solution is specifically intended for RHEL and CentOS 7.x environments.
 
 ## Random 504 Error on Ingresses
 
-**Symptoms**: Sometimes ingresses return 504 error (Gateway Timeout) even if backend pods are up and running. Also traffic between pods located at different nodes doesn't go.
+### Description
+Sometimes ingresses return a 504 error (Gateway Timeout) even when the backend pods are up and running. Additionally, traffic between pods located on different nodes is not routed properly.
 
-**Root cause**: A network policy applied at the infrastructure level doesn't allow traffic for `podSubnet` and/or `serviceSubnet` at the nodes' ports.
+### Alerts
+Not applicable.
 
-**Solution**: Check that [prerequisites](/documentation/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are met. 
-For OpenStack IaaS not only Security Group settings applied to a node port should be checked, but also Allowed Address Pairs settings (if Port Security is enabled and the nodes ports).
+### Stack trace(s)
+Not applicable.
 
-Check the status of Port Security for a port:
-```
-# openstack port show -c port_security_enabled ${PORT_ID}
-```
-Add `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for a port:
-```
-# openstack port set --allowed-address ip-address=10.128.0.0/14 ${PORT_ID} --insecure
-# openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
-```
+### How to solve
+The root cause of this issue is a network policy applied at the infrastructure level that blocks traffic for the `podSubnet` and/or `serviceSubnet` on the nodes' ports.
+
+To resolve the issue, ensure that the [prerequisites](/documentation/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are properly configured.
+
+For OpenStack IaaS environments:
+1. Check both the Security Group settings and the Allowed Address Pairs settings (if Port Security is enabled on the nodes' ports).
+2. Verify the Port Security status for the port:
+   ```bash
+   openstack port show -c port_security_enabled ${PORT_ID}
+   ```
+3. Add the `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for the port:
+   ```bash
+   openstack port set --allowed-address ip-address=10.128.0.0/14 ${PORT_ID} --insecure
+   openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
+   ```
+
+### Recommendations
+Verify the network policies and configurations, especially in environments with Port Security enabled, to ensure that the `podSubnet` and `serviceSubnet` networks have the necessary access.
+
+>**Note**  
+>This solution is applicable to environments where infrastructure-level network policies may affect traffic between nodes.
+
 
 ## Nodes Have `NotReady` Status Periodically
 
-**Symptoms**: Nodes that work on Ubuntu 20.04 become `NotReady` without any sufficient workload. The `kubelet` has the following messages in log:
+### Description
+Nodes running on Ubuntu 20.04 may periodically enter the `NotReady` status without significant workload. The `kubelet` logs contain the following message:
 
-```
+```bash
 Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go:1870] "Skipping pod synchronization" err="PLEG is not healthy: pleg was last seen active 3m0.416753742s ago; threshold is 3m0s"
 ```
 
-**Root cause**: The Linux kernel version `5.4.0-132-generic` has an issue that affects the `CRI` work.
+### Alerts
+Not applicable.
 
-**Solution**: Upgrade Linux kernel to `5.4.0-135-generic`
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of this issue is a known problem with the Linux kernel version `5.4.0-132-generic`, which affects the Container Runtime Interface (CRI).
+
+To resolve the issue, upgrade the Linux kernel to `5.4.0-135-generic`.
+
+### Recommendations
+Regularly update the Linux kernel to avoid known issues that may affect the stability of nodes, particularly those related to the CRI.
+
+>**Note**  
+>This solution specifically applies to Ubuntu 20.04 with kernel version `5.4.0-132-generic`.
+
 
 ## Long Pulling of Images
 
-**Symptoms**: Pods are stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took a few minutes or more.
-
-```
+### Description
+Pods may get stuck in the `ContainerCreating` status for an extended period of time. The event logs show that pulling an image takes several minutes or longer:
+```bash
 Successfully pulled image "<image_name>" in 12m37.752058078s
 ```
 
-**Root cause**: By default, kubelet pulls images one by one. One slow pulling may trap all the pullings on the node.
+### Alerts
+Not applicable.
 
-**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet to use parallel image pulls.
-**Note**: It is recommended not to change the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend.
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause is that, by default, kubelet pulls images sequentially, one by one. A slow image pull can delay all other image pulls on the node.
+
+To resolve the issue, add the following parameter to the kubelet configuration to allow parallel image pulls:
+```bash
+--serialize-image-pulls=false
+```
+
+> **Note**: It is recommended not to change the default value (`--serialize-image-pulls=true`) on nodes running a Docker daemon with version < 1.9 or using the `aufs` storage backend.
+
+### Recommendations
+In environments with newer Docker versions and non-aufs storage backends, enabling parallel image pulls can significantly reduce the time it takes to pull images and improve pod startup times.
+
+>**Note**  
+>Ensure compatibility with your Docker version and storage backend before making this change.
+
 
 ## No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface
 
-**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 permanent network interface at the nodes.
+### Description
+There is no traffic between pods located on different nodes, and the affected nodes have more than one permanent network interface.
 
-**Root cause**: Not all Calico BGP sessions between nodes are established due to incorrect network interface choice.
+### Alerts
+Not applicable.
 
-**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
-to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
-```
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause is that not all Calico BGP sessions between nodes are established due to incorrect network interface selection. By default, Calico uses the `first-found` method, which selects the first valid IP address on the first network interface to route traffic between nodes. This approach works for nodes with a single Ethernet interface but may cause issues in cases where multiple interfaces are present.
+
+To resolve this, specify the correct network interface for Calico in the `IP_AUTODETECTION_METHOD` variable. For example:
+```yaml
 plugins:
   calico:
     env:
       IP_AUTODETECTION_METHOD: interface=ens160
 ```
-For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+For more details on IP autodetection methods, refer to the [official Calico documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+### Recommendations
+Ensure that the appropriate network interface is set for nodes with multiple network interfaces to avoid routing issues in Calico.
+
+>**Note**  
+>Consult the Calico documentation for best practices when configuring IP autodetection methods.
+
 
 ## No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation
 
-**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 IPs on used network interface with different CIDR notations.
+### Description
+There is no traffic between pods located on different nodes, and the nodes in question have more than one IP on the network interface, with different CIDR notations.
 
-**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on the chosen IPs for nodes.
-Typically, such situation can appear in minha scheme with vrrp, where the balancer role is combined with other roles. In that case, 
-Calico can autodetect vrrp for some node instead of its internal IP.
-You can use `calicoctl` to check such a situation. For example, in [example Mini-HA cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
-```sh
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause is that not all Calico BGP sessions between nodes are established due to different CIDR notations on the chosen IPs for nodes. This issue often occurs in setups where the balancer role is combined with other roles, such as with VRRP, where Calico may autodetect the VRRP IP instead of the node's internal IP.
+
+You can use `calicoctl` to inspect this situation. For example, in a Mini-HA cluster, the output may look like this:
+```bash
 sudo calicoctl get nodes --output=wide
 NAME                  ASN       IPV4                IPV6
 k8s-control-plane-1   (64512)   192.168.0.250/32
@@ -882,55 +1196,74 @@ k8s-control-plane-2   (64512)   192.168.0.2/24
 k8s-control-plane-3   (64512)   192.168.0.3/24
 ```
 
-**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
-to route the traffic between nodes. This is fine for nodes that do not have more than one different IPs, but it can work 
-improperly in case of multiple IPs. 
-To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method
-that is suitable in your situation:
-```
+By default, Calico uses the `first-found` method to select the first valid IP address on the first network interface to route traffic between nodes. This method works well for nodes with a single IP but may cause issues when multiple IPs with different CIDR notations are present.
+
+To avoid this, change Calico's `IP_AUTODETECTION_METHOD` variable to `kubernetes-internal-ip` or another method that suits your environment:
+```yaml
 plugins:
   calico:
     install: true
     env:
       IP_AUTODETECTION_METHOD: kubernetes-internal-ip
 ```
-**Note**: `kubernetes-internal-ip` autodetection method cannot be used in calico earlier than v3.24.0 due to a [known issue](https://github.com/projectcalico/calico/issues/6142). The fix was also cherry-picked to calico v3.22.4 and v3.23.2.
 
-For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+> **Note**: The `kubernetes-internal-ip` autodetection method cannot be used in Calico versions earlier than v3.24.0 due to a [known issue](https://github.com/projectcalico/calico/issues/6142). The fix has also been backported to Calico v3.22.4 and v3.23.2.
+
+### Recommendations
+Ensure that Calico is configured to detect the correct IPs when nodes have multiple IP addresses with different CIDR notations, particularly in complex networking setups involving VRRP or similar configurations.
+
+>**Note**  
+>For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
 
 ## Ingress Cannot Be Created or Updated
 
-**Symptoms**: Ingress cannot be created or updated with following error:
-```
+### Description
+An ingress cannot be created or updated, and the following error is displayed:
+```bash
 Internal error occurred: failed calling webhook "validate.nginx.ingress.kubernetes.io": failed to call webhook: Post "https://ingress-nginx-controller-admission.ingress-nginx.svc:443/networking/v1/ingresses?timeout=10s": context deadline exceeded
 ```
 
-**Root cause**: This issue can occur in clusters with a large number of ingresses when the admission webhook is enabled. Testing a new configuration takes too much time and does not fit into the timeout.
+### Alerts
+Not applicable.
 
-**Solution**: There are two ways to solve this.
-* Increase the timeout:
-```
-$ kubectl edit ValidatingWebhookConfiguration ingress-nginx-admission
-...
-  timeoutSeconds: 30
-```
-* Add the `--disable-full-test` [argument](https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/) for the ingress-nginx-controller:
-```
-$ kubectl edit ds ingress-nginx-controller
-...
-spec:
-  containers:
-      args:
-        - '--disable-full-test'
-```
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of this issue is that in clusters with a large number of ingresses, the admission webhook may take too long to test a new configuration, exceeding the timeout.
+
+There are two ways to resolve this issue:
+
+1. **Increase the webhook timeout**:
+   ```bash
+   kubectl edit ValidatingWebhookConfiguration ingress-nginx-admission
+   ...
+     timeoutSeconds: 30
+   ```
+
+2. **Disable the full test** by adding the `--disable-full-test` argument for the ingress-nginx-controller:
+   ```bash
+   kubectl edit ds ingress-nginx-controller
+   ...
+   spec:
+     containers:
+         args:
+           - '--disable-full-test'
+   ```
+
+### Recommendations
+For clusters with a large number of ingresses, consider increasing the timeout or disabling the full test to ensure the ingress-nginx-controller can handle updates in a timely manner.
+
+>**Note**  
+>Adjust the timeout value according to your cluster's performance and workload requirements.
+
 
 ## vIP Address is Unreachable
 
-**Symptoms**:
-
-Installation failed with error:
-
-```console
+### Description
+The installation process failed with the following error, indicating that the Kubernetes API's vIP address is unreachable:
+```bash
 .....
 <DATETIME> VERBOSE [log.verbose] I1220 14:12:57.517911    3239 waitcontrolplane.go:83] [wait-control-plane] Waiting for the API server to be healthy
 <DATETIME> VERBOSE [log.verbose] I1220 14:12:58.520621    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 1 to https://api.example.com:6443/healthz?timeout=10s
@@ -950,113 +1283,166 @@ Installation failed with error:
 <DATETIME> CRITICAL [errors.error_logger] KME0002: Remote group exception
 ```
 
-Looks like IP address for Kubernetes API is unreachable.
+The logs suggest that the vIP address for the Kubernetes API is unreachable.
 
-**Root Cause**:
+### Alerts
+Not applicable.
 
-1. Make shure vIP address is unreachable:
+### Stack trace(s)
+Not applicable.
 
-    Try to check connectivity with `api.example.com`:
+### How to solve
+1. **Check if the vIP address is unreachable**:
+   Verify connectivity to the Kubernetes API via the vIP address:
+   ```bash
+   ping -c 1 -W 2 api.example.com
+   ```
 
-    ```console
-    ping -c 1 -W 2 api.example.com
+   Example output if the IP address is unreachable:
+   ```bash
+   PING api.example.com (10.10.10.144) 56(84) bytes of data.
 
+   --- api.example.com ping statistics ---
+   1 packets transmitted, 0 received, 100% packet loss, time 0ms
+   ```
 
-    PING api.example.com (10.10.10.144) 56(84) bytes of data.
+   In this case, the IP address `10.10.10.144` (the floating IP for the internal `192.168.0.4`) is unreachable.
 
-    --- api.example.com ping statistics ---
-    1 packets transmitted, 0 received, 100% packet loss, time 0ms
-    ```
+2. **Check if the vIP is managed by keepalived and assigned to the correct network interface**:
+   Verify that the vIP is associated with the correct interface on the node that serves as the balancer:
+   ```bash
+   sudo ip a
+   ```
 
-    IP address `10.10.10.144` is the floating IP address for internal `192.168.0.4` and it is unreachable.
+   Example output:
+   ```bash
+   2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+       link/ether fa:16:3e:54:45:74 brd ff:ff:ff:ff:ff:ff
+       altname enp0s3
+       altname ens3
+       inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute eth0
+         valid_lft 36663sec preferred_lft 36663sec
+       inet 192.168.0.4/32 scope global vip_2910a02af7
+         valid_lft forever preferred_lft forever
+   ```
 
-1. Check vIP address is managed by keepalived and exists on the correct network interface:
+3. **Ping the internal IP address from any worker node**:
+   ```bash
+   ping -c 1 -W 2 192.168.0.4
+   ```
 
-    Check the vIP address is on the interface of node with **balancer**:
+   Example output if the internal IP is unreachable:
+   ```bash
+   PING 192.168.0.4 (192.168.0.4) 56(84) bytes of data.
 
-      ```console
-      sudo ip a
+   --- 192.168.0.4 ping statistics ---
+   1 packets transmitted, 0 received, 100% packet loss, time 0ms
+   ```
 
+4. **Check the ARP table for the correct MAC address**:
+   Ensure that the MAC address listed in the ARP table matches the correct address of the interface on the node with the balancer. For example:
+   ```bash
+   sudo arp -a | grep 192.168.0.4
+   ```
 
-      ....
-    2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
-        link/ether fa:16:3e:54:45:74 brd ff:ff:ff:ff:ff:ff
-        altname enp0s3
-        altname ens3
-        inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute eth0
-          valid_lft 36663sec preferred_lft 36663sec
-        inet 192.168.0.4/32 scope global vip_2910a02af7
-          valid_lft forever preferred_lft forever
-    ```
+   Example output on the worker node:
+   ```bash
+   <NODENAME> (192.168.0.4) at 10:e7:c6:c0:47:35 [ether] on ens3
+   ```
 
-1. Try to ping by internal IP address from any worker node:
+   If the MAC address does not match (e.g., it shows `10:e7:c6:c0:47:35` instead of the correct `fa:16:3e:54:45:74`), this indicates that the GARP (Gratuitous ARP) protocol is disabled, preventing `keepalived` from announcing the correct MAC address for the vIP.
 
-    ```console
-    ping -c 1 -W 2 192.168.0.4
+5. **Solution**:
+   If GARP is disabled in your environment and `keepalived` cannot announce the new MAC address for the vIP, contact technical support and request that the GARP protocol be enabled.
+   
+### Recommendations
+Ensure that GARP is enabled in your environment to allow `keepalived` to function correctly for managing vIP addresses.
 
-
-    PING 192.168.0.4 (192.168.0.4) 56(84) bytes of data.
-
-    --- 192.168.0.4 ping statistics ---
-    1 packets transmitted, 0 received, 100% packet loss, time 0ms
-    ```
-
-1. Check the ARP table for correct MAC address. Should be the same with `fa:16:3e:54:45:74`
-
-    On worker node:
-
-    ```console
-    sudo arp -a | grep 192.168.0.4
-
-    <NODENAME> (192.168.0.4) at 10:e7:c6:c0:47:35 [ether] on ens3
-    ```
-
-1. In case of the MAC address from arp command is different with correct value GARP protocol is disabled in environment and **keepalived** can not announce new MAC address for vIP address.
-
-    **Solution**: Уou need to contact technical support and ask to enable the GARP protocol.
+>**Note**  
+>Not applicable.
 
 ## CoreDNS Cannot Resolve the Name
 
 ### Case 1
+### Description
+Pod Cannot Resolve a Short Name: A pod is unable to resolve a short name. When checking the pod's DNS resolution, the following error appears:
 
-**Symptoms**: A pod cannot resolve a short name. A check inside the pod looks like the following:
-
-```
+```bash
 $ nslookup kubernetes.default
 Server:         172.30.0.10
 Address:        172.30.0.10:53
 
-
 ** server can't find kubernetes.default: NXDOMAIN
 ```
 
-**Root cause**: Images with the `busybox` utility that represents the `nslookup` command could have issues with the `search` directives in `/etc/resolv.conf`.
+### Alerts
+Not applicable.
 
-**Solution**: Use FQDN instead of a short name, which consists of `service` and `namespace` only. For example, `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`. In some cases, addition of `bind-tools` package fixes the issue with short names. For more information, refer to the following: 
-* [https://github.com/docker-library/busybox/issues/48](https://github.com/docker-library/busybox/issues/48)
-* [https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of this issue is that images using the `busybox` utility, which provides the `nslookup` command, can have issues handling the `search` directives in `/etc/resolv.conf`.
+
+To resolve the issue, use the Fully Qualified Domain Name (FQDN) instead of the short name. For example, use `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`.
+
+In some cases, installing the `bind-tools` package within the pod can also resolve issues with short names.
+
+### Recommendations
+For more details, you can refer to:
+- [Busybox nslookup issues](https://github.com/docker-library/busybox/issues/48)
+- [Known DNS issues with Alpine in Kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
 
 ### Case 2
 
-**Symptoms**: A pod that is attached to `hostNetwork` cannot resolve a name periodically or constantly, even if it is FQDN. The following error message is displayed:
+### Description
+Pod with `hostNetwork` Cannot Resolve FQDN: A pod attached to `hostNetwork` cannot resolve a Fully Qualified Domain Name (FQDN) periodically or constantly. The following error message is displayed when attempting to resolve a name:
 
-```
+```bash
 $ nslookup kubernetes.default.svc.cluster.local
 ;; connection timed out; no servers could be reached
-``` 
+```
 
-**Root cause**: Traffic from node network to pod network is blocked for UDP port 53.
+### Alerts
+Not applicable.
 
-**Solution**: Change the cloud provider configuration to allow the traffic on the IaaS layer. In OpenStack, the Security Groups manage the allowed traffic.
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of this issue is that traffic from the node network to the pod network is blocked for UDP port 53, which is required for DNS resolution.
+
+To resolve the issue, update the cloud provider configuration to allow traffic between the node and pod networks, specifically for UDP port 53.
+
+In OpenStack environments, this can be managed by adjusting the Security Groups to allow the necessary traffic.
+
+### Recommendations
+Ensure that the cloud provider or IaaS network configuration allows traffic on UDP port 53 between node and pod networks, particularly when using `hostNetwork` pods.
+
+> **Note**: Not applicable.
+
 
 ## Pods do not Start Properly
 
-**Symptoms**: Pods do not start properly and `Audit` daemon has the following messages in the log:
-`Error receiving audit netlink packet (No buffer space available)`
+### Description
+Pods do not start properly, and the `Audit` daemon logs the following message:
+```bash
+Error receiving audit netlink packet (No buffer space available)
+```
 
-**Root cause**: `Audit` daemon internal issue.
+### Alerts
+Not applicable.
 
-**Solution**: Change the `Audit` daemon configuration or disable it.
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause is an internal issue with the `Audit` daemon. To resolve this, either change the configuration of the `Audit` daemon or disable it entirely.
+
+### Recommendations
+Consider adjusting the buffer size in the `Audit` daemon configuration to avoid resource limitations or disable the `Audit` daemon if it is not essential for your environment.
+
+> **Note**: Not applicable.
 
 # Troubleshooting Kubemarine
 
@@ -1064,17 +1450,24 @@ This section provides troubleshooting information for Kubemarine-specific or ins
 
 ## Operation not Permitted Error in Kubemarine Docker Run
 
-**Symptoms**: Some command in Kubemarine docker fails with "Operation not permitted" error. The command can be absolutely different, e.g. new thread creation for Kubemarine run or simple `ls` command.
+### Description
+Some commands in Kubemarine Docker fail with the "Operation not permitted" error. These commands can vary, such as creating a new thread for Kubemarine or executing a simple `ls` command.
 
-**Root cause**: The problem is not compatible docker and Kubemarine base [image version](/Dockerfile#L1): Kubemarine uses system calls, that is not allowed by default in docker.
+### Alerts
+Not applicable.
 
-**Solution**: Check the compatibility issues for used docker version and Kubemarine base [image version](/Dockerfile#L1) and 
-upgrade docker version to one, where found issues are resolved. 
+### Stack trace(s)
+Not applicable.
 
-As alternative, provide additional grants to Kubemarine container using `--privileged` or `--cap-add` options for docker command.
+### How to solve
+The root cause of this issue is incompatibility between the Docker version and the Kubemarine base [image version](/Dockerfile#L1). Kubemarine uses system calls that are not allowed by default in Docker, causing the failure.
 
-**Example of problem**: Kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
+To fix this issue:
+1. **Check for compatibility issues** between the Docker version being used and the Kubemarine base [image version](/Dockerfile#L1). If there are known issues, upgrade Docker to a version that resolves them.
+   
+2. **Use additional grants** for the Kubemarine container by adding the `--privileged` or `--cap-add` options to the Docker command to provide the necessary permissions.
 
+Example of the problem: Kubemarine image `v0.25.0` runs the `ls -la` command on `CentOS 7.5` with Docker version `1.13.1-102`:
 ```bash
 $ docker run --entrypoint ls kubemarine:v0.25.0 -la
 ls: cannot access '.': Operation not permitted
@@ -1086,162 +1479,249 @@ d????????? ? ? ? ?            ? ..
 -????????? ? ? ? ?            ? .dockerignore
 ```
 
-The root cause here is in `coreutils 8.32` library, that is installed in that Kubemarine image. This library uses `statx` calls for `ls` command,
-but those calls were added to docker white-list only since `1.13.1-109` version. For this reason it works only with this  or newer version.
+The root cause is that the `coreutils 8.32` library, installed in this Kubemarine image, uses `statx` system calls for the `ls` command. However, these calls were added to Docker’s whitelist only in version `1.13.1-109`. As a result, the command works only in this or newer Docker versions.
 
+### Recommendations
+To prevent this issue in the future:
+- Use the `--privileged` or `--cap-add` flags when necessary to avoid permission issues when running system calls in Docker containers.
+
+**Note**: Not applicable.
 
 ## Failures During Kubernetes Upgrade Procedure
 
 ### Upgrade Procedure Failure, Upgrade Not Completed
 
-**Symptoms**: The `upgrade` procedure fails at some point and leaves the upgrade process in an incomplete state.
+### Description
+The `upgrade` procedure fails at some point, leaving the upgrade process in an incomplete state. This failure interrupts the upgrade and requires corrective action before the process can be completed.
 
-**Root cause**: Any error during the `upgrade` procedure could cause an upgrade procedure failure.
+### Alerts
+Not applicable.
 
-**Solution**: First of all, it is required to find the root cause of the failure and fix it. You can check other troubleshooting sections in this guide regarding the issues during the upgrade. 
+### Stack trace(s)
+Not applicable.
 
-After the cause of the failure is fixed, you need to run the `upgrade` procedure once again to complete the upgrade. However, it is very important to check the status of the upgrade process before restarting the procedure because it may be required to change the procedure parameters like `cluster.yaml` and procedure inventory. 
+### How to solve
+The root cause of this issue is any error that occurs during the `upgrade` procedure, leading to its failure. 
 
-For example, imagine you are doing the following upgrade: `1.16.12 -> 1.17.7 -> 1.18.8`. 
-In this case, if the upgrade fails on version `1.18.8`, but is completed for version `1.17.7`, you have to update `cluster.yaml` with the latest information available in the regenerated inventory (`cluster.yaml` is regenerated after each minor version upgrade) and also remove version `1.17.7` from the procedure inventory. It is absolutely fine to retry upgrades for version `X.Y.Z`, but only until the moment the upgrade starts for next version `X.Y+1.M`. It is incorrect to start upgrade to version `1.17.7` after the upgrade to version `1.18.8` is started.
+To resolve the issue:
+1. **Identify the root cause of the failure** and fix it. You can refer to other troubleshooting sections in this guide to help diagnose the issue.
+2. Once the cause is resolved, **restart the `upgrade` procedure**. However, before restarting, it is essential to **check the current status** of the upgrade process. Depending on the progress, you may need to update the procedure parameters in files like `cluster.yaml` and the procedure inventory.
+
+   For example, if you are performing an upgrade from version `1.16.12 -> 1.17.7 -> 1.18.8`, and the upgrade fails at version `1.18.8` but is completed for version `1.17.7`, you must:
+   - Update `cluster.yaml` with the latest information from the regenerated inventory (as `cluster.yaml` is regenerated after each minor version upgrade).
+   - Remove version `1.17.7` from the procedure inventory.
+
+   It is safe to retry upgrades for version `X.Y.Z`, but only up to the point where the next version `X.Y+1.M` upgrade starts. It is incorrect to retry the upgrade to version `1.17.7` after the upgrade to version `1.18.8` has already begun.
+
+### Recommendations
+Ensure that the upgrade is only retried for the current version, and any intermediate versions that were successfully upgraded should be removed from the procedure inventory.
+
+**Note**: Not applicable.
+
 
 ### Cannot Drain Node Because of PodDisruptionBudget
 
-**Symptoms**: The `upgrade` procedure fails during node drain because of PodDisruptionBudget (PDB) limits.
+### Description
+The `upgrade` procedure fails during the node drain process due to PodDisruptionBudget (PDB) limits. Kubernetes cannot proceed with draining the pods because it would violate the PDB rules set by an application.
 
-**Root cause**: Kubernetes is unable to drain a pod because draining the pod violates PDB rules configured by some application.
+### Alerts
+Not applicable.
 
-**Solution**: Since the Kubernetes version 1.18, there is an option to ignore PDB rules during upgrades using `disable-eviction`. You can configure this option in the upgrade procedure. This option is enabled by default.
+### Stack trace(s)
+Not applicable.
 
-If you face an issue with PDB rules during the upgrade on Kubernetes versions lower than 1.18, then temporarily change PDB limits to lower values, so that pods could be drained. After that you can run the `upgrade` procedure once again. After the upgrade, you have to return the PDB limits to the previous value.
+### How to solve
+The root cause of the issue is that draining a pod would violate the PDB rules configured by an application.
+
+To resolve this issue:
+- Starting from Kubernetes version 1.18, you can configure the upgrade procedure to ignore PDB rules using the `disable-eviction` option. This option is enabled by default in version 1.18 and above.
+  
+- If you encounter this issue on Kubernetes versions lower than 1.18, temporarily **lower the PDB limits** to allow the pods to be drained. Once the pods are drained and the node is updated, run the `upgrade` procedure again. After the upgrade, you must **restore the PDB limits** to their original values.
+
+### Recommendations
+For Kubernetes versions lower than 1.18, ensure that PDB limits are temporarily adjusted during upgrades and restored afterward. For versions 1.18 and above, use the `disable-eviction` option to bypass PDB limitations during the upgrade.
+
+**Note**: Not applicable.
 
 ### Cannot Drain Node Because of Pod Stuck in "Terminating" Status
 
-**Symptoms**: The `upgrade` procedure fails during node drain because of the pod stuck in the "Terminating" status.
+### Description
+The `upgrade` procedure fails during the node drain process due to a pod being stuck in the "Terminating" status. This prevents the node from being drained and halts the upgrade process.
 
-**Root cause**: There could be many different reasons for pod being stuck in the "Terminating" status. Try to check the pod events to gather more details. Delete the "Terminating" pod to continue the upgrade.
+### Alerts
+Not applicable.
 
-**Solution**: To resolve the issue with pod stuck in the "Terminating" status, perform the following steps:
+### Stack trace(s)
+Not applicable.
 
-1. Try to forcefully delete the terminating pod using the command: `kubectl delete pod <PODNAME> --grace-period=0 --force --namespace <NAMESPACE>`.
-2. If force delete does not help, try to reboot the node on which the pod is stuck in the "Terminating" status.
+### How to solve
+The root cause of this issue is a pod that is stuck in the "Terminating" status. There can be various reasons for this behavior, so it's important to check the pod events for more details. To proceed with the upgrade, the "Terminating" pod needs to be deleted.
 
-After the "Terminating" pod is deleted, run the `upgrade` procedure once again.
+To resolve the issue, follow these steps:
+1. Attempt to forcefully delete the stuck pod with the following command:
+   ```bash
+   kubectl delete pod <PODNAME> --grace-period=0 --force --namespace <NAMESPACE>
+   ```
+2. If the force delete does not resolve the issue, try rebooting the node where the pod is stuck in the "Terminating" status.
+
+After the "Terminating" pod is successfully deleted, run the `upgrade` procedure again.
+
+### Recommendations
+Monitor for pods stuck in the "Terminating" status during upgrades, and ensure they are deleted or handled appropriately to avoid interruptions in the upgrade process.
+
+**Note**: Not applicable.
+
 
 ### Etcd Pod Customizations Are Missing After Upgrade
 
-**Symptoms**: After an upgrade, you may notice that your etcd customizations are not present in the `/etc/kubernetes/manifests/etcd.yaml` file.
+### Description
+After an upgrade, you may notice that your etcd customizations are no longer present in the `/etc/kubernetes/manifests/etcd.yaml` file. This can happen if the customizations were not properly preserved during the upgrade process.
 
-**Root cause**: During the upgrade, etcd configuration is re-generated by kubeadm from its own configuration in `kubeadm-config` config map in `kube-system` namespace which, in turn, is updated with data from cluster.yaml. Your customizations are missing in this config map and/or in the cluster.yaml.
+### Alerts
+Not applicable.
 
-**Solution**: You need to put your customizations not only to the etcd pod manifest in `/etc/kubernetes/manifests/etcd.yaml` file, but also to `kubeadm-config` config map in `kube-system` namespace. 
-For example, if you want to increase etcd snapshot count from 10000 to 10001, you need to also modify `kubeadm-config` config map as following:
+### Stack trace(s)
+Not applicable.
 
-```yaml
-data:
-  ClusterConfiguration: |
-    etcd:
-      local:
-        extraArgs:
-          snapshot-count: "10001"
-```
+### How to solve
+The root cause of this issue is that the etcd configuration is re-generated by kubeadm during the upgrade using data from the `kubeadm-config` config map in the `kube-system` namespace. If your customizations are not present in this config map or in `cluster.yaml`, they will be missing after the upgrade.
 
-Note that the key has the same name as the etcd argument. The value should be quoted. 
-After the upgrade, this results in following etcd argument (among others):
+To resolve this issue:
+1. Ensure that your customizations are included in both the `/etc/kubernetes/manifests/etcd.yaml` file and the `kubeadm-config` config map in the `kube-system` namespace.
+   
+   For example, if you want to increase the etcd snapshot count from 10000 to 10001, modify the `kubeadm-config` config map as follows:
+   ```yaml
+   data:
+     ClusterConfiguration: |
+       etcd:
+         local:
+           extraArgs:
+             snapshot-count: "10001"
+   ```
 
-```yaml
-spec:
-  containers:
-  - command:
-    - etcd
-    - --snapshot-count=10001
-```
+   The key should match the etcd argument, and the value should be quoted. After the upgrade, this will result in the following etcd argument:
+   ```yaml
+   spec:
+     containers:
+     - command:
+       - etcd
+       - --snapshot-count=10001
+   ```
 
-Note that these arguments are added by kubeadm during the upgrade only, they will not be added automatically.
-It means that you should manually add your customization to both the `/etc/kubernetes/manifests/etcd.yaml` file and the `kubeadm-config` config map.
+2. Remember that these customizations are applied by kubeadm only during the upgrade. Therefore, you must manually add your customizations to both the `/etc/kubernetes/manifests/etcd.yaml` file and the `kubeadm-config` config map.
 
-Also all the custom settings for `etcd`, `kube-apiserver`, `kube-controller`, `kube-scheduler` should be reflected in the cluster.yaml (see [services.kubeadm parameters](Installation.md#kubeadm)).
+3. Ensure that all custom settings for etcd, `kube-apiserver`, `kube-controller`, and `kube-scheduler` are also reflected in the `cluster.yaml` file. Refer to [services.kubeadm parameters](Installation.md#kubeadm) for more details.
 
-If everything is done correctly, all of your etcd customizations persist among Kubernetes upgrades.
+### Recommendations
+To preserve your customizations during future Kubernetes upgrades, ensure they are properly reflected in both the `kubeadm-config` config map and `cluster.yaml`.
+
+**Note**: Not applicable.
 
 ### Kubernetes Image Repository Does Not Change During Upgrade
 
-**Symptoms**: You expect Kubernetes to use a new repository during and after an upgrade, 
-but Kubernetes keeps using the old image repository. Kubernetes may fail to find images and the upgrade fails.
+### Description
+During an upgrade, you expect Kubernetes to use a new image repository, but Kubernetes keeps using the old image repository. As a result, Kubernetes may fail to find the required images, causing the upgrade to fail.
 
-**Root cause**: During an upgrade procedure, the kubeadm cluster configuration is not changed by `kubemarine`, 
-particularly there is no way to change the Kubernetes image repository automatically during an upgrade using `kubemarine`.
+### Alerts
+Not applicable.
 
-**Solution**: You have to change the image repository manually in the kubeadm configuration and container runtime configuration. You have to modify `cluster.yaml` too.
+### Stack trace(s)
+Not applicable.
 
-To edit the kubeadm configuration, use the following command:
+### How to solve
+The root cause of this issue is that the kubeadm cluster configuration is not automatically updated by `kubemarine` during the upgrade process. Specifically, `kubemarine` does not provide a way to change the Kubernetes image repository automatically during an upgrade.
 
-```bash
-kubectl edit cm kubeadm-config -n kube-system
-```
+To resolve this issue, you must manually update the image repository in the kubeadm configuration and the container runtime configuration. You must also modify the `cluster.yaml` file to reflect these changes.
 
-Here, change the `imageRepository` value to the new one, make sure to keep the `ks8.gcr.io` prefix if needed.
-After these changes, kubeadm uses a new specified repository for downloading Kubernetes component images, 
-but only after the `upgrade` or `add_node` procedure (for new nodes). 
-Do not forget to change `imageRepository` in your `cluster.yaml` too, so that there are no inconsistencies
-between `cluster.yaml` and the actual cluster configuration.
+1. **Update the kubeadm configuration**:
+   Use the following command to edit the kubeadm configuration:
+   ```bash
+   kubectl edit cm kubeadm-config -n kube-system
+   ```
+   Change the `imageRepository` value to the new repository. Make sure to retain the `ks8.gcr.io` prefix if necessary. After making this change, kubeadm will use the specified repository for downloading Kubernetes component images, but only after the next `upgrade` or `add_node` procedure.
 
-You may also need to change your container runtime configuration to work correctly and consistently with the new registry.
+2. **Update `cluster.yaml`**:
+   Make sure to update the `imageRepository` in your `cluster.yaml` as well to avoid inconsistencies between the file and the actual cluster configuration.
 
-**Warning**: Executing the following actions restarts all pods in the cluster because the container runtime configuration changes.
-These actions are actually optional, you need to execute them only if you want to use an insecure registry.
+3. **Update container runtime configuration**:
+   You may need to change your container runtime configuration to ensure it works consistently with the new registry. This step is optional unless you want to configure an insecure registry.
 
-If you have global unified registry specified in the `cluster.yaml` under the `registry` section, then change it to point to the new repository address.
-If you have container runtime configurations under the `cri` section in `cluster.yaml`, then make sure they are consistent with your new registry.
-You may need to not only change registry address, but also configure insecure access.
-Do not remove the old registry from your container runtime configuration as it could still be used for some images.
-After these changes, you need to run the `install` procedure with the `prepare.cri` task to update the container runtime configuration. 
-This restarts all containers in the cluster making it unavailable for some time.
-If you use `containerd` as the container runtime, its version may also be updated.
+   If you have a unified registry specified in `cluster.yaml` under the `registry` section, update it to point to the new repository address. Additionally, if there are container runtime configurations under the `cri` section, ensure they are aligned with the new registry, including configuring insecure access if needed.
 
-After making these changes, your cluster should be ready to upgrade using the new image repository.
+4. **Apply changes**:
+   After making these changes, run the `install` procedure with the `prepare.cri` task to update the container runtime configuration. This action restarts all containers in the cluster, which will make it temporarily unavailable.
+
+   > **Warning**: Executing these actions will restart all pods in the cluster as part of the container runtime configuration changes. Ensure this downtime is acceptable before proceeding.
+
+5. **Container runtime updates**:
+   If you're using `containerd` as the container runtime, its version may also be updated during this process.
+
+Once these steps are completed, your cluster will be ready to upgrade using the new image repository.
+
+### Recommendations
+Ensure the `imageRepository` is consistently updated in both `kubeadm-config` and `cluster.yaml`, and verify that the container runtime configuration is aligned with the new repository settings.
+
+**Note**: Not applicable.
 
 ### Kubernetes Garbage Collector Doesn't Reclaim Disk Space
 
-**Symptoms**: There are error messages in the log file like the following:
-
-```
+### Description
+The Kubernetes garbage collector is failing to free up disk space, as indicated by error messages like:
+```text
 Apr 02 13:15:01 worker3 kubelet[1114]: E0402 13:15:01.809804    1114 kubelet.go:1302] Image garbage collection failed multiple times in a row: failed to garbage collect required amount of images. Wanted to free 966184140 bytes, but freed 0 bytes
 ```
+Additionally, disk space usage is increasing, and pods are being evicted due to DiskPressure.
 
-Also, the disk space usage is increasing, and pods are being evicted due to DiskPressure.
+### Alerts
+Not applicable.
 
-**Root cause**: Kubernetes garbage collector cleans up only unused images and containers which are located under `/var/lib/docker`. It starts cleaning up when the disk usage is equal or above `image-gc-high-threshold` (The default value is 85%).
-The pods' eviction due to DiskPressure starts when the free disk space is less than `imagefs.available` (The default value is 15%).
-If other files except images and containers use the disk so that GC cannot free enough space, such an error may happen.
+### Stack trace(s)
+Not applicable.
 
-**Solution**: Move /var/lib/docker to a separate disk of reasonable size. Also setting `image-gc-high-threshold` to a value lower than 100-`imagefs.available` may help.
+### How to solve
+The root cause of this issue is that the Kubernetes garbage collector only cleans up unused images and containers located under `/var/lib/docker`. It initiates cleanup when disk usage reaches the `image-gc-high-threshold` (default is 85%). Pods are evicted due to DiskPressure when the free disk space is less than `imagefs.available` (default is 15%).
 
-`image-gc-high-threshold` may be set as a kubelet flag in /var/lib/kubelet/kubeadm-flags.env. Keep in mind that its value should be higher than `image-gc-low-threshold`, whose default value is 80%. An example of kubeadm-flags.env file:
+If non-container files occupy the disk space and the garbage collector cannot free enough space, this error may occur.
 
-```
+To resolve this issue:
+1. **Move `/var/lib/docker` to a separate disk** of reasonable size to free up space on the main disk.
+2. **Adjust `image-gc-high-threshold`** to a value lower than 100 minus `imagefs.available`. For example, setting it to 80% ensures that garbage collection starts earlier.
+
+The `image-gc-high-threshold` can be set as a kubelet flag in `/var/lib/kubelet/kubeadm-flags.env`. Ensure that its value is higher than `image-gc-low-threshold`, whose default is 80%. Here is an example of a `kubeadm-flags.env` file:
+```bash
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
+### Recommendations
+- Regularly monitor disk space usage and garbage collection thresholds to prevent DiskPressure issues.
+- Consider moving Docker storage to a dedicated disk to avoid running out of space on the main disk.
+
+**Note**: Not applicable.
+
 ### Upgrade Procedure to v1.28.3 Fails on ETCD Step
 
-**Symptoms**:
-Upgrade procedure from v1.28.0(v1.28.1, v1.28.2 as well) to v1.28.3 fails with error message:
+### Description
+During the upgrade from v1.28.0 (or v1.28.1, v1.28.2) to v1.28.3, the upgrade procedure fails at the ETCD step, showing the following error message:
 
-```
+```text
 2023-11-10 11:56:44,465 CRITICAL        Command: "sudo kubeadm upgrade apply v1.28.3 -f --certificate-renewal=true --ignore-preflight-errors='Port-6443,CoreDNSUnsupportedPlugins' --patches=/etc/kubernetes/patches && sudo kubectl uncordon ubuntu && sudo systemctl restart kubelet"
 ```
 
-and `debug.log` has the following message:
-
-```
+In the `debug.log`, the following message is logged:
+```text
 2023-11-10 11:56:44,441 140368685827904 DEBUG [__init__.upgrade_first_control_plane]    [upgrade/apply] FATAL: fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: static Pod hash for component etcd on Node ubuntu did not change after 5m0s: timed out waiting for the condition
 ```
 
-**Root cause**: `kubeadm v1.28.0` adds default fields that are not compatible with `kubeadm v1.28.3`
+### Alerts
+Not applicable.
 
-**Solution**: 
-* Remove the following parts from the `etcd.yaml` manifest on each control plane node in the cluster one by one(lines are marked by `-`):
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause is that `kubeadm v1.28.0` adds default fields that are incompatible with `kubeadm v1.28.3`. To resolve this issue:
+
+1. **Remove the following parts from the `etcd.yaml` manifest** on each control plane node in the cluster, one by one. The lines to remove are marked by `-`:
 
 ```yaml
 apiVersion: v1
@@ -1301,25 +1781,39 @@ spec:
 ...
 ```
 
-* Wait for the ETCD restart.
-* Run upgrade procedure once again.
+2. **Wait for the ETCD to restart**.
+
+3. **Run the upgrade procedure again** to complete the upgrade.
+
+### Recommendations
+Ensure you manually update the `etcd.yaml` manifest before retrying the upgrade to prevent compatibility issues with `kubeadm v1.28.3`.
+
+**Note**: Not applicable.
+
 
 ## Numerous Generation of `Auditd` System
 
-**Symptoms**: Generation of numerous system messages on nodes and their processing in graylog:
+### Description
+Numerous system messages are being generated on nodes, and they are processed in Graylog. These logs can quickly accumulate, as seen with the audit log files:
 
-```
+```text
 -rw-------. 1 root root 1528411 aug 13 10:36 audit.log
 -r--------. 1 root root 8388693 aug 13 10:35 audit.log.1
 -r--------. 1 root root 8388841 aug 13 10:34 audit.log.2
 -r--------. 1 root root 8388720 aug 13 10:32 audit.log.3
 -r--------. 1 root root 8388785 aug 13 10:30 audit.log.4
-
 ```
 
+### Alerts
+Not applicable.
 
-**Root cause**: The reason for generating numerous messages is to add new rules to `audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
-```
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+The root cause of the issue is the addition of new rules to `audit.rules` due to the update of the default.yaml configuration file. The default audit settings in Linux operating systems involve two files: `auditd.conf` and `audit.rules`. For example, the following rules have been added:
+
+```text
 -w /var/lib/docker -k docker 
 -w /etc/docker -k docker 
 -w /usr/lib/systemd/system/docker.service -k docker 
@@ -1329,103 +1823,163 @@ spec:
 -w /usr/bin/containerd -k docker 
 -w /usr/sbin/runc -k dockerks 
 -w /usr/bin/dockerd -k docker
-
 ```
 
+To resolve the issue, follow these steps:
 
-**Solution**: The solution to this problem is to modify the configuration files of the auditd daemon. 
+1. **Modify the `auditd.conf` file**:
+   - Set the maximum log file size and number of log files to limit excessive log generation:
+   ```bash
+   max_log_file = 8  # File size in megabytes
+   num_logs = 5      # Number of generated log files
+   ```
 
-1- Modifying the settings for the auditd.conf file
-```
-max_log_file = 8  <- Generated file size in megabytes
-num_logs = 5 <- Number of generated files
-```
-2- Removing added rules
-```
--w /var/lib/docker -k docker 
--w /etc/docker -k docker 
--w /usr/lib/systemd/system/docker.service -k docker 
--w /usr/lib/systemd/system/docker.socket -k docker 
--w /etc/default/docker -k docker 
--w /etc/docker/daemon.json -k docker 
--w /usr/bin/containerd -k docker 
--w /usr/sbin/runc -k dockerks 
--w /usr/bin/dockerd -k docker
+2. **Remove the added rules**:
+   - Delete the added rules related to Docker from `predefined.rules`, located in `/etc/audit/rules.d`:
+   ```bash
+   -w /var/lib/docker -k docker 
+   -w /etc/docker -k docker 
+   -w /usr/lib/systemd/system/docker.service -k docker 
+   -w /usr/lib/systemd/system/docker.socket -k docker 
+   -w /etc/default/docker -k docker 
+   -w /etc/docker/daemon.json -k docker 
+   -w /usr/bin/containerd -k docker 
+   -w /usr/sbin/runc -k dockerks 
+   -w /usr/bin/dockerd -k docker
+   ```
 
-```
+3. **Apply the new configuration**:
+   After making the changes, apply the updated audit rules by restarting the `auditd` service:
+   ```bash
+   sudo service auditd restart
+   ```
 
-Rules are deleted in predefined.rules, which is located on this path /etc/audit/rules.d 
+### Recommendations
+Monitor audit logs to ensure that unnecessary rules are not being added, and adjust `auditd` settings to manage the size and retention of logs effectively.
 
-**After all the manipulations, you need to apply the new configuration with the command** `sudo service auditd restart`
+**Note**: Not applicable.
+
 
 ## Failure During Installation on Ubuntu OS With Cloud-init
 
-### Issues Related to Updating Apt Repositories List
- 
-* In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubemarine` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubemarine` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
-    * You can find out the current status of `cloud-init` and wait on completion by using the command below:
-    ```bash
-    cloud-init status
-    ```
+### Description
+Installation failures can occur on Ubuntu when the `cloud-init` service is running simultaneously with `Kubemarine` procedures. These issues often arise due to conflicts during the updating of apt repositories.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+To avoid potential problems, if the operating system has just been installed on a VM, it is recommended to **wait approximately 10 minutes** before starting any `Kubemarine` procedures. This ensures that the `cloud-init` service has completed its initial setup.
+
+You can check the current status of `cloud-init` and ensure it has finished its preparations using the following command:
+```bash
+cloud-init status
+```
+
+Wait for the service to complete before proceeding with the installation to avoid conflicts.
+
+### Recommendations
+- Verify the status of `cloud-init` after an OS installation to ensure the system is fully prepared before initiating any `Kubemarine` procedures.
+- Delaying the start of `Kubemarine` by 10 minutes allows `cloud-init` to finish without interference.
+
+**Note**: Not applicable.
+
 ## Troubleshooting an Installation That Ended Incorrectly
 
-* Sometimes the installation of Kubemarine may not complete correctly, and for further analysis of the situation, Kubemarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
+### Description
+Sometimes the installation of Kubemarine may not complete correctly. For further analysis of the issue, Kubemarine provides functionality that collects information about the cluster installation before each procedure.
 
-### Analysis of the Situation
+### Alerts
+Not applicable.
 
-* When a user enters the node, along the path `/etc/kubemarine/kube_tasks` he can see the collected logs that were collected during the installation.
-  * Logs are a set of files, namely:
-  ```
-  data_time_initial_procedure
-    cluster.yaml
-    version
-    dump/
-      
-      cluster_finalized.yaml
-      cluster_precompiled.yaml
-      cluster.yaml
-      procedure_parameters
-  ```
-The user can analyze these files and try to find the reason for the failed installation of Kubemarine.
+### Stack trace(s)
+Not applicable.
 
-## kubectl logs and kubectl exec fail
+### How to solve
 
-**Symptoms**: The attempt to get pod logs and execute a command inside the container fails with the following errors:
+To analyze the situation:
+1. After entering the node, navigate to the path `/etc/kubemarine/kube_tasks`, where you will find logs that were collected during the installation process.
+   
+2. The logs are organized into a set of files, which include:
+   ```bash
+   data_time_initial_procedure
+     cluster.yaml
+     version
+     dump/
+       cluster_finalized.yaml
+       cluster_precompiled.yaml
+       cluster.yaml
+       procedure_parameters
+   ```
 
-```
+3. Review these files to try and identify the cause of the failed Kubemarine installation. Specifically, analyzing `cluster_finalized.yaml`, `cluster_precompiled.yaml`, and `procedure_parameters` may provide insights into what went wrong during the installation.
+
+### Recommendations
+Regularly check and review the logs in `/etc/kubemarine/kube_tasks` after any failed installation attempts to assist in identifying and resolving issues.
+
+**Note**: Not applicable.
+
+
+## Kubectl logs and kubectl exec fail
+
+### Description
+Attempts to retrieve pod logs or execute a command inside the container using `kubectl logs` and `kubectl exec` fail due to TLS-related errors. These errors occur because the kubelet server certificate is not approved in a cluster where self-signed certificates are not allowed for the kubelet server.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 $ kubectl -n my-namespace logs my-pod
 Error from server: Get "https://192.168.1.1:10250/containerLogs/my-namespace/my-pod/controller": remote error: tls: internal error
 ```
-
-```
+```text
 $ kubectl -n my-namespace exec my-pod -- id
 Error from server: error dialing backend: remote error: tls: internal error
 ```
 
-**Root cause**: The `kubelet` server certificate is not approved, whereas the cluster has been configured not to use self-signed certificates for the `kubelet` server.
+### How to solve
+1. Perform the Certificate Signing Request (CSR) approval process by following the steps outlined in the maintenance guide.
+2. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/internal/Hardening.md#kubelet-server-certificate-approval) section for detailed instructions on how to approve the kubelet server certificate.
 
-**Solution**: Perform CSR approval steps from the maintenance guide. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/internal/Hardening.md#kubelet-server-certificate-approval) section for details.
+### Recommendations
+Ensure that the cluster's certificate management process is aligned with the security policies. Regularly check the status of certificates to avoid such issues.
+
+**Note**: Not applicable.
 
 ## OpenSSH server becomes unavailable during cluster installation on Centos9
 
-**Sympthoms**: Installation fails on `kubemarine.system.reboot_nodes`, OpenSSH server becomes unavailable due to OpenSSL version missmatch error.
+### Description
+During cluster installation on Centos9, the OpenSSH server becomes unavailable, leading to a failure in the installation process at the `kubemarine.system.reboot_nodes` stage. This issue is caused by a version mismatch between OpenSSL and OpenSSH, which results in OpenSSH being unable to start.
 
-The following lines can be found in the OpenSSH server logs:
-```
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+```text
 OpenSSL version mismatch. Built against 30000070, you have 30200010
 sshd.service: Main process exited, code=exited, status=255/EXEPTION
 sshd.service: Failed with result 'exit-code'.
 Failed to start OpenSSH server daemon.
 ```
 
-**Root cause**: Since OpenSSL is updated by default when deploying a cluster with KubeMarine, the version incompatibility problem arises. OpenSSH was compiled with OpenSSL version 3.0.0 (30000070) and after the update, version 3.2.0 (30200010) is installed.
-Probably, OpenSSL does not provide backward compatibility.
+### How to solve
+1. To resolve this issue, update the OpenSSH server to ensure compatibility with the updated OpenSSL version.
+2. Add the following upgrade section to the **cluster.yaml** file:
+   ```yaml
+   services:
+     packages:
+       upgrade:
+         - openssh-server
+   ```
 
-**Solution**: Add the upgrade section for OpenSSH server in the **cluster.yaml** file.
+3. This will ensure the OpenSSH server is upgraded along with OpenSSL, avoiding the version mismatch problem.
 
-```yaml
-services:
-  packages:
-    upgrade:
-      - openssh-server
-```
+### Recommendations
+- Ensure that critical services such as OpenSSH are upgraded when their dependencies, like OpenSSL, are updated.
+- Test updates in a staging environment to catch compatibility issues before deployment.
+
+**Note**: Not applicable.
