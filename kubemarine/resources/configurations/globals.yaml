@@ -344,6 +344,7 @@ compatibility_map:
         versions:
           - '20.04'
           - '22.04'
+          - '24.04'
         unstable_kernel:
           - '5.4.0-132-generic'
     debian:
