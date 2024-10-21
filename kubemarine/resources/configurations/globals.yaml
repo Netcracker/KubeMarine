@@ -325,10 +325,12 @@ compatibility_map:
           - '8.7'
           - '8.8'
           - '8.9'
+          - '8.10'  
       - os_family: 'rhel9'
         versions:
           - '9.2'
-
+          - '9.3'
+          - '9.4'
     rocky:
       - os_family: 'rhel8'
         versions:
