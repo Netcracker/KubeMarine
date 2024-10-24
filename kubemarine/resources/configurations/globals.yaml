@@ -339,6 +339,7 @@ compatibility_map:
         versions:
           - '9.2'
           - '9.3'
+          - '9.4'
     ubuntu:
       - os_family: 'debian'
         versions:
