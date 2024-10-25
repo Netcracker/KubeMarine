@@ -49,7 +49,7 @@ nodes:
       retries: 30
   boot:
     # different OSes have sshd or ssh systemd service
-    reboot_command: '( systemctl stop sshd || sudo systemctl stop ssh ) && sudo reboot 2>/dev/null >/dev/null'
+    reboot_command: 'systemctl stop sshd || sudo systemctl stop ssh ; sudo reboot 2>/dev/null >/dev/null'
     defaults:
       delay_period: 5
   drain:
