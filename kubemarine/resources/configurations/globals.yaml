@@ -48,7 +48,8 @@ nodes:
       timeout: 10
       retries: 30
   boot:
-    reboot_command: 'systemctl stop sshd && sudo reboot 2>/dev/null >/dev/null'
+    # different OSes have sshd or ssh systemd service
+    reboot_command: '( systemctl stop sshd || sudo systemctl stop ssh ) && sudo reboot 2>/dev/null >/dev/null'
     defaults:
       delay_period: 5
   drain:
