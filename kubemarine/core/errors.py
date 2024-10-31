@@ -91,7 +91,8 @@ def get_kme_dictionary() -> dict:
                     "Please, specify required 'sandbox_image' explicitly in procedure inventory."
         },
         'KME0014': {
-            "name": "The provided Helm chart URL {url} does not return {type} content in the {destination} file. Please validate the URL. If this is a private repository, ensure the correct authentication is provided."
+            "name": "The provided Helm chart URL {url} does not return {type} content in the {destination} file. "
+                    "Please validate the URL. If this is a private repository, ensure the correct authentication is provided."
         }
     }
 
