@@ -920,15 +920,15 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
             try:
                 with zipfile.ZipFile(destination, 'r') as zf:
                     zf.extractall(local_chart_folder)
-            except zipfile.BadZipFile:
-                raise KME(code="KME0014", url=chart_path, type=extension, destination=destination)
+            except zipfile.BadZipFile as e:
+                raise KME(code="KME0014", url=chart_path, type=extension, destination=destination) from e
         else:
             logger.verbose('Tar will be used for unpacking')
             try:
                 with tarfile.open(destination, "r:gz") as tf:
                     tf.extractall(local_chart_folder)
-            except tarfile.ReadError:
-                raise KME(code="KME0014", url=chart_path, type="tar:gz", destination=destination)
+            except tarfile.ReadError as e:
+                raise KME(code="KME0014", url=chart_path, type="tar:gz", destination=destination) from e
     else:
         logger.debug("Create copy of chart to work with")
         shutil.copytree(chart_path, local_chart_folder, dirs_exist_ok=True)
