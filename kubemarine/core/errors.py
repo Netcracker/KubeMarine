@@ -92,7 +92,7 @@ def get_kme_dictionary() -> dict:
         },
         'KME0014': {
             "name": "The provided Helm chart URL {url} does not return {type} content in the {destination} file. "
-                    "Please validate the URL. If this is a private repository, ensure the correct authentication is provided."
+                    "Please validate the URL. If this is a private repository, ensure that the correct authentication is provided."
         }
     }
 
