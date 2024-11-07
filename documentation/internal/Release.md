@@ -9,7 +9,7 @@ If you want to make a new KubeMarine release, you need to do following:
 2. Create a new pre-release for your tag. Do not forget to generate release notes.
 3. Wait for GitHub Actions completion and verify released artifacts. Following artifacts are essential for each tag:
     * KubeMarine binaries for different OS. They could be found in release assets.
-    * KubeMarine python distribution package. They could be found in release assets.
+    * KubeMarine python distribution package. It could be found in release assets.
     * [KubeMarine image](https://github.com/Netcracker/KubeMarine/pkgs/container/kubemarine).
     * [Kubemarine documentation](https://github.com/Netcracker/KubeMarine/tree/main/documentation).
 
