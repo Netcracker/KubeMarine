@@ -174,6 +174,10 @@ Also, check out the following inventory examples:
 - [cluster.yaml](examples/cluster.yaml)
 - [procedure.yaml](examples/procedure.yaml)
 
+For maintainers and developers there is useful [internal documentation](/documentation/internal/), for example:
+* [How to write patches](/documentation/internal/Patches.md)
+* [How to make new release](/documentation/internal/Release.md)
+
 ## Issues, Questions
 If you have any problems while working with Kubemarine, feel free to open a [new issue](https://github.com/netcracker/kubemarine/issues) or even
 [PR](https://github.com/netcracker/kubemarine/pulls) with related changes.
