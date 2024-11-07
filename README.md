@@ -40,7 +40,7 @@ There are following key locations in the repository
 | Paths | Description |
 | ----- | ----------- |
 | `.github/workflows/`, `ci/` | Contain GitHub Actions configuration which runs unit/integration tests, builds/publishes artifacts, etc |
-| `documentation/`, `examples/`, `README.md` | Contain documentation and exmaples |
+| `documentation/`, `examples/`, `README.md` | Contain documentation and examples |
 | `kubemarine/` | Contains source code for KubeMarine python package |
 | `test/` | Contains tests |
 | `bin/`, `scripts/ci/` | Contains auxiliary scripts used during KubeMarine build |
