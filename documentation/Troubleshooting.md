@@ -135,11 +135,10 @@ KME0002: Remote group exception
 
 ### How to solve
 1. Run the [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure) to ensure that the infrastructure and platform are functioning properly.
-2. Inspect the node where the error occurred and verify the presence of the required package manager. 
-3. If the package manager is not available, ensure that the correct package management tool is installed on the node or adjust the command to use the appropriate tool (e.g., `yum` for RHEL-based systems).
-4. Verify that all necessary dependencies are correctly installed on the node, and reattempt the task.
-5. Ensure that the inventory and configuration files are correctly set up, following the proper sequence of commands.
-6. If the issue persists, [start a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and provide a description of the error with its stack trace for further assistance.
+2. Inspect the node where the error occurred. In our particular example, it is required to check the presence of the required package manager and install it if it is missing. 
+3. Verify that all necessary dependencies are correctly installed on the node, and reattempt the task.
+4. Ensure that the inventory and configuration files are correctly set up, following the proper sequence of commands.
+5. If the issue persists, [start a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and provide a description of the error with its stack trace for further assistance.
 
 ### Recommendations
 To avoid this issue in the future:
@@ -275,52 +274,40 @@ To prevent this issue in the future:
 - Ensure all connection users are properly configured with sudo privileges on all nodes before running any procedures.
 - Regularly audit the sudoer configurations to avoid permission issues during deployments or node additions.
 
->**Note**  
->Not applicable.
-
 # Troubleshooting Tools
 
 This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
 
 ## Etcdctl Script
 
-### Description
-This script allows you to execute `etcdctl` queries without the need for additional binary installations or manual connection setup. The script is installed during the `prepare.thirdparties` task on all control-plane nodes and requires root privileges to execute commands.
+This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
-### Alerts
-Not applicable.
+To execute a command through this script, make sure you meet all the following prerequisites:
 
-### Stack trace(s)
-Not applicable.
+* You run the command from the control-plane node with root privileges.
+* You have configured `admin.conf` on node.
+* The node with which you are running has all the necessary ETCD certificates and they are located in the correct paths.
 
-### How to solve
-To use the `etcdctl` script, ensure the following prerequisites are met:
-1. You are running the command from a control-plane node with root privileges.
-2. The `admin.conf` is configured on the node.
-3. The node has the necessary ETCD certificates located in the correct paths.
+If all prerequisites are achieved, you can execute almost any `etcdctl` command.
+For example:
 
-Once the prerequisites are satisfied, you can execute most `etcdctl` commands. Examples include:
-```bash
-etcdctl member list
-etcdctl endpoint health --cluster -w table
-etcdctl endpoint status --cluster -w table
 ```
-If you encounter issues, consult the official ETCD documentation for additional options and features.
+# etcdctl member list
+# etcdctl endpoint health --cluster -w table
+# etcdctl endpoint status --cluster -w table
+```
 
-The script follows this algorithm to launch the `etcdctl` container:
-1. It detects the already running ETCD instance in the Kubernetes cluster, parses its parameters, and launches the ETCD container with the same parameters on the current node.
-2. If the Kubernetes cluster is unavailable, the script parses the `/etc/kubernetes/manifests/etcd.yaml` file and launches the ETCD container with the corresponding parameters.
+To find out all the available `etcdctl` options and features, use the original ETCD documentation.
 
-### Recommendations
-To avoid issues with the `etcdctl` script:
-- Ensure all necessary certificates are correctly configured and paths are accurate.
-- Always run the script with the appropriate permissions and from a control-plane node.
-- Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
-  - `/var/lib/etcd` : `/var/lib/etcd`
-  - `/etc/kubernetes/pki` : `/etc/kubernetes/pki`
+To execute the command, the script tries to launch the container using the following algorithm:
 
->**Note**  
->Not applicable.
+1. Detect already running ETCD in Kubernetes cluster, parse its parameters, and launch the ETCD container with the same parameters on the current node.
+2. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
+
+Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
+
+* `/var/lib/etcd`:`/var/lib/etcd`
+* `/etc/kubernetes/pki`:`/etc/kubernetes/pki`
 
 # Troubleshooting Kubernetes Generic Issues
 
@@ -330,9 +317,6 @@ This section provides troubleshooting information for generic Kubernetes solutio
 
 ### Description
 CoreDNS may respond with delays when there is a high load due to a large volume of applications or nodes in the cluster. This increased load can cause CoreDNS to slow down its response times.
-
-### Alerts
-Not applicable.
 
 ### Stack trace(s)
 Not applicable.
@@ -577,18 +561,17 @@ To avoid this issue in the future:
 ## Etcdctl Compaction and Defragmentation
 
 ### Description
-Errors related to etcd disk space can occur, such as the following messages in the `etcd` pod logs:
-```text
-etcdserver: mvcc: database space exceeded
-etcdserver: no space
-```
+Errors related to etcd disk space can occur, such as the `database space exceeded` & `no space` messages in the `etcd` pod logs.
 Additionally, if the etcd database reaches 70% of the default storage size (2GB by default), defragmentation may be required.
 
 ### Alerts
 Not applicable.
 
 ### Stack trace(s)
-Not applicable.
+```text
+etcdserver: mvcc: database space exceeded
+etcdserver: no space
+```
 
 ### How to solve
 The root cause of this issue is fragmented space left after the compaction procedure. While this space is available for etcd, it is not available to the host filesystem. You must defragment the etcd database to make this space available to the filesystem.
@@ -1396,7 +1379,7 @@ For more details, you can refer to:
 ### Case 2
 
 ### Description
-Pod with `hostNetwork` Cannot Resolve FQDN: A pod attached to `hostNetwork` cannot resolve a Fully Qualified Domain Name (FQDN) periodically or constantly. The following error message is displayed when attempting to resolve a name:
+A pod that is attached to `hostNetwork` cannot resolve a name periodically or constantly, even if it is FQDN. The following error message is displayed:
 
 ```bash
 $ nslookup kubernetes.default.svc.cluster.local
@@ -1694,9 +1677,7 @@ KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-c
 
 ### Recommendations
 - Regularly monitor disk space usage and garbage collection thresholds to prevent DiskPressure issues.
-- Consider moving Docker storage to a dedicated disk to avoid running out of space on the main disk.
 
-**Note**: Not applicable.
 
 ### Upgrade Procedure to v1.28.3 Fails on ETCD Step
 
