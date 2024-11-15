@@ -42,6 +42,7 @@ Results:
 ### Checklist
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
+- [ ] There is no breaking changes, or migration patch is provided
 - [ ] Integration CI passed
 - [ ] Unit tests. If Yes list of new/changed tests with brief description
 - [ ] There is no merge conflicts
