@@ -33,6 +33,20 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 - Package extension with [open extension API](documentation/PackageExtension.md)
 - Support different deployment schemes (all-in-one, mini-HA, HA, and so on)
 
+## Repository structure
+
+There are following key locations in the repository
+
+| Paths | Description |
+| ----- | ----------- |
+| `.github/workflows/`, `ci/` | Contain GitHub Actions configuration which runs unit/integration tests, builds/publishes artifacts, etc |
+| `documentation/`, `examples/`, `README.md` | Contain documentation and examples |
+| `kubemarine/` | Contains source code for KubeMarine python package |
+| `test/` | Contains tests |
+| `bin/`, `scripts/ci/` | Contains auxiliary scripts used during KubeMarine build |
+| `scripts/thirdparties/` | Contains auxiliary script used to update KubeMarine thirdparties versions | 
+| `Dockerfile`, `kubemarine.spec`, `MANIFEST.in`, `pyproject.toml`, `requirements-pyinstaller.txt`, `setup.py` | Different files used to build KubeMarine artifacts (image, binaries, package) |
+
 ## Kubemarine Binary Installation
 Proceed the following steps to install Kubemarine  on your environment:
 1. Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
@@ -173,6 +187,10 @@ The following documents and tutorials are available:
 Also, check out the following inventory examples:
 - [cluster.yaml](examples/cluster.yaml)
 - [procedure.yaml](examples/procedure.yaml)
+
+For maintainers and developers there is useful [internal documentation](/documentation/internal/), for example:
+* [How to write patches](/documentation/internal/Patches.md)
+* [How to make new release](/documentation/internal/Release.md)
 
 ## Issues, Questions
 If you have any problems while working with Kubemarine, feel free to open a [new issue](https://github.com/netcracker/kubemarine/issues) or even

@@ -36,6 +36,7 @@ import yaml
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine import jinja, thirdparties
 from kubemarine.core import utils, static, errors, os as kos, log
+from kubemarine.core.errors import FailException, KME
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -916,12 +917,18 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
         extension = destination.split('.')[-1]
         if extension == 'zip':
             logger.verbose('Unzip will be used for unpacking')
-            with zipfile.ZipFile(destination, 'r') as zf:
-                zf.extractall(local_chart_folder)
+            try:
+                with zipfile.ZipFile(destination, 'r') as zf:
+                    zf.extractall(local_chart_folder)
+            except zipfile.BadZipFile as e:
+                raise KME(code="KME0014", url=chart_path, type=extension, destination=destination) from e
         else:
             logger.verbose('Tar will be used for unpacking')
-            with tarfile.open(destination, "r:gz") as tf:
-                tf.extractall(local_chart_folder)
+            try:
+                with tarfile.open(destination, "r:gz") as tf:
+                    tf.extractall(local_chart_folder)
+            except tarfile.ReadError as e:
+                raise KME(code="KME0014", url=chart_path, type="tar:gz", destination=destination) from e
     else:
         logger.debug("Create copy of chart to work with")
         shutil.copytree(chart_path, local_chart_folder, dirs_exist_ok=True)

@@ -89,6 +89,11 @@ def get_kme_dictionary() -> dict:
                     "in cluster.yaml{previous_version_spec}, "
                     "but not present in procedure inventory{next_version_spec}. "
                     "Please, specify required 'sandbox_image' explicitly in procedure inventory."
+        },
+        'KME0014': {
+            "name": "The provided Helm chart URL {url} does not return {type} content in the {destination} file. "
+                    "Please validate the URL. If this is a private repository, "
+                    "ensure that the correct authentication is provided."
         }
     }
 
