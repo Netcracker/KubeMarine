@@ -20,21 +20,21 @@ calico:
   v1.28.4:
     version: v3.26.4
   v1.28.6:
-    version: v3.27.0
+    version: v3.27.4
   v1.28.8:
-    version: v3.27.0
+    version: v3.27.4
   v1.28.9:
-    version: v3.27.3
+    version: v3.27.4
   v1.28.12:
     version: v3.29.1
   v1.29.1:
-    version: v3.27.0
+    version: v3.27.4
   v1.29.4:
-    version: v3.27.3
+    version: v3.27.4
   v1.29.7:
     version: v3.29.1
   v1.30.1:
-    version: v3.27.3
+    version: v3.27.4
   v1.30.3:
     version: v3.29.1
   v1.31.1:
