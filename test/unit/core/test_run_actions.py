@@ -217,7 +217,7 @@ class RunActionsTest(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_upgrade_templates_two_versions(self):
-        before, through, after = 'v1.26.11', 'v1.27.13', 'v1.28.12'
+        before, through, after = 'v1.27.13', 'v1.28.12', 'v1.29.7'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -249,7 +249,7 @@ class RunActionsTest(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_upgrade_templates_second_version_failed_task(self):
-        before, through, after = 'v1.26.11', 'v1.27.13', 'v1.28.12'
+        before, through, after = 'v1.27.13', 'v1.28.12', 'v1.29.7'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -286,7 +286,7 @@ class RunActionsTest(test_utils.CommonTest):
     @test_utils.temporary_directory
     def test_upgrade_failed_enrichment(self):
         self.inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.26.11'
+            'kubernetesVersion': 'v1.27.13'
         }
         self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
         self.procedure_inventory['upgrade_plan'] = ['v1.27.13']
@@ -303,7 +303,7 @@ class RunActionsTest(test_utils.CommonTest):
             with self.subTest(f"version verified: {verified}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {
-                    'before': 'v1.26.11', 'after': 'v1.27.13'
+                    'before': 'v1.27.13', 'after': 'v1.28.12'
                 }
                 self.inventory['services']['kubeadm'] = {
                     'kubernetesVersion': '{{ values.before }}'
@@ -341,7 +341,7 @@ class RunActionsTest(test_utils.CommonTest):
     @test_utils.temporary_directory
     def test_upgrade_formatted_procedure_inventory(self):
         self.inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.26.11'
+            'kubernetesVersion': 'v1.27.13'
         }
         procedure_inventory_text = dedent("""\
             upgrade_plan:
@@ -552,7 +552,7 @@ class RunActionsTest(test_utils.CommonTest):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {'k': 'v1'}
                 self.inventory['services']['kubeadm'] = {
-                    'kubernetesVersion': 'v1.26.11'
+                    'kubernetesVersion': 'v1.27.13'
                 }
                 self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
                 self.procedure_inventory['upgrade_plan'] = ['v1.27.13']

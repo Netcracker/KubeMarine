@@ -328,7 +328,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                     self.new_cluster()
 
     def test_require_package_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.27.1', 'v1.27.4', 'v1.27.13', 'v1.28.12'
+        before, through1, through2, after = 'v1.27.1', 'v1.27.13', 'v1.28.12', 'v1.29.7'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -353,7 +353,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_package_redefinition_first_step(self):
-        self.setUpVersions('v1.27.1', ['v1.27.4', 'v1.27.13'])
+        self.setUpVersions('v1.27.1', ['v1.27.13', 'v1.28.12'])
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
         self.upgrade[self.upgrade_plan[0]]['packages']['associations']['containerd']['package_name'] = 'containerd-upgrade1'
 
@@ -551,7 +551,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
             self.new_cluster()
 
     def test_require_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.27.1', 'v1.27.4', 'v1.27.13', 'v1.28.12'
+        before, through1, through2, after = 'v1.27.1', 'v1.27.13', 'v1.28.12', 'v1.29.7'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -578,7 +578,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
                 self.run_actions()
 
     def test_require_image_redefinition_first_step(self):
-        self.setUpVersions('v1.27.1', ['v1.27.4', 'v1.27.13'])
+        self.setUpVersions('v1.27.1', ['v1.27.13', 'v1.28.12'])
         self.inventory['plugins'].setdefault('kubernetes-dashboard', {})\
             .setdefault('dashboard', {})['image'] = 'dashboard-redefined'
         self.upgrade[self.upgrade_plan[0]]['plugins'].setdefault('kubernetes-dashboard', {})\
@@ -824,7 +824,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_dont_require_redefinition_source_template_defaults_changed_second_step(self):
-        self.setUpVersions('v1.27.1', ['v1.27.4', 'v1.27.13'])
+        self.setUpVersions('v1.27.1', ['v1.27.13', 'v1.28.12'])
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
 
@@ -865,7 +865,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_source_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.27.1', 'v1.27.4', 'v1.27.13', 'v1.28.12'
+        before, through1, through2, after = 'v1.27.1', 'v1.27.13', 'v1.28.12', 'v1.29.7'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -940,7 +940,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_sandbox_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.27.1', 'v1.27.4', 'v1.27.13', 'v1.28.12'
+        before, through1, through2, after = 'v1.27.1', 'v1.27.13', 'v1.28.12', 'v1.29.7'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -962,7 +962,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_sandbox_image_redefinition_first_step(self):
-        self.setUpVersions('v1.27.1', ['v1.27.4', 'v1.27.13'])
+        self.setUpVersions('v1.27.1', ['v1.27.13', 'v1.28.12'])
         self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-redefined'
         self._grpc_cri(self.upgrade[self.upgrade_plan[0]])['sandbox_image'] = 'pause-upgrade1'
 
@@ -1125,9 +1125,9 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.26.11', 'v1.27.13', False),
-                ('v1.27.13', 'v1.28.12', True),
-                ('v1.28.3', 'v1.28.12', False),
+                ('v1.27.13', 'v1.28.12', False),
+                ('v1.28.12', 'v1.29.7', True),
+                ('v1.29.4', 'v1.29.7', False),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
