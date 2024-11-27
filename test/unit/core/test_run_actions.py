@@ -315,7 +315,7 @@ class RunActionsTest(test_utils.CommonTest):
 
                 dump_subdir = 'upgrade'
                 if verified:
-                    dump_subdir = 'v1.27.13'
+                    dump_subdir = 'v1.28.12'
 
                 dump_content = {'debug.log', dump_subdir}
                 self.assertEqual(dump_content, self._list_dump_content())
@@ -346,7 +346,7 @@ class RunActionsTest(test_utils.CommonTest):
         procedure_inventory_text = dedent("""\
             upgrade_plan:
               # comment
-              - "v1.27.13"
+              - "v1.28.12"
         """)
         self.procedure_inventory = yaml.safe_load(procedure_inventory_text)
         upgrade_plan = self.procedure_inventory['upgrade_plan']
@@ -555,7 +555,7 @@ class RunActionsTest(test_utils.CommonTest):
                     'kubernetesVersion': 'v1.27.13'
                 }
                 self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
-                self.procedure_inventory['upgrade_plan'] = ['v1.27.13']
+                self.procedure_inventory['upgrade_plan'] = ['v1.28.12']
                 self.prepare_context(procedure='upgrade')
                 self.context['upgrade_step'] = 0
 

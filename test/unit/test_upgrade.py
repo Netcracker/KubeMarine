@@ -1125,9 +1125,9 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.27.13', 'v1.28.12', False),
-                ('v1.28.12', 'v1.29.7', True),
-                ('v1.29.4', 'v1.29.7', False),
+                ('v1.27.4', 'v1.27.13', False),
+                ('v1.27.13', 'v1.28.12', True),
+                ('v1.28.3', 'v1.28.12', False),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
