@@ -263,7 +263,7 @@ def get_config_path(inventory: dict) -> Optional[str]:
     return config_path
 
 
-def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
+def configure_containerd(group: NodeGroup, wait_restart=False) -> RunnersGroupResult:
     cluster = group.cluster
     log = cluster.log
 
@@ -303,9 +303,9 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
             node.sudo(
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                f"systemctl status {os_specific_associations['service_name']} && "
-                f"timeout 10 sh -c 'until sudo crictl version 2>&1; do sleep 1; done' "
-                , callback=collector)
+                f"systemctl status {os_specific_associations['service_name']}", callback=collector)
+            if wait_restart:
+                node.sudo( f"timeout 60 sh -c 'until sudo crictl version 2>&1; do sleep 1; done' ", callback=collector)
     return collector.result
 
 
