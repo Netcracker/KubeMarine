@@ -263,7 +263,7 @@ def get_config_path(inventory: dict) -> Optional[str]:
     return config_path
 
 
-def configure_containerd(group: NodeGroup, wait_restart=False) -> RunnersGroupResult:
+def configure_containerd(group: NodeGroup, wait_restart: bool = False) -> RunnersGroupResult:
     cluster = group.cluster
     log = cluster.log
 
