@@ -852,7 +852,7 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
 
     # upgrade of sandbox_image is currently not supported for migrate_kubemarine
     if cluster.context["upgrade"]["required"].get('containerdConfig', False):
-        containerd.configure_containerd(group)
+        containerd.configure_containerd(group, wait_restart=True)
     else:
         log.debug("'containerd' configuration upgrade is not required")
 
