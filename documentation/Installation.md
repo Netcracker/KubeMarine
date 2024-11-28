@@ -1095,7 +1095,7 @@ By default, the installer uses the following parameters:
 
 | Parameter                                               | Default Value                                            | Description                                                                            |
 |---------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------------------------------------|
-| kubernetesVersion                                       | `v1.28.12`                                               |                                                                                        |
+| kubernetesVersion                                       | `v1.30.3`                                               |                                                                                        |
 | controlPlaneEndpoint                                    | `{{ cluster_name }}:6443`                                |                                                                                        |
 | networking.podSubnet                                    | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                        |
 | networking.serviceSubnet                                | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                        |
@@ -1174,12 +1174,12 @@ services:
 
 #### Kubernetes version
 
-By default, the `v1.28.12` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
+By default, the `v1.30.3` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
 
 ```yaml
 services:
   kubeadm:
-    kubernetesVersion: v1.28.12
+    kubernetesVersion: v1.30.3
 ```
 
 ### Service Account Issuer

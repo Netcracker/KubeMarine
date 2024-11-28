@@ -263,14 +263,16 @@ class PrimitiveValuesAsString(unittest.TestCase):
     def test_default_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.28.12'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.30.3'
+        
 
         cluster = demo.new_cluster(inventory)
         inventory = cluster.inventory
 
         self.assertEqual(True, inventory['services']['cri']['containerdConfig']
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
-        self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
+        self.assertIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
+        
 
         nginx_ingress_ports = inventory['plugins']['nginx-ingress-controller']['ports']
         self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
