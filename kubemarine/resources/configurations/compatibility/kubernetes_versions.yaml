@@ -73,7 +73,7 @@ compatibility_map:
     local-path-provisioner: v0.0.26
     crictl: v1.30.0
   v1.28.12:
-    calico: v3.29.1
+    calico: v3.28.1
     nginx-ingress-controller: v1.11.1
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
