@@ -26,7 +26,7 @@ calico:
   v1.28.9:
     version: v3.27.4
   v1.28.12:
-    version: v3.29.1
+    version: v3.28.1
   v1.29.1:
     version: v3.29.1
   v1.29.4:

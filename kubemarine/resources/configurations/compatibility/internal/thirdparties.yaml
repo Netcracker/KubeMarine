@@ -140,8 +140,8 @@ calicoctl:
     version: v3.27.4
     sha1: df6672fd1e1f9b2ba65567a04383af6bbffc2cd2
   v1.28.12:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
+    version: v3.28.1
+    sha1: 80f164a8248b8fa501f35f12cbcac0b059e665e2
   v1.29.1:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
