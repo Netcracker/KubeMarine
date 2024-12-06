@@ -734,10 +734,19 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     upgrade_cri_if_required(first_control_plane)
     fix_flag_kubelet(first_control_plane)
 
-    first_control_plane.sudo(
-        f"sudo kubeadm upgrade apply {version} {flags} && "
-        f"sudo kubectl uncordon {node_name} && "
-        f"sudo systemctl restart kubelet", hide=False, pty=True)
+    try:
+        first_control_plane.sudo(
+            f"sudo kubeadm upgrade apply {version} {flags} && "
+            f"sudo kubectl uncordon {node_name} && "
+            f"sudo systemctl restart kubelet", hide=False, pty=True)
+    except Exception as e:
+        first_control_plane.sudo(
+            f"sudo kubectl get pods -A -owide", hide=False, pty=True)
+        first_control_plane.sudo(
+            f"sudo kubectl get events -A --sort-by='.metadata.creationTimestamp' "
+            f"-o=custom-columns='NAMESPACE:metadata.namespace,TYPE:type,REASON:reason,CREATION_TIME:metadata.creationTimestamp,OBJECT KIND:involvedObject.kind,OBJECT_NAME:involvedObject.name,MESSAGE:message'",
+            hide=False, pty=True)
+        raise e
 
     copy_admin_config(cluster.log, first_control_plane)
 
