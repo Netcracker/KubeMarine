@@ -744,7 +744,13 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
             f"sudo kubectl get pods -A -owide", hide=False, pty=True)
         first_control_plane.sudo(
             f"sudo kubectl get events -A --sort-by='.metadata.creationTimestamp' "
-            f"-o=custom-columns='NAMESPACE:metadata.namespace,TYPE:type,REASON:reason,CREATION_TIME:metadata.creationTimestamp,OBJECT KIND:involvedObject.kind,OBJECT_NAME:involvedObject.name,MESSAGE:message'",
+            f"-o=custom-columns='"
+            f"NAMESPACE:metadata.namespace,"
+            f"TYPE:type,REASON:reason,"
+            f"CREATION_TIME:metadata.creationTimestamp,"
+            f"OBJECT KIND:involvedObject.kind,"
+            f"OBJECT_NAME:involvedObject.name,"
+            f"MESSAGE:message'",
             hide=False, pty=True)
         raise e
 
