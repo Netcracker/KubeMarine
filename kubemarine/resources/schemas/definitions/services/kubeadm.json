@@ -5,7 +5,7 @@
   "properties": {
     "kubernetesVersion": {
       "type":  "string",
-      "default": "v1.26.11",
+      "default": "v1.30.3",
       "description": "Specify the version to install and maintain. This version applies into all the dependent parameters - images, binaries, rpms, configurations."
     },
     "imageRepository": {

@@ -5,14 +5,6 @@
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.
 
 calico:
-  v1.26.3:
-    version: v3.24.2
-  v1.26.4:
-    version: v3.25.1
-  v1.26.7:
-    version: v3.26.1
-  v1.26.11:
-    version: v3.26.4
   v1.27.1:
     version: v3.26.4
   v1.27.4:
@@ -28,38 +20,26 @@ calico:
   v1.28.4:
     version: v3.26.4
   v1.28.6:
-    version: v3.27.0
+    version: v3.27.4
   v1.28.8:
-    version: v3.27.0
+    version: v3.27.4
   v1.28.9:
-    version: v3.27.3
+    version: v3.27.4
   v1.28.12:
     version: v3.28.1
   v1.29.1:
-    version: v3.27.0
+    version: v3.29.1
   v1.29.4:
-    version: v3.27.3
+    version: v3.29.1
   v1.29.7:
-    version: v3.28.1
+    version: v3.29.1
   v1.30.1:
-    version: v3.27.3
+    version: v3.29.1
   v1.30.3:
-    version: v3.28.1
+    version: v3.29.1
   v1.31.1:
-    version: v3.28.1
+    version: v3.29.1
 nginx-ingress-controller:
-  v1.26.3:
-    version: v1.4.0
-    webhook-version: v20220916-gd32f8c343
-  v1.26.4:
-    version: v1.7.0
-    webhook-version: v20230312-helm-chart-4.5.2-28-g66a760794
-  v1.26.7:
-    version: v1.8.1
-    webhook-version: v20230407
-  v1.26.11:
-    version: v1.8.4
-    webhook-version: v20231011-8b53cabe0
   v1.27.1:
     version: v1.8.4
     webhook-version: v20231011-8b53cabe0
@@ -112,18 +92,6 @@ nginx-ingress-controller:
     version: v1.11.1
     webhook-version: v1.4.1
 kubernetes-dashboard:
-  v1.26.3:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.26.4:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.26.7:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.26.11:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
   v1.27.1:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
@@ -176,18 +144,6 @@ kubernetes-dashboard:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
 local-path-provisioner:
-  v1.26.3:
-    version: v0.0.23
-    busybox-version: 1.34.1
-  v1.26.4:
-    version: v0.0.24
-    busybox-version: 1.34.1
-  v1.26.7:
-    version: v0.0.24
-    busybox-version: 1.34.1
-  v1.26.11:
-    version: v0.0.25
-    busybox-version: 1.34.1
   v1.27.1:
     version: v0.0.25
     busybox-version: 1.34.1

@@ -34,7 +34,8 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
         return None
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
-    return group.sudo("find /etc/apt/ -type f -name '*.list' | "
+    # since Ubuntu 24.04 default repos are in ubuntu.sources file
+    return group.sudo("find /etc/apt/ -type f -name '*.list' -o -name '*.sources'| "
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
