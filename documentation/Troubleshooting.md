@@ -1447,8 +1447,9 @@ Not applicable.
 ### How to solve
 As WA XDP acceleration can be turned off by adding the following parameter:
 
+#### Manualy
 ```bash
- # kubectl -n kube-system edit ds calico-node
+ kubectl -n kube-system edit ds calico-node
 ...
 spec:
   template:
@@ -1460,6 +1461,19 @@ spec:
           value: "false"
 ... 
 ```
+#### Using KubeMarine
+
+Define this parameter in `cluster.yaml` like:
+
+```bash
+plugins:
+  calico:
+    install: true
+    env:
+      FELIX_XDPENABLED: 'false'
+```
+And run `kubemarine install --tasks=deploy.plugins`
+
 Pods should stop generating such amount of logs and resource consumption should normalize.
 
 # Troubleshooting Kubemarine
