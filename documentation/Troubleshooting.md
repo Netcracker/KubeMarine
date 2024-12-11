@@ -37,6 +37,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [CoreDNS Cannot Resolve the Name](#coredns-cannot-resolve-the-name)
     - [Case 1](#case-1)
     - [Case 2](#case-2)
+  - [Calico Generates High Amount of Logs and Consumes a lot of CPU](#calico-generates-high-amount-of-logs-and-consumes-a-lot-of-cpu) 
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -1426,6 +1427,54 @@ The root cause is an internal issue with the `Audit` daemon. To resolve this, ei
 Consider adjusting the buffer size in the `Audit` daemon configuration to avoid resource limitations or disable the `Audit` daemon if it is not essential for your environment.
 
 > **Note**: Not applicable.
+
+## Calico Generates High Amount of Logs and Consumes a lot of CPU
+
+### Description
+Calico-node pods generate a lot of logs and consume a lot of resources that causes pod restart. Such logs can be found in calico-node pods:
+
+```bash
+[WARNING][89] felix/int_dataplane.go 1822: failed to wipe the XDP state error=failed to load BPF program (/usr/lib/calico/bpf/filter.o): stat /sys/fs/bpf/calico/xdp/prefilter_v1_calico_tmp_A: no such file or directory
+libbpf: Error loading BTF: Invalid argument(22)
+```
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+As WA XDP acceleration can be turned off by adding the following parameter:
+
+#### Manualy
+```bash
+ kubectl -n kube-system edit ds calico-node
+...
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+...
+        - name: FELIX_XDPENABLED
+          value: "false"
+... 
+```
+#### Using KubeMarine
+
+Define this parameter in `cluster.yaml` like:
+
+```bash
+plugins:
+  calico:
+    install: true
+    env:
+      FELIX_XDPENABLED: 'false'
+```
+And run `kubemarine install --tasks=deploy.plugins`
+
+Pods should stop generating such amount of logs and resource consumption should normalize.
 
 # Troubleshooting Kubemarine
 
