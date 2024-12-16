@@ -1,17 +1,30 @@
-name: Prettier
+name: Continuous Integration
 
+# This action works with pull requests and pushes on the main branch
 on:
-  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
 
 jobs:
-  Prettier_Check:
-    # The type of runner that the job will run on
+  prettier:
+    name: Prettier Check
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - uses: actions/checkout@v2 # Check out the repository first.
-      - uses: actionsx/prettier@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Run Prettier
+        id: prettier-run
+        uses: rutajdash/prettier-cli-action@v1.0.0
         with:
-          # prettier CLI arguments.
-          args: --check .
+          config_path: ./.prettierrc.yml
+
+      # This step only runs if prettier finds errors causing the previous step to fail
+      # This steps lists the files where errors were found
+      - name: Prettier Output
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          echo "The following files are not formatted:"
+          echo "${{steps.prettier-run.outputs.prettier_output}}"
