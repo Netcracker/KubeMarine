@@ -1,5 +1,0 @@
-- uses: actions/checkout@v2 # Check out the repository first.
-- uses: actionsx/prettier@v2
-  with:
-    # prettier CLI arguments.
-    args: --check .
