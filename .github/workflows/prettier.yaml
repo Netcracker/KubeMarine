@@ -1,6 +1,6 @@
 ---
 name: Prettier-fix
-on: [pull_request, push]
+on: [pull_request, push, workflow_dispatch]
 
 permissions:
   contents: write
