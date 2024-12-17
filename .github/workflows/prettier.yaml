@@ -1,30 +1,30 @@
-name: Continuous Integration
+name: Prettier
 
-# This action works with pull requests and pushes on the main branch
 on:
   pull_request:
-  push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   prettier:
-    name: Prettier Check
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Run Prettier
-        id: prettier-run
-        uses: rutajdash/prettier-cli-action@v1.0.0
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          config_path: ./.prettierrc.yml
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          # Make sure the value of GITHUB_TOKEN will not be persisted in repo's config
+          persist-credentials: false
 
-      # This step only runs if prettier finds errors causing the previous step to fail
-      # This steps lists the files where errors were found
-      - name: Prettier Output
-        if: ${{ failure() }}
-        shell: bash
-        run: |
-          echo "The following files are not formatted:"
-          echo "${{steps.prettier-run.outputs.prettier_output}}"
+      - name: Prettify code
+        uses: creyD/prettier_action@v4.3
+        with:
+          dry: True
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prettier_plugins: |
+            "@prettier/plugin-xml"
+            "@prettier-plugin-sh"
+            "@prettier-plugin-properties"
+            "@prettier-plugin-jinja-template"
