@@ -1,26 +1,21 @@
-name: Prettier
+---
+name: Prettier-fix
+on: [pull_request, push]
 
-on:
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+permissions:
+  contents: write
 
 jobs:
-  prettier:
+  prettier-fix:
+    ## Run only if the actor is not the GitHub Actions bot
+    #if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-
+    # Limit the running time
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Invoke the Prettier fix
+        # Use the latest commit in the main branch.
+        uses: WorkOfStan/prettier-fix@main
         with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
-          # Make sure the value of GITHUB_TOKEN will not be persisted in repo's config
-          persist-credentials: false
-
-      - name: Prettify code
-        uses: creyD/prettier_action@v4.3
-        with:
-          dry: True
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          prettier_plugins: "@prettier/plugin-xml @prettier-plugin-sh @prettier-plugin-properties @prettier-plugin-jinja-template @prettier-plugin-java @prettier-plugin-go-template"
+          #node-version: "20"
+          commit-changes: false
