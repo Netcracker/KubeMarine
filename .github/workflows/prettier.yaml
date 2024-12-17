@@ -1,0 +1,21 @@
+---
+name: Prettier-fix
+on: [pull_request, push, workflow_dispatch]
+
+permissions:
+  contents: write
+
+jobs:
+  prettier-fix:
+    ## Run only if the actor is not the GitHub Actions bot
+    #if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    # Limit the running time
+    timeout-minutes: 10
+    steps:
+      - name: Invoke the Prettier fix
+        # Use the latest commit in the main branch.
+        uses: WorkOfStan/prettier-fix@main
+        with:
+          #node-version: "20"
+          commit-changes: false

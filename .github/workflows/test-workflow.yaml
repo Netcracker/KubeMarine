@@ -1,0 +1,11 @@
+---
+name: Shit posting
+on: [workflow_dispatch]
+
+jobs:
+  shitPosting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print some shit into console
+        run: |
+          echo "Print some nice sentense to please a user"
