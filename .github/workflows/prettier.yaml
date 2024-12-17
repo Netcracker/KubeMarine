@@ -23,8 +23,4 @@ jobs:
         with:
           dry: True
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          prettier_plugins: |
-            "@prettier/plugin-xml"
-            "@prettier-plugin-sh"
-            "@prettier-plugin-properties"
-            "@prettier-plugin-jinja-template"
+          prettier_plugins: "@prettier/plugin-xml,@prettier-plugin-sh,@prettier-plugin-properties,@prettier-plugin-jinja-template"
