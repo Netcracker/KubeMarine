@@ -16,6 +16,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0011: Redefined Key in Third-Party Configuration](#kme0011-redefined-key-in-third-party-configuration)
   - [KME0012: Procedure Restricted by OS Family Compatibility](#kme0012-procedure-restricted-by-os-family-compatibility)
   - [KME0013: Redefined Key in Containerd Configuration](#kme0013-redefined-key-in-containerd-configuration)
+  - [KME0014: Invalid Helm Chart URL](#kme0014-invalid-helm-chart-url)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl Script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
@@ -459,6 +460,31 @@ Not applicable.
 
 ### Recommendations
 - Ensure that all necessary keys, including `sandbox_image`, are explicitly defined in the procedure inventory to avoid configuration issues.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+## KME0014: Invalid Helm Chart URL
+
+### Description
+This error occurs when the provided Helm chart URL does not return the expected content type in the specified file. If the URL is pointing to a private repository, the correct authentication may be missing.
+
+### Alerts
+- **Alert:** Helm chart URL does not return the expected content.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Verify the Helm chart URL.
+2. Ensure the URL returns the correct content type in the file located at destination.
+3. If the repository is private, check that the correct authentication (such as a token or credentials) is provided.
+4. Test the URL manually to confirm it is accessible and returning the expected content.
+5. Re-run the procedure after validating the URL and authentication.
+
+### Recommendations
+- Always verify the Helm chart URL before using it in your configuration.
+- Ensure proper authentication is provided for private repositories to avoid access issues.
 
 >**Note**  
 >If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
