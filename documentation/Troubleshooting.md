@@ -9,6 +9,13 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Command did not complete within a number of seconds](#command-did-not-complete-within-a-number-of-seconds)
   - [KME0004: There are no control planes defined in the cluster scheme](#kme0004-there-are-no-control-planes-defined-in-the-cluster-scheme)
   - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
+  - [KME0006: Node Accessibility Issues](#kme0006-node-accessibility-issues)
+  - [KME0008: Invalid Kubernetes Version](#kme0008-invalid-kubernetes-version)
+  - [KME0009: Redefined Key in Plugin Configuration](#kme0009-redefined-key-in-plugin-configuration)
+  - [KME0010: Redefined Associations in Package Configuration](#kme0010-redefined-associations-in-package-configuration)
+  - [KME0011: Redefined Key in Third-Party Configuration](#kme0011-redefined-key-in-third-party-configuration)
+  - [KME0012: Procedure Restricted by OS Family Compatibility](#kme0012-procedure-restricted-by-os-family-compatibility)
+  - [KME0013: Redefined Key in Containerd Configuration](#kme0013-redefined-key-in-containerd-configuration)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl Script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
@@ -37,7 +44,6 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [CoreDNS Cannot Resolve the Name](#coredns-cannot-resolve-the-name)
     - [Case 1](#case-1)
     - [Case 2](#case-2)
-  - [Calico Generates High Amount of Logs and Consumes a lot of CPU](#calico-generates-high-amount-of-logs-and-consumes-a-lot-of-cpu) 
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -275,6 +281,188 @@ KME0005: ['10.101.1.1'] are not sudoers
 To prevent this issue in the future:
 - Ensure all connection users are properly configured with sudo privileges on all nodes before running any procedures.
 - Regularly audit the sudoer configurations to avoid permission issues during deployments or node additions.
+
+## KME0006: Node Accessibility Issues
+
+### Description
+This error occurs when nodes are either offline or inaccessible through SSH during the cluster setup or runtime operations.
+
+### Alerts
+- **Alert:** Nodes not reachable or inaccessible through SSH.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. For nodes reported as **offline**:
+   - Verify that the node addresses are correctly entered in the inventory.
+   - Ensure the nodes are powered on and reachable over the network.
+   - Check that the SSH port is open and correctly configured.
+   - Confirm that the SSH daemon is running and properly set up on the nodes.
+
+2. For nodes reported as **inaccessible**:
+   - Validate that the SSH credentials (keyfile, username, password) are correct in the inventory.
+   - Test the SSH connection manually to confirm access.
+
+### Recommendations
+- Test connectivity to all nodes using ping and SSH before initiating any cluster setup or updates.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0008: Invalid Kubernetes Version
+
+### Description
+This error occurs when a specified Kubernetes version is not allowed for use. The selected version does not match the list of supported or allowed versions.
+
+### Alerts
+- **Alert:** Specified Kubernetes version is invalid or unsupported.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Verify the Kubernetes version specified in your configuration.
+2. Check the list of allowed versions provided in the error message: `{allowed_versions}`.
+3. Update your configuration to use one of the allowed Kubernetes versions.
+4. Re-run the task or setup process after correcting the version.
+
+### Recommendations
+- Before starting the setup, always refer to the official documentation or project configuration to identify supported Kubernetes versions.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0009: Redefined Key in Plugin Configuration
+
+### Description
+This error occurs when a key in the plugin configuration is redefined in the `cluster.yaml` file but is missing in the procedure inventory. The mismatch indicates that the required plugin configuration is not explicitly specified in the procedure inventory.
+
+### Alerts
+- **Alert:** Key redefined in `cluster.yaml` but missing in the procedure inventory.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Identify the key in question.
+2. Verify the plugin name.
+3. Check the `cluster.yaml` file for the redefined key and review the changes in the procedure.yaml
+4. Update the procedure inventory to include the required plugin configuration explicitly.
+5. Re-run the process after ensuring consistency between the `cluster.yaml` and procedure.yaml files.
+
+### Recommendations
+- Maintain a consistent plugin configuration between `cluster.yaml` and the procedure inventory files.
+- Before making changes, review the plugin configuration schema and ensure all required keys are explicitly defined in both files.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0010: Redefined Associations in Package Configuration
+
+### Description
+This error occurs when associations for a package are redefined in the `cluster.yaml` file but are missing in the procedure inventory. The inconsistency indicates that the required associations are not explicitly specified in the procedure inventory.
+
+### Alerts
+- **Alert:** Associations redefined in `cluster.yaml` but missing in the procedure inventory.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Identify the package in question.
+2. Check the `cluster.yaml` file for the redefined associations and review the changes in the procedure.yaml
+3. Update the procedure inventory to include the required associations explicitly for the package.
+4. Ensure the associations are consistent between the `cluster.yaml` and procedure inventory files.
+5. Re-run the process after making the necessary updates.
+
+### Recommendations
+- Always maintain consistency in package associations between `cluster.yaml` and procedure inventory files.
+- Regularly validate that all required associations are explicitly defined in the procedure inventory.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0011: Redefined Key in Third-Party Configuration
+
+### Description
+This error occurs when a key in the third-party configuration is redefined in the `cluster.yaml` file but is missing in the procedure inventory. This inconsistency indicates that the required third-party configuration is not explicitly specified in the procedure inventory.
+
+### Alerts
+- **Alert:** Key redefined in `cluster.yaml` for a third-party component but missing in the procedure inventory.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Identify the key in question.
+2. Verify the third-party component name.
+3. Check the `cluster.yaml` file for the redefined key and review the changes in the procedure.yaml
+4. Update the procedure inventory to include the required third-party configuration explicitly.
+5. Ensure consistency between the `cluster.yaml` and procedure inventory files for the third-party configuration.
+6. Re-run the process after making the necessary updates.
+
+### Recommendations
+- Always ensure that third-party configurations are explicitly defined in the procedure inventory to avoid inconsistencies.
+- Regularly validate third-party configurations between `cluster.yaml` and procedure inventory files.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0012: Procedure Restricted by OS Family Compatibility
+
+### Description
+This error occurs when a procedure is attempted on a cluster where nodes do not all share the same and supported OS family. The procedure requires uniformity in the OS family across all nodes in the cluster.
+
+### Alerts
+- **Alert:** Procedure is not possible due to incompatible OS families across cluster nodes.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Verify the OS family of each node in the cluster.
+   - Ensure all nodes have the same OS family.
+   - Confirm that the OS family is supported for the procedure.
+2. Update the nodes to use a consistent and supported OS family.
+3. Retry the procedure after ensuring OS family uniformity.
+
+### Recommendations
+- Standardize the OS family across all nodes in the cluster before starting any procedure to avoid compatibility issues.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
+
+## KME0013: Redefined Key in Containerd Configuration
+
+### Description
+This error occurs when the `sandbox_image` key for the `containerdConfig` plugin is redefined in the `cluster.yaml` file but is missing in the procedure inventory. This indicates that the required `sandbox_image` configuration is not explicitly specified in the procedure inventory.
+
+### Alerts
+- **Alert:** Key `'plugins."io.containerd.grpc.v1.cri".sandbox_image'` redefined in `cluster.yaml` but missing in procedure inventory.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+1. Identify the key in question: `'plugins."io.containerd.grpc.v1.cri".sandbox_image'`.
+2. Verify the plugin configuration for `containerdConfig` in the `cluster.yaml` file.
+3. Update the procedure inventory to explicitly include the `sandbox_image` key for the `containerdConfig` plugin.
+4. Ensure consistency between the `cluster.yaml` and procedure inventory files for the `sandbox_image` configuration.
+5. Re-run the process after making the necessary updates.
+
+### Recommendations
+- Ensure that all necessary keys, including `sandbox_image`, are explicitly defined in the procedure inventory to avoid configuration issues.
+
+>**Note**  
+>If you resolve the problem, consider [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls) to document your solution, which will help others in the community.
+
 
 # Troubleshooting Tools
 
@@ -1428,54 +1616,6 @@ The root cause is an internal issue with the `Audit` daemon. To resolve this, ei
 Consider adjusting the buffer size in the `Audit` daemon configuration to avoid resource limitations or disable the `Audit` daemon if it is not essential for your environment.
 
 > **Note**: Not applicable.
-
-## Calico Generates High Amount of Logs and Consumes a lot of CPU
-
-### Description
-Calico-node pods generate a lot of logs and consume a lot of resources that causes pod restart. Such logs can be found in calico-node pods:
-
-```bash
-[WARNING][89] felix/int_dataplane.go 1822: failed to wipe the XDP state error=failed to load BPF program (/usr/lib/calico/bpf/filter.o): stat /sys/fs/bpf/calico/xdp/prefilter_v1_calico_tmp_A: no such file or directory
-libbpf: Error loading BTF: Invalid argument(22)
-```
-
-### Alerts
-Not applicable.
-
-### Stack trace(s)
-Not applicable.
-
-### How to solve
-As WA XDP acceleration can be turned off by adding the following parameter:
-
-#### Manualy
-```bash
- kubectl -n kube-system edit ds calico-node
-...
-spec:
-  template:
-    spec:
-      containers:
-      - env:
-...
-        - name: FELIX_XDPENABLED
-          value: "false"
-... 
-```
-#### Using KubeMarine
-
-Define this parameter in `cluster.yaml` like:
-
-```bash
-plugins:
-  calico:
-    install: true
-    env:
-      FELIX_XDPENABLED: 'false'
-```
-And run `kubemarine install --tasks=deploy.plugins`
-
-Pods should stop generating such amount of logs and resource consumption should normalize.
 
 # Troubleshooting Kubemarine
 
