@@ -13,7 +13,7 @@ ca-key.pem
 kubernetes.csr
 kubernetes.pem
 kubernetes-key.pem
-/cluster.yaml
+/cluster*.yaml
 /additional.yaml
 /procedure.yaml
 venv/
