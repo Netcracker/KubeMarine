@@ -533,9 +533,9 @@ def init_first_control_plane(group: NodeGroup) -> None:
 
     # Preparing join_dict to init other nodes
     control_plane_lines = list(result.values())[0].stdout. \
-                       split("You can now join any number of the control-plane")[1].splitlines()[2:5]
+                       split("You can now join any number of the control-plane")[0].splitlines()[2:5]
     worker_lines = list(result.values())[0].stdout. \
-                       split("Then you can join any number of worker")[1].splitlines()[2:4]
+                       split("Then you can join any number of worker")[0].splitlines()[2:4]
     control_plane_join_command = " ".join([x.replace("\\", "").strip() for x in control_plane_lines])
     worker_join_command = " ".join([x.replace("\\", "").strip() for x in worker_lines])
 
