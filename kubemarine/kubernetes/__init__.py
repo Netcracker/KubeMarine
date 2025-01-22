@@ -16,6 +16,7 @@ import io
 import math
 import os
 import time
+import re
 from contextlib import contextmanager
 from typing import List, Dict, Iterator, Any, Optional
 
@@ -531,13 +532,31 @@ def init_first_control_plane(group: NodeGroup) -> None:
     # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
     first_control_plane.call(components.patch_kubelet_configmap)
 
-    # Preparing join_dict to init other nodes
-    control_plane_lines = list(result.values())[0].stdout. \
-                       split("You can now join any number of control-plane")[1].splitlines()[2:5]
-    worker_lines = list(result.values())[0].stdout. \
-                       split("Then you can join any number of worker")[1].splitlines()[2:4]
-    control_plane_join_command = " ".join([x.replace("\\", "").strip() for x in control_plane_lines])
-    worker_join_command = " ".join([x.replace("\\", "").strip() for x in worker_lines])
+    stdout_output = list(result.values())[0].stdout
+
+    # regex patterns for variations in msg for kubeadm init command
+    control_plane_pattern = r"You can now join any number of (?:the )?control-plane node[s]?.*?(\n\s+kubeadm join[^\n]+(?:\n\s+--[^\n]+)*)"
+    worker_pattern = r"Then you can join any number of worker nodes.*?(\n\s+kubeadm join[^\n]+(?:\n\s+--[^\n]+)*)"
+
+    control_plane_match = re.search(control_plane_pattern, stdout_output, re.DOTALL)
+    if control_plane_match:
+        control_plane_lines = control_plane_match.group(1).splitlines()
+        control_plane_lines = [line.strip() for line in control_plane_lines if line.strip()]
+        if not control_plane_lines:
+            raise ValueError("Extracted control-plane join command block is empty")
+        control_plane_join_command = " ".join(control_plane_lines).replace("\\", "").strip()
+    else:
+        raise ValueError("Failed to extract control-plane join command from kubeadm output")
+
+    worker_match = re.search(worker_pattern, stdout_output, re.DOTALL)
+    if worker_match:
+        worker_lines = worker_match.group(1).splitlines()
+        worker_lines = [line.strip() for line in worker_lines if line.strip()]
+        if not worker_lines:
+            raise ValueError("Extracted worker join command block is empty")
+        worker_join_command = " ".join(worker_lines).replace("\\", "").strip()
+    else:
+        raise ValueError("Failed to extract worker join command from kubeadm output")
 
     # TODO: Get rid of this code and use get_join_dict() method
     args = control_plane_join_command.split("--")
