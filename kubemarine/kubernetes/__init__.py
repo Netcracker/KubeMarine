@@ -17,6 +17,7 @@ import math
 import os
 import time
 import re
+import json
 from contextlib import contextmanager
 from typing import List, Dict, Iterator, Any, Optional
 
@@ -506,6 +507,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
     first_control_plane.sudo("mkdir -p /etc/kubernetes")
     first_control_plane.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
 
+    migrate_kubeadm_config(first_control_plane, "/etc/kubernetes/init-config.yaml")
     # put control-plane patches
     components.create_kubeadm_patches_for_node(cluster, first_control_plane)
 
@@ -514,7 +516,6 @@ def init_first_control_plane(group: NodeGroup) -> None:
 
     # put audit-policy.yaml
     prepare_audit_policy(first_control_plane)
-
     log.debug("Initializing first control_plane...")
     result = first_control_plane.sudo(
         "kubeadm init"
@@ -1161,6 +1162,8 @@ def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
+    migrate_kubeadm_config(group, "/etc/kubernetes/prepull-config.yaml")
+
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml",
                       pty=True, callback=collector)
 
@@ -1290,3 +1293,27 @@ def prepare_audit_policy(group: NodeGroup) -> None:
     utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
     # upload rules on cluster
     group.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+
+def migrate_kubeadm_config(group: NodeGroup, config_file: str) -> None:
+    """
+    Check if migration is needed based on Kubernetes minor version and perform the migration.
+    
+    :param group: Node group where the migration is performed.
+    :param config_file: The path to the configuration file.
+    """
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
+
+    # Retrieve Kubernetes version from inventory and parse the minor version
+    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    log.debug(f"Cluster Kubernetes version: {k8s_version}")
+    minor_version = int(k8s_version.lstrip('v').split('.')[1])
+   
+    # If minor version > 31, proceed with migration
+    if minor_version > 31:
+        config = config_file
+        # Perform migration
+        group.sudo(f"kubeadm config migrate --old-config {config} --new-config {config}", hide=True) 
+        log.debug(f"Kubeadm config migration successful: {config}")
+    else:
+        log.debug(f"No migration needed for Kubernetes version: {k8s_version}")
