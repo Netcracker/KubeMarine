@@ -535,7 +535,10 @@ def init_first_control_plane(group: NodeGroup) -> None:
     stdout_output = list(result.values())[0].stdout
 
     # regex patterns for variations in msg for kubeadm init command
-    control_plane_pattern = r"You can now join any number of (?:the )?control-plane node[s]?.*?(\n\s+kubeadm join[^\n]+(?:\n\s+--[^\n]+)*)"
+    control_plane_pattern = (
+    r"You can now join any number of (?:the )?control-plane node[s]?.*?"
+    r"(\n\s+kubeadm join[^\n]+(?:\n\s+--[^\n]+)*)"
+    )
     worker_pattern = r"Then you can join any number of worker nodes.*?(\n\s+kubeadm join[^\n]+(?:\n\s+--[^\n]+)*)"
 
     control_plane_match = re.search(control_plane_pattern, stdout_output, re.DOTALL)
