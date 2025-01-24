@@ -399,6 +399,8 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
     node.sudo("mkdir -p /etc/kubernetes")
     node.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
+
+
     # put control-plane patches
     components.create_kubeadm_patches_for_node(cluster, node)
 
@@ -1313,7 +1315,8 @@ def migrate_kubeadm_config(group: NodeGroup, config_file: str) -> None:
     if minor_version > 31:
         config = config_file
         # Perform migration
-        group.sudo(f"kubeadm config migrate --old-config {config} --new-config {config}", hide=True) 
-        log.debug(f"Kubeadm config migration successful: {config}")
+        group.sudo(f"kubeadm config migrate --old-config {config} --new-config {config}-migrated", hide=True) 
+        log.debug(f"Kubeadm config migration successful: {config}-migrated")
+        group.sudo(f"cp {config}-migrated {config}")
     else:
         log.debug(f"No migration needed for Kubernetes version: {k8s_version}")

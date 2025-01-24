@@ -516,6 +516,18 @@ def _upload_config(cluster: KubernetesCluster, control_plane: AbstractGroup[RunR
     utils.dump_file(cluster, config, f"{name}_{control_plane.get_node_name()}.yaml")
 
     control_plane.put(io.StringIO(config), remote_path, sudo=True)
+    
+    log = cluster.log
+    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    log.debug(f"Cluster Kubernetes version: {k8s_version}")
+    minor_version = int(k8s_version.lstrip('v').split('.')[1])
+    # If minor version > 31, proceed with migration
+    if minor_version > 31:
+        control_plane.sudo(f"kubeadm config migrate --old-config {remote_path} --new-config {remote_path}-migrated") 
+        log.debug(f"Kubeadm config migration successful: {remote_path}-migrated")
+        control_plane.sudo(f"cp {remote_path}-migrated {remote_path}")
+    else:
+        log.debug(f"No migration needed for Kubernetes version: {k8s_version}")
 
 
 def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, configmap: str,
@@ -895,7 +907,6 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
 def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[str]:
     control_plane = cluster.nodes['control-plane'].get_first_member()
     kubeadm_config = KubeadmConfig(cluster)
-
     if configmap == 'kubelet-config':
         # Do not check kubelet-config ConfigMap, because some properties may be deleted from KubeletConfiguration
         # if set to default, for example readOnlyPort: 0, protectKernelDefaults: false
@@ -960,7 +971,6 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         return utils.get_unified_diff(yaml.dump(stored_config), yaml.dump(generated_config),
                                       fromfile=f'{configmap} ConfigMap',
                                       tofile=f"{configmap} ConfigMap merged 'services.{section}' section")
-
 
 def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: str, tofile: str) -> bool:
     diff = utils.get_yaml_diff(old, new, fromfile, tofile)
