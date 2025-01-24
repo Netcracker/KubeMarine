@@ -19,7 +19,7 @@ import time
 import re
 import json
 from contextlib import contextmanager
-from typing import List, Dict, Iterator, Any, Optional
+from typing import List, Dict, Iterator, Any, Optional, Union
 
 import yaml
 from jinja2 import Template
@@ -1296,7 +1296,7 @@ def prepare_audit_policy(group: NodeGroup) -> None:
     # upload rules on cluster
     group.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
 
-def migrate_kubeadm_config(group: NodeGroup, config_file: str) -> None:
+def migrate_kubeadm_config(group: Union[NodeGroup, DeferredGroup], config_file: str) -> None:
     """
     Check if migration is needed based on Kubernetes minor version and perform the migration.
     
