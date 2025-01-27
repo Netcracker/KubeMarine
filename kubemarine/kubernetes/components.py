@@ -517,17 +517,17 @@ def _upload_config(cluster: KubernetesCluster, control_plane: AbstractGroup[RunR
 
     control_plane.put(io.StringIO(config), remote_path, sudo=True)
     
-    log = cluster.log
-    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    log.debug(f"Cluster Kubernetes version: {k8s_version}")
-    minor_version = int(k8s_version.lstrip('v').split('.')[1])
-    # If minor version > 31, proceed with migration
-    if minor_version > 31:
-        control_plane.sudo(f"kubeadm config migrate --old-config {remote_path} --new-config {remote_path}-migrated") 
-        log.debug(f"Kubeadm config migration successful: {remote_path}-migrated")
-        control_plane.sudo(f"cp {remote_path}-migrated {remote_path}")
-    else:
-        log.debug(f"No migration needed for Kubernetes version: {k8s_version}")
+    # log = cluster.log
+    # k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    # log.debug(f"Cluster Kubernetes version: {k8s_version}")
+    # minor_version = int(k8s_version.lstrip('v').split('.')[1])
+    # # If minor version > 31, proceed with migration
+    # if minor_version > 31:
+    #     control_plane.sudo(f"kubeadm config migrate --old-config {remote_path} --new-config {remote_path}-migrated") 
+    #     log.debug(f"Kubeadm config migration successful: {remote_path}-migrated")
+    #     control_plane.sudo(f"cp {remote_path}-migrated {remote_path}")
+    # else:
+    #     log.debug(f"No migration needed for Kubernetes version: {k8s_version}")
 
 
 def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, configmap: str,
