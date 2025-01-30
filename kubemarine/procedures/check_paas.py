@@ -322,7 +322,7 @@ def kubelet_config(cluster: KubernetesCluster) -> None:
         k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
         minor_version = int(k8s_version.lstrip('v').split('.')[1])
         # If minor version > 31, skip checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section 
-        if minor_version < 31:
+        if minor_version < 32:
             cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section")
             diff = components.compare_configmap(cluster, 'kubelet-config')
             if diff is not None:
@@ -330,6 +330,8 @@ def kubelet_config(cluster: KubernetesCluster) -> None:
                 messages.append(msg)
                 cluster.log.debug(msg)
                 cluster.log.debug(diff + '\n')
+        else:
+            cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section in skipped as kubernetes version is >= v1.32.0")
 
         if not messages:
             tc.success(results='valid')
