@@ -517,6 +517,7 @@ def _upload_config(cluster: KubernetesCluster, control_plane: AbstractGroup[RunR
 
     control_plane.put(io.StringIO(config), remote_path, sudo=True)
 
+
 def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, configmap: str,
                       uploader: Callable[[DeferredGroup], None], backup_dir: str) -> bool:
     logger = cluster.log
@@ -894,6 +895,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
 def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[str]:
     control_plane = cluster.nodes['control-plane'].get_first_member()
     kubeadm_config = KubeadmConfig(cluster)
+    
     if configmap == 'kubelet-config':
         # Do not check kubelet-config ConfigMap, because some properties may be deleted from KubeletConfiguration
         # if set to default, for example readOnlyPort: 0, protectKernelDefaults: false
@@ -958,6 +960,7 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         return utils.get_unified_diff(yaml.dump(stored_config), yaml.dump(generated_config),
                                       fromfile=f'{configmap} ConfigMap',
                                       tofile=f"{configmap} ConfigMap merged 'services.{section}' section")
+
 
 def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: str, tofile: str) -> bool:
     diff = utils.get_yaml_diff(old, new, fromfile, tofile)

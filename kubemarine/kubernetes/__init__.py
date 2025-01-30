@@ -19,7 +19,7 @@ import time
 import re
 import json
 from contextlib import contextmanager
-from typing import List, Dict, Iterator, Any, Optional, Union
+from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
@@ -399,8 +399,6 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
     node.sudo("mkdir -p /etc/kubernetes")
     node.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
-
-
     # put control-plane patches
     components.create_kubeadm_patches_for_node(cluster, node)
 
@@ -508,6 +506,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
     log.debug("Uploading init config to initial control_plane...")
     first_control_plane.sudo("mkdir -p /etc/kubernetes")
     first_control_plane.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
+
     # put control-plane patches
     components.create_kubeadm_patches_for_node(cluster, first_control_plane)
 
@@ -516,6 +515,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
 
     # put audit-policy.yaml
     prepare_audit_policy(first_control_plane)
+
     log.debug("Initializing first control_plane...")
     result = first_control_plane.sudo(
         "kubeadm init"
@@ -1161,6 +1161,7 @@ def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
     config = components.get_kubeadm_config(cluster, kubeadm_init)
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
+
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml",
                       pty=True, callback=collector)
 
@@ -1290,4 +1291,3 @@ def prepare_audit_policy(group: NodeGroup) -> None:
     utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
     # upload rules on cluster
     group.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
-
