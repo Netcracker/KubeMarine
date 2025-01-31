@@ -895,7 +895,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
 def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[str]:
     control_plane = cluster.nodes['control-plane'].get_first_member()
     kubeadm_config = KubeadmConfig(cluster)
-    
+
     if configmap == 'kubelet-config':
         # Do not check kubelet-config ConfigMap, because some properties may be deleted from KubeletConfiguration
         # if set to default, for example readOnlyPort: 0, protectKernelDefaults: false
