@@ -86,7 +86,7 @@ jobs:
         run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: default_cluster_procedure_dumps-${{ matrix.kubernetes-version }}
           path: ./results/
@@ -148,7 +148,7 @@ jobs:
         run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: extended_cluster_procedure_dumps
           path: ./results/
