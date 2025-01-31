@@ -331,8 +331,9 @@ def kubelet_config(cluster: KubernetesCluster) -> None:
                 cluster.log.debug(msg)
                 cluster.log.debug(diff + '\n')
         else:
-            cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet "\
-                              "section in skipped as kubernetes version is >= v1.32.0")
+            raise TestWarn("Skipping kubelet-config ConfigMap consistency check",
+                           hint="Kubernetes version is >= v1.32.0. The consistency check is no longer performed as the "\
+                                "kubelet configuration is managed differently in newer versions. Verify manually if required.")
 
         if not messages:
             tc.success(results='valid')
