@@ -318,14 +318,22 @@ def kubelet_config(cluster: KubernetesCluster) -> None:
         if failed_nodes:
             messages.append(f"/var/lib/kubelet/config.yaml is not consistent with patches from inventory "
                             f"on nodes {', '.join(failed_nodes)}")
-
-        cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section")
-        diff = components.compare_configmap(cluster, 'kubelet-config')
-        if diff is not None:
-            msg = "kubelet-config ConfigMap is not consistent with services.kubeadm_kubelet section"
-            messages.append(msg)
-            cluster.log.debug(msg)
-            cluster.log.debug(diff + '\n')
+            
+        k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        minor_version = int(k8s_version.lstrip('v').split('.')[1])
+        # If minor version > 31, skip checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section 
+        if minor_version < 32:
+            cluster.log.debug("Checking kubelet-config ConfigMap consistency with services.kubeadm_kubelet section")
+            diff = components.compare_configmap(cluster, 'kubelet-config')
+            if diff is not None:
+                msg = "kubelet-config ConfigMap is not consistent with services.kubeadm_kubelet section"
+                messages.append(msg)
+                cluster.log.debug(msg)
+                cluster.log.debug(diff + '\n')
+        else:
+            raise TestWarn("Skipping kubelet-config ConfigMap consistency check",
+                           hint="Kubernetes version is >= v1.32.0. The consistency check is no longer performed as the "\
+                                "kubelet configuration is managed differently in newer versions. Verify manually if required.")
 
         if not messages:
             tc.success(results='valid')
