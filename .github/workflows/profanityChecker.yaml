@@ -1,0 +1,74 @@
+name: profanityChecker
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+env:
+  SWEARSCAN_FOUND_ZERO_WORDS: true
+
+jobs:
+  profanityCheck:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+        with:
+          path: project-code
+
+      - uses: actions/checkout@v4
+        with:
+          repository: 'Hesham-Elbadawi/list-of-banned-words'
+          ref: 'master'
+          path: 'list-of-banned-words'
+      
+      - name: "Clean .git"
+        run: |
+          rm -rf ./list-of-banned-words/.git
+          rm -rf ./project-code/.git
+          rm -rf ./project-code/.github
+
+      - uses: actions/checkout@v4
+        with:
+          ref: 'master'
+          repository: '8bitbuddhist/swearscan'
+          path: 'swearscan'
+  
+      - name: Create dictionary
+        run: |
+          rm -rf ./.git
+          cd ./swearscan
+          if [ -f dictionary.csv ]; then mv -f dictionary.csv dictionary.csv.orig; fi
+          for lang_file in $(find ../list-of-banned-words -maxdepth 1 -name ??); do
+            sed -e '/,/d;s/$/,1/' $lang_file >> dictionary.csv
+            echo "" >> dictionary.csv
+          done
+          sed -i '/^[[:space:]]*$/d' dictionary.csv
+        
+      - name: Profanity Scan
+        uses: mathiasvr/command-output@v2.0.0
+        id: scan_run
+        with:
+          run: |
+            cd ./swearscan          
+            python3 swearscan.py ../project-code
+
+      - name: Set step summary
+        if: ${{ contains(steps.scan_run.outputs.stdout, 'Total score:') }}
+        run: echo "### Prophany check found swear words in project code!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if Scan found something
+        if: ${{ contains(steps.scan_run.outputs.stdout, 'Total score:') }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Prophany check found swear words in project code!')
+        
