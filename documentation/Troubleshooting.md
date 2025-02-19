@@ -47,6 +47,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1283-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
   - [OpenSSH server becomes unavailable during cluster installation on Centos9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos9)
+  - [Packets Loss During the Transmission Between Nodes](#packets-loss-during-the-transmission-between-nodes)
 
 # Kubemarine Errors
 
@@ -2011,5 +2012,24 @@ Failed to start OpenSSH server daemon.
 ### Recommendations
 - Ensure that critical services such as OpenSSH are upgraded when their dependencies, like OpenSSL, are updated.
 - Test updates in a staging environment to catch compatibility issues before deployment.
+
+**Note**: Not applicable.
+
+## Packets loss during the transmission between nodes
+
+### Description
+Packets are lost during the transmission between nodes that are located in defferent subnets. It appears in retries of TCP sessions or inability to get the UDP packets in case of high network load. The root cause is in theIaaS level routers performance. Basically, routing works slower than switching.
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to solve
+Reschedule the pods in cluster to displace the pods that create the significant network load to the nodes in the same subnet OR move all of the nodes in the cluster in the same subnet
+
+### Recommendations
+- Avoid routing between nodes in the same cluster in case of high network load
 
 **Note**: Not applicable.
