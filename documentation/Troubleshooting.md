@@ -2018,7 +2018,7 @@ Failed to start OpenSSH server daemon.
 ## Packets loss during the transmission between nodes
 
 ### Description
-Packets are lost during the transmission between nodes that are located in defferent subnets. It appears in retries of TCP sessions or inability to get the UDP packets in case of high network load. The root cause is in theIaaS level routers performance. Basically, routing works slower than switching.
+Packets are lost during the transmission between nodes that are located in different subnets. It appears in retries of TCP sessions or inability to get the UDP packets in case of high network load. The root cause is in the IaaS level routers performance. Basically, routing works slower than switching.
 
 ### Alerts
 Not applicable.
