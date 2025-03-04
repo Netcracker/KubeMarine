@@ -11,7 +11,7 @@ RUN go mod download && \
     GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false && \
     gzip ipip_check
 
-FROM python:3.13-slim-bullseye AS python-build
+FROM python:3.14.0a5-slim-bullseye AS python-build
 
 ARG BUILD_TYPE
 
@@ -24,7 +24,7 @@ COPY . /opt/kubemarine/
 COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
 
-RUN apt update && apt upgrade -y && \
+RUN apt update && \
     pip3 install --no-cache-dir setuptools wheel && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
