@@ -76,7 +76,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_downgrade(self):
-        old_kubernetes_version = 'v1.30.3'
+        old_kubernetes_version = 'v1.30.10'
         new_kubernetes_version = 'v1.29.7'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
@@ -91,7 +91,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_incorrect_inventory_not_latest_patch_version(self):
         old_kubernetes_version = 'v1.29.7'
-        new_kubernetes_version = 'v1.30.3'
+        new_kubernetes_version = 'v1.30.10'
         latest_supported_patch_version = next(v for v in self.latest_patch_k8s_versions()
                                               if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version))
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_LATEST_PATCH
@@ -891,7 +891,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.29.7', ['v1.30.3'])
+        self.setUpVersions('v1.29.7', ['v1.30.10'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
