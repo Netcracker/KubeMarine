@@ -222,7 +222,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
 
     def test_error_kubelet_patch_refers_balancer(self):
         self.setUpScheme(demo.FULLHA)
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.27.1'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.7'
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
                 {'nodes': ['balancer-1'], 'patch': {'maxPods': 111}},
