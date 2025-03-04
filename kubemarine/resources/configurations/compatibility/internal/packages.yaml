@@ -5,87 +5,29 @@
 #
 # After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 containerd:
-  v1.27.1:
-    version_debian: 1.6.*
-  v1.27.4:
-    version_debian: 1.6.*
-  v1.27.8:
-    version_debian: 1.6.*
-  v1.27.13:
-    version_debian: 1.6.*
-  v1.28.0:
-    version_debian: 1.6.*
-  v1.28.3:
-    version_debian: 1.6.*
-  v1.28.4:
-    version_debian: 1.6.*
-  v1.28.6:
-    version_debian: 1.6.*
-  v1.28.8:
-    version_debian: 1.6.*
-  v1.28.9:
-    version_debian: 1.6.*
-  v1.28.12:
-    version_debian: 1.6.*
   v1.29.1:
     version_debian: 1.6.*
   v1.29.4:
     version_debian: 1.6.*
   v1.29.7:
     version_debian: 1.7.*
+  v1.29.10:
+    version_debian: 1.7.*
   v1.30.1:
     version_debian: 1.6.*
   v1.30.3:
     version_debian: 1.7.*
+  v1.30.10:
+    version_debian: 1.7.*
   v1.31.1:
     version_debian: 1.7.*
+  v1.31.6:
+    version_debian: 1.7.*
   v1.32.0:
+    version_debian: 1.7.*
+  v1.32.2:
     version_debian: 1.7.*
 containerdio:
-  v1.27.1:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.27.4:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.27.8:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.27.13:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.0:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.3:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.4:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.6:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.8:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.9:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
-  v1.28.12:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_rhel9: 1.6*
   v1.29.1:
     version_rhel: 1.6*
     version_rhel8: 1.6*
@@ -98,6 +40,10 @@ containerdio:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
+  v1.29.10:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
   v1.30.1:
     version_rhel: 1.6*
     version_rhel8: 1.6*
@@ -106,11 +52,23 @@ containerdio:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
+  v1.30.10:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
   v1.31.1:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
+  v1.31.6:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
   v1.32.0:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+  v1.32.2:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
