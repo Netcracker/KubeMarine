@@ -289,7 +289,7 @@ class RunActionsTest(test_utils.CommonTest):
             'kubernetesVersion': 'v1.29.7'
         }
         self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        self.procedure_inventory['upgrade_plan'] = ['v1.30.10']
+        self.procedure_inventory['upgrade_plan'] = ['v1.29.7']
 
         self._run_upgrade_with_failed_enrichment(version_verified=False)
 
@@ -687,7 +687,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.7'
 
         procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        upgrade_plan = ['v1.29.7', 'v1.30.10']
+        upgrade_plan = ['v1.30.10', 'v1.31.6']
         procedure_inventory['upgrade_plan'] = upgrade_plan
 
         context = demo.create_silent_context(['fake.yaml', '--without-act'], procedure='upgrade')

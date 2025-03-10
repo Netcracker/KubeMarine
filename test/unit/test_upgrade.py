@@ -91,7 +91,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_incorrect_inventory_not_latest_patch_version(self):
         old_kubernetes_version = 'v1.29.1'
-        new_kubernetes_version = 'v1.28.0'
+        new_kubernetes_version = 'v1.30.1'
         latest_supported_patch_version = next(v for v in self.latest_patch_k8s_versions()
                                               if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version))
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_LATEST_PATCH
@@ -194,7 +194,7 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def test_version_upgrade_not_possible_template(self):
         old_kubernetes_version = 'v1.29.1'
-        new_kubernetes_version = 'v1.28.0'
+        new_kubernetes_version = 'v1.30.1'
         latest_supported_patch_version = max(
             (v for v in static.KUBERNETES_VERSIONS['compatibility_map']
              if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version)),
@@ -1024,7 +1024,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.28.0', ['v1.28.12', 'v1.29.7', 'v1.30.10'])
+        self.setUpVersions('v1.29.1', ['v1.29.10', 'v1.30.10', 'v1.31.6'])
 
     def package_names(self, services: dict, package: str, package_names) -> None:
         services.setdefault('packages', {}).setdefault('associations', {}) \
@@ -1207,7 +1207,7 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                 utils.mock_call(kubernetes.components._reconfigure_node_components), \
                 utils.mock_call(kubernetes.components._update_configmap, return_value=True), \
                 utils.mock_call(kubernetes.components._kube_proxy_configmap_uploader) as kube_proxy_uploader:
-            self.setUpVersions('v1.28.4', ['v1.29.7'])
+            self.setUpVersions('v1.29.7', ['v1.30.10'])
 
             self._stub_load_configmap('kube-proxy', {'data': {'config.conf': yaml.dump({
                 'kind': 'KubeProxyConfiguration',
