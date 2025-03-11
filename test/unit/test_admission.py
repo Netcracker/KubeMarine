@@ -14,7 +14,6 @@
 import re
 import unittest
 from copy import deepcopy
-from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import errors
