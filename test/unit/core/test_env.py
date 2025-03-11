@@ -199,7 +199,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
         self.inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = 'containerd'
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
 
-        env_kubernetes_version = 'v1.27.13'
+        env_kubernetes_version = 'v1.29.7'
         changed_upgrade_config = {
             'thirdparties': {'crictl': [env_kubernetes_version]},
             'packages': {
