@@ -92,10 +92,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.commonSetUp(Identity('nginx-ingress-controller'))
         # Requires ingress-nginx >= v1.9.5
         self.k8s_latest = self.get_latest_k8s()
-        # Requires ingress-nginx < v1.9.5
-        self.k8s_1_28_x = self.get_latest_k8s("v1.28")
-        # Requires ingress-nginx < v1.9.0
-        self.k8s_1_27_x = self.get_latest_k8s("v1.27")
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -188,29 +184,21 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                     default_label_checker(pss_label, target_yaml.items(), "PPS labels validation failed")
 
     def test_webhook_resources_difference(self):
-        for k8s_version, expected_num_resources in (
-            (self.k8s_1_27_x, 9),
-            (self.k8s_1_28_x, 10),
-            (self.k8s_latest, 9)
-        ):
-            with self.subTest(k8s_version):
-                cluster = demo.new_cluster(self.inventory(k8s_version))
-                manifest = self.enrich_yaml(cluster)
-                webhook_resources = 0
+        cluster = demo.new_cluster(self.inventory(self.k8s_latest))
+        manifest = self.enrich_yaml(cluster)
+        webhook_resources = 0
 
-                # Check if nginx-ingress-controller version is v1.9.5 or higher before counting webhook resources
-                nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
-                    ['spec']['template']['spec']['containers'][0]['image'].split(":")[-1]
-            
-                if Version(nginx_version) >= Version("v1.9.5"):
-                    expected_num_resources = 9  # Adjust expected number for v1.9.5 and higher
+        nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")\
+            ['spec']['template']['spec']['containers'][0]['image'].split(":")[-1]
 
-                for key in self.all_obj_keys(manifest):
-                    if 'admission' in key:
-                        webhook_resources += 1
+        expected_num_resources = 9
 
-                self.assertEqual(expected_num_resources, webhook_resources,
-                                 f"ingress-nginx for {k8s_version} should have {expected_num_resources} webhook resources")
+        for key in self.all_obj_keys(manifest):
+            if 'admission' in key:
+                webhook_resources += 1
+
+        self.assertEqual(expected_num_resources, webhook_resources,
+                        f"ingress-nginx {nginx_version} should have {expected_num_resources} webhook resources")
 
     def test_service_ipv6(self):
         inventory = self.inventory(self.k8s_latest)
