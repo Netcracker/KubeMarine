@@ -864,12 +864,35 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
     log = cluster.log
 
     if 'containerd' in cluster.context["upgrade"]["required"]['packages']:
-        cri_packages = cluster.get_package_association_for_node(group.get_host(), 'containerd', 'package_name')
+        # stop kubelet during containerd upgrade so that it does not interfere
+        log.debug(f"Containerd will be upgraded on node: {group.get_node_name()}")
+        log.debug(f"Stopping kubelet on node: {group.get_node_name()}")
+        group.sudo("systemctl stop kubelet")
 
+        # Before upgrade, remove all pod sandboxes on the old containerd version.
+        # This is required, because containerd upgrade may break old pods.
+        # To support AIO clusters, we remove pods in two steps:
+        # 1. First we remove pods which use calico CNI (e.g. nginx), because
+        #       removal of such pods under the hood requires an API call to kube-api
+        #       to remove pod network (for calico CNI at least).
+        # 2. Then we remove pods which use only host network (e.g. kube-api, calico),
+        #       because these pods do not need API calls to kube-api to remove pod network.
+        # For proper cleanup, it is important to remove pods, not just containers.
+        log.debug(f"Restarting all containers on node: {group.get_node_name()}")
+        group.run("for pod in $(sudo crictl pods -q); do " 
+                        "sudo crictl inspectp $pod | " 
+                        "grep '\"network\": \"NODE\"' > /dev/null || " 
+                        "sudo crictl rmp -f $pod; " 
+                  "done", warn=True)
+        group.sudo("crictl rmp -fa", warn=True)
+
+        # upgrade containerd after all pod sandboxes are removed
+        cri_packages = cluster.get_package_association_for_node(group.get_host(), 'containerd', 'package_name')
         log.debug(f"Installing {cri_packages} on node: {group.get_node_name()}")
         packages.install(group, include=cri_packages, pty=True)
-        log.debug(f"Restarting all containers on node: {group.get_node_name()}")
-        group.sudo("crictl rm -fa", warn=True)
+
+        log.debug(f"Starting kubelet on node: {group.get_node_name()}")
+        group.sudo("systemctl start kubelet")
     else:
         log.debug("'containerd' package upgrade is not required")
 
