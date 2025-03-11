@@ -22,7 +22,6 @@ from typing import List, Set
 from unittest import mock
 from test.unit import utils
 
-import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import kubernetes, system, plugins, thirdparties
