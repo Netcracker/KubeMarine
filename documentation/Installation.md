@@ -6086,6 +6086,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed.                                       |
 |          | rancher/local-path-provisioner                                 | v0.0.27          | v0.0.27                      | v0.0.27      | v0.0.27      | v0.0.27           | v0.0.27   | v0.0.27   | Required only if local-path provisioner plugin is set to be installed.                                   |   
 
+
 ## Default Dependent Components Versions for Kubernetes Versions v1.32.2
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
