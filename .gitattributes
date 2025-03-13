@@ -1,4 +1,35 @@
 ###############################
+# Qubership common            #
+###############################
+.editorconfig text
+.flake8 text
+.gitattributes text
+.gitignore text
+.helmignore text
+.prettierignore text
+
+*.env text eol=lf
+*.json text
+*.md text
+*.mod text
+*.robot text
+*.sum text
+*.tpl text
+*.txt text
+*.yaml text
+*.yml text
+
+LICENSE text
+Dockerfile text
+
+/CHANGELOG.md merge=union
+/contributors.json merge=union
+/CODE-OF-CONDUCT.md text
+/CONTRIBUTING.md text
+/README.md text
+/SECURITY.md text
+
+###############################
 # Git Line Endings            #
 ###############################
 
