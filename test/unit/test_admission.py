@@ -14,7 +14,6 @@
 import re
 import unittest
 from copy import deepcopy
-from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import errors
@@ -60,51 +59,6 @@ class EnrichmentValidation(unittest.TestCase):
                 f"Incorrect enforce-version 'not a version', "
                 f"valid version (for example): v1.30")):
             self._new_cluster()
-
-    def test_default_admission_for_kuber_version(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-
-        # New kuber version with default pss admission
-        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.27.1'}
-        cluster = demo.new_cluster(inventory)
-        self.assertEqual(cluster.inventory['rbac']['admission'], 'pss')
-
-    def test_conditional_enrich_pss_extra_args_feature_gates(self):
-        for k8s_version, feature_gates_enriched in (('v1.27.8', True), ('v1.28.4', False)):
-            with self.subTest(f"Kubernetes: {k8s_version}"):
-                self.setUp()
-                self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
-
-                feature_gates_expected = 'PodSecurity=true' if feature_gates_enriched else None
-
-                cluster = self._new_cluster()
-                apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-                self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
-                self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args['admission-control-config-file'])
-
-                finalized_inventory = test_utils.make_finalized_inventory(cluster)
-                apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-                self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
-                self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args['admission-control-config-file'])
-
-    def test_enrich_pss_extra_args_feature_gates_custom(self):
-        self.inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.27.8',
-            'apiServer': {'extraArgs': {'feature-gates': 'ServiceAccountIssuerDiscovery=true'}},
-        }
-
-        cluster = self._new_cluster()
-        apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual('ServiceAccountIssuerDiscovery=true,PodSecurity=true', apiserver_extra_args.get('feature-gates'))
-
-        finalized_inventory = test_utils.make_finalized_inventory(cluster)
-        apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual('ServiceAccountIssuerDiscovery=true,PodSecurity=true', apiserver_extra_args.get('feature-gates'))
-
 
 if __name__ == '__main__':
     unittest.main()
