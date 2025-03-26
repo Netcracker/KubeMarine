@@ -1,0 +1,22 @@
+---
+
+quiet: true
+
+skip-check:
+# https://www.checkov.io/5.Policy%20Index/kubernetes.html
+- CKV_K8S_15 # Image Pull Policy should be Always
+- CKV_K8S_21 # The default namespace should not be used
+- CKV_K8S_22 # Use read-only filesystem for containers where possible
+- CKV_K8S_35 # Prefer using secrets as files over secrets as environment variables
+- CKV_K8S_38 # Ensure that Service Account Tokens are only mounted where necessary
+- CKV_K8S_40 # Containers should run as a high UID to avoid host conflict
+- CKV_K8S_43 # Image should use digest
+- CKV2_K8S_5 # No ServiceAccount/Node should be able to read all secrets
+- CKV2_K8S_6 # Minimize the admission of pods which lack an associated NetworkPolicy
+# https://www.checkov.io/5.Policy%20Index/dockerfile.html
+- CKV_DOCKER_2 # Ensure that HEALTHCHECK instructions have been added to container images
+# https://www.checkov.io/5.Policy%20Index/secrets.html
+- CKV_SECRET_6 # Base64 High Entropy String
+# https://www.checkov.io/5.Policy%20Index/github_actions.html
+- CKV2_GHA_1 # Ensure top-level permissions are not set to write-all
+- CKV_GHA_7 # The build output cannot be affected by user parameters other than the build entry point and the top-level source location. GitHub Actions workflow_dispatch inputs MUST be empty.
