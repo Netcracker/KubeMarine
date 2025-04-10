@@ -1,9 +1,11 @@
 /*
 IPIP encapsulation check scheme:
 
- --------           --------
+	--------           --------
+
 | Client | ------> | Server |
- --------           --------
+
+	--------           --------
 
 The Client creates and sends the IPIP packet.
 The Server receives IPIP packets and tries to parse them.
@@ -11,37 +13,41 @@ If the internal IP address, destination port and message are matched, the server
 
 The packet format is the following:
 
- -------------------------------------------------------------------------------------------------------------------
-|| Src IP | DstExt IP | IP Payload: | Src IP | DstInt IP | IP Payload: | UDP Src Port | UDP Dst Port | UDP Payload ||
- -------------------------------------------------------------------------------------------------------------------
+	-------------------------------------------------------------------------------------------------------------------
 
+|| Src IP | DstExt IP | IP Payload: | Src IP | DstInt IP | IP Payload: | UDP Src Port | UDP Dst Port | UDP Payload ||
+
+	-------------------------------------------------------------------------------------------------------------------
 */
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"net"
 	"os"
 	"time"
-	"flag"
-	"errors"
 
+	_ "github.com/docker/docker/client"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	_ "github.com/open-policy-agent/opa"
+	_ "golang.org/x/crypto/ssh"
 )
 
 var (
 	mode, msg, src, dstExt, dstInt string
-	srcIP, dstExtIP, dstIntIP net.IP
-	sport, dport, timeout uint
+	srcIP, dstExtIP, dstIntIP      net.IP
+	sport, dport, timeout          uint
 )
 
 func customUsage() {
 	fmt.Printf("Usage of %s:\n", os.Args[0])
 	fmt.Printf("%s -mode client -src 192.168.0.1 -ext 192.168.0.2 -int 240.0.0.1 -sport 45455 -dport 54545 -msg Message -timeout 10\n",
-	      os.Args[0])
+		os.Args[0])
 	fmt.Printf("%s -mode server -ext 192.168.0.2 -int 240.0.0.1 -sport 45455 -dport 54545 -msg Message -timeout 3\n",
-	      os.Args[0])
+		os.Args[0])
 	fmt.Println("Where:")
 	flag.PrintDefaults()
 	fmt.Println("Note: Pay attention to the fact that some implementations of packet filters might includes rule that allows 'related' traffic (eg.: Security Groups implementation in OpenStack). That means the mode changing on the same host might lead to incorrect results of the check.")
@@ -67,7 +73,7 @@ func parseParam() error {
 		return errors.New("Unknown mode. It might be 'server' or 'client'")
 	}
 	srcIP = net.ParseIP(src)
-        if srcIP == nil && mode == "client" {
+	if srcIP == nil && mode == "client" {
 		return errors.New("External source address is invalid")
 	}
 	dstExtIP = net.ParseIP(dstExt)
@@ -100,14 +106,14 @@ func runSrv() {
 	// Listen on the external IP address. The payload protocol is IPIP
 	ipConn, err := net.ListenIP("ip4:4", &dstExtIPaddr)
 	if err != nil {
-                fmt.Println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	defer ipConn.Close()
 	decodeOpts := gopacket.DecodeOptions{
-		Lazy:   false, 
-		NoCopy: false,
-		SkipDecodeRecovery: false,
+		Lazy:                     false,
+		NoCopy:                   false,
+		SkipDecodeRecovery:       false,
 		DecodeStreamsAsDatagrams: false,
 	}
 	// Set timeout
@@ -132,13 +138,13 @@ func runSrv() {
 			srcIntIP := fmt.Sprintf("%s", ipIntPacket.SrcIP)
 			dstIntIP := fmt.Sprintf("%s", ipIntPacket.DstIP)
 			// Check if destination IP matches with 'Interal IP' parameter
-			if  dstInt == dstIntIP {
+			if dstInt == dstIntIP {
 				// Check UDP port
 				if packet.Layers()[1].LayerType() == layers.LayerTypeUDP {
 					udpLayer := packet.Layers()[1]
 					udpPacket := udpLayer.(*layers.UDP)
 					if udpPacket.DstPort == dstUDPPort &&
-					   udpPacket.SrcPort == srcUDPPort {
+						udpPacket.SrcPort == srcUDPPort {
 						payload := fmt.Sprintf("%s", packet.Layers()[1].LayerPayload())
 						// Check UDP paylaod
 						if payload == msg {
@@ -181,13 +187,13 @@ func runClt() {
 	// Searilization
 	err := gopacket.SerializeLayers(buf, opts, &ipLayer2, &udpLayer, gopacket.Payload(msg))
 	if err != nil {
-                fmt.Println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	// Listen on the source IP. The payload protocol is IPIP
 	ipConn, err := net.ListenIP("ip4:4", &srcIPaddr)
 	if err != nil {
-                fmt.Println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	defer ipConn.Close()
@@ -198,15 +204,15 @@ func runClt() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		time.Sleep(1 * time.Second) 
+		time.Sleep(1 * time.Second)
 	}
 	fmt.Println("The packets have been sent!")
-} 
+}
 
 func main() {
 	err := parseParam()
 	if err != nil {
-                fmt.Println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
