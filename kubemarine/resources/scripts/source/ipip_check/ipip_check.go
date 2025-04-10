@@ -32,7 +32,7 @@ import (
 	_ "github.com/docker/docker/client"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	_ "github.com/open-policy-agent/opa"
+	_ "github.com/open-policy-agent/opa/v1"
 	_ "golang.org/x/crypto/ssh"
 )
 
