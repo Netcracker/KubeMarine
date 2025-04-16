@@ -2,7 +2,7 @@ module ipip_check
 
 go 1.23.6
 
-toolchain go1.23.7
+toolchain go1.24.1
 
 require (
 	github.com/docker/docker v28.0.4+incompatible
