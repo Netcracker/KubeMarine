@@ -3798,6 +3798,7 @@ where this endpoint requires authentication.
 We disable authentication by default, 
 because some applications do not support authentication 
 on OIDC discovery endpoints.
+For more information see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery
 
 ### Plugins
 
