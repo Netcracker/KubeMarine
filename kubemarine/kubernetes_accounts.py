@@ -62,7 +62,8 @@ def handle_authenticated_sa_issuer_discovery(cluster: KubernetesCluster) -> None
     To disable authentication, we apply CRB which allows unauthenticated access.
     To enable authentication, we delete above CRB (if it is present).
 
-    For more information on the cluster role: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery
+    For more information on the cluster role: 
+    https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery
     """
     mode = "unauthenticated"
     kubectl_cmd = "apply"
