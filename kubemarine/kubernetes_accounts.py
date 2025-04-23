@@ -58,14 +58,9 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
 def handle_authenticated_sa_issuer_discovery(cluster: KubernetesCluster) -> None:
     """
     This function handles SA issuer discovery endpoint authentication
-    Endpoint URL is: https://<cluster_ip>:6443/.well-known/openid-configuration/
 
     To disable authentication, we apply CRB which allows unauthenticated access.
     To enable authentication, we delete above CRB (if it is present).
-
-    Enable/disable is controlled by "rbac.authenticated-issuer-discovery" flag.
-    By default, we disable authentication. 
-    This is in contrast to native k8s default, where it is enabled by default.
     """
     mode = "unauthenticated"
     kubectl_cmd = "apply"
