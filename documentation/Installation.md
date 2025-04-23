@@ -2,14 +2,12 @@ This section provides information about the inventory, features, and steps for i
 
 - [Prerequisites](#prerequisites)
   - [Prerequisites for Deployment Node](#prerequisites-for-deployment-node)
-    - [Windows Deployer Restrictions](#windows-deployer-restrictions)
   - [Prerequisites for Cluster Nodes](#prerequisites-for-cluster-nodes)
     - [Minimal Hardware Requirements](#minimal-hardware-requirements)
     - [Recommended Hardware Requirements](#recommended-hardware-requirements)
     - [Disk Partitioning Recommendation](#disk-partitioning-recommendation)
-      - [Disk Pressure](#disk-pressure)
     - [ETCD Recommendation](#etcd-recommendation)
-    - [SSH Key Recommendation](#ssh-key-recommendation)
+    - [SSH key Recommendation](#ssh-key-recommendation)
     - [Private Certificate Authority](#private-certificate-authority)
 - [Inventory Preparation](#inventory-preparation)
   - [Deployment Schemes](#deployment-schemes)
@@ -19,85 +17,59 @@ This section provides information about the inventory, features, and steps for i
       - [Mini-HA Scheme](#mini-ha-scheme)
       - [Full-HA Scheme](#full-ha-scheme)
   - [Taints and Toleration](#taints-and-toleration)
-      - [CoreDNS Deployment with Node Taints](#coredns-deployment-with-node-taints)
-      - [Plugins Deployment with Node Taints](#plugins-deployment-with-node-taints)
   - [Configuration](#configuration)
-      - [Inventory validation](#inventory-validation)
     - [globals](#globals)
-    - [node\_defaults](#node_defaults)
+    - [node_defaults](#node_defaults)
     - [nodes](#nodes)
-    - [cluster\_name](#cluster_name)
-    - [control\_plain](#control_plain)
-      - [control\_endpoint](#control_endpoint)
-    - [public\_cluster\_ip](#public_cluster_ip)
+    - [cluster_name](#cluster_name)
+    - [control_plain](#control_plain)
+    - [public_cluster_ip](#public_cluster_ip)
     - [registry](#registry)
-      - [registry (new endpoints format)](#registry-new-endpoints-format)
-      - [registry (old address-port format)](#registry-old-address-port-format)
-    - [gateway\_nodes](#gateway_nodes)
-    - [vrrp\_ips](#vrrp_ips)
-      - [maintenance type](#maintenance-type)
+    - [gateway_nodes](#gateway_nodes)
+    - [vrrp_ips](#vrrp_ips)
     - [services](#services)
       - [kubeadm](#kubeadm)
-      - [Kubernetes version](#kubernetes-version)
-    - [Service Account Issuer](#service-account-issuer)
-      - [kubeadm\_kubelet](#kubeadm_kubelet)
-      - [kubeadm\_kube-proxy](#kubeadm_kube-proxy)
-      - [kubeadm\_patches](#kubeadm_patches)
-      - [kernel\_security](#kernel_security)
+        - [Kubernetes version](#kubernetes-version)
+        - [Service Account Issuer](#service-account-issuer)
+      - [kubeadm_kubelet](#kubeadm_kubelet)
+      - [kubeadm_kube-proxy](#kubeadm_kube-proxy)
+      - [kubeadm_patches](#kubeadm_patches)
+      - [kernel_security](#kernel_security)
         - [selinux](#selinux)
         - [apparmor](#apparmor)
       - [packages](#packages)
-        - [package\_manager](#package_manager)
+        - [package_manager](#package_manager)
         - [management](#management)
-          - [mandatory](#mandatory)
-          - [custom](#custom)
         - [associations](#associations)
-          - [RHEL and Centos](#rhel-and-centos)
-          - [Ubuntu and Debian](#ubuntu-and-debian)
       - [thirdparties](#thirdparties)
-        - [secure registries for thirdparties](#secure-registries-for-thirdparties)
       - [CRI](#cri)
       - [modprobe](#modprobe)
       - [sysctl](#sysctl)
       - [audit](#audit)
-        - [Audit Kubernetes Policy](#audit-kubernetes-policy)
-        - [Audit Daemon](#audit-daemon)
+        - [Kubernetes Policy](#audit-kubernetes-policy)
+        - [Daemon](#audit-daemon)
       - [ntp](#ntp)
         - [chrony](#chrony)
         - [timesyncd](#timesyncd)
       - [resolv.conf](#resolvconf)
-      - [etc\_hosts](#etc_hosts)
+      - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
-        - [add\_etc\_hosts\_generated](#add_etc_hosts_generated)
-        - [configmap](#configmap)
-        - [deployment](#deployment)
       - [loadbalancer](#loadbalancer)
-          - [target\_ports](#target_ports)
-        - [haproxy](#haproxy)
-        - [keepalived](#keepalived)
-      - [maintenance mode](#maintenance-mode)
     - [patches](#patches)
     - [RBAC pss](#rbac-pss)
       - [Configuring Default Profiles](#configuring-default-profiles)
       - [Configuring Exemptions](#configuring-exemptions)
       - [Application Prerequisites](#application-prerequisites)
     - [RBAC Accounts](#rbac-accounts)
-    - [RBAC account\_defaults](#rbac-account_defaults)
-    - [RBAC Authenticated Issuer Discovery](#rbac-authenticated-issuer-discovery)
+      - [RBAC account_defaults](#rbac-account_defaults)
     - [Plugins](#plugins)
       - [Predefined Plugins](#predefined-plugins)
         - [calico](#calico)
-          - [Calico BGP Configuration](#calico-bgp-configuration)
-          - [Default Typha Tolerations](#default-typha-tolerations)
-          - [Calico Metrics Configuration](#calico-metrics-configuration)
-          - [Calico Environment Properties](#calico-environment-properties)
-          - [Calico API server](#calico-api-server)
         - [nginx-ingress-controller](#nginx-ingress-controller)
-          - [monitoring](#monitoring)
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
       - [Plugins Features](#plugins-features)
-        - [plugin\_defaults](#plugin_defaults)
+        - [plugin_defaults](#plugin_defaults)
         - [Plugins Reinstallation](#plugins-reinstallation)
         - [Plugins Installation Order](#plugins-installation-order)
         - [Node Selector](#node-selector)
@@ -131,20 +103,15 @@ This section provides information about the inventory, features, and steps for i
   - [Tasks List Redefinition](#tasks-list-redefinition)
   - [Logging](#logging)
   - [Dump Files](#dump-files)
-    - [Finalized Dump](#finalized-dump)
   - [Configurations Backup](#configurations-backup)
   - [Ansible Inventory](#ansible-inventory)
     - [Contents](#contents)
-      - [\[all\]](#all)
-      - [\[cluster:children\]](#clusterchildren)
-      - [\[balancer\], \[control-plane\], \[worker\]](#balancer-control-plane-worker)
-      - [\[cluster:vars\]](#clustervars)
+      - [[all]](#all)
+      - [[cluster:children]](#clusterchildren)
+      - [[balancer], [control-plane], [worker]](#balancer-control-plane-worker)
+      - [[cluster:vars]](#clustervars)
   - [Cumulative Points](#cumulative-points)
 - [Supported Versions](#supported-versions)
-  - [Default Dependent Components Versions for Kubernetes Versions v1.29.10](#default-dependent-components-versions-for-kubernetes-versions-v12910)
-  - [Default Dependent Components Versions for Kubernetes Versions v1.30.10](#default-dependent-components-versions-for-kubernetes-versions-v13010)
-  - [Default Dependent Components Versions for Kubernetes Versions v1.31.6](#default-dependent-components-versions-for-kubernetes-versions-v1316)
-  - [Default Dependent Components Versions for Kubernetes Versions v1.32.2](#default-dependent-components-versions-for-kubernetes-versions-v1322)
 
 # Prerequisites
 
@@ -3776,28 +3743,6 @@ rbac:
 ```
 
 The yaml file that is created from the above template is applied to the cluster during the installation procedure.
-
-### RBAC Authenticated Issuer Discovery
-
-*Installation task*: `deploy.accounts`
-
-To configure service account issuer discovery authentication you can use
-following flag:
-```yaml
-rbac:
-  authenticated-issuer-discovery: False
-```
-
-By default KubeMarine sets this flag to `False`, 
-which allows unauthenticated access to 
-service account issuer discovery endpoint, usually found at 
-`https://<cluster_ip>:6443/.well-known/openid-configuration/`. 
-
-This is different from default K8s behavior, 
-where this endpoint requires authentication.
-We disable authentication by default, 
-because some applications do not support authentication 
-on OIDC discovery endpoints.
 
 ### Plugins
 
