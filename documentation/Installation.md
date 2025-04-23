@@ -3753,10 +3753,10 @@ To configure service account issuer discovery authentication you can use
 following flag:
 ```yaml
 rbac:
-  authenticated-issuer-discovery: False
+  authenticated-issuer-discovery: false
 ```
 
-By default KubeMarine sets this flag to `False`, 
+By default KubeMarine sets this flag to `false`, 
 which allows unauthenticated access to 
 service account issuer discovery endpoint, usually found at 
 `https://<cluster_ip>:6443/.well-known/openid-configuration/`. 
