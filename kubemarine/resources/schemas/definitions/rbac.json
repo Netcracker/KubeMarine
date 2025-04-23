@@ -19,6 +19,11 @@
       "default": "pss",
       "description": "Admission implementation switcher"
     },
+    "authenticated-issuer-discovery": {
+      "type": "boolean",
+      "default": false,
+      "description": "Authenticated issuer discovery switcher"
+    },
     "pss": {
       "$ref": "rbac/pss.json"
     }
