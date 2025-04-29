@@ -893,6 +893,8 @@ rbac:
       usernames: []
       runtimeClasses: []
       namespaces: ["kube-system"]
+  
+  authenticated-issuer-discovery: false
 
 procedure_history:
   archive_threshold: 5

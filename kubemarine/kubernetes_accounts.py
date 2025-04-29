@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+from textwrap import dedent
 from typing import Optional
 
 import yaml
@@ -54,7 +55,49 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
             rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
 
 
+def handle_authenticated_sa_issuer_discovery(cluster: KubernetesCluster) -> None:
+    """
+    This function handles SA issuer discovery endpoint authentication
+
+    To disable authentication, we apply CRB which allows unauthenticated access.
+    To enable authentication, we delete above CRB (if it is present).
+
+    For more information on the cluster role: 
+    https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery
+    """
+    mode = "unauthenticated"
+    kubectl_cmd = "apply"
+    if cluster.inventory.get("rbac", {}).get("authenticated-issuer-discovery", False):
+        mode = "authenticated"
+        kubectl_cmd = "delete --ignore-not-found"
+    issuer_discovery_crb = dedent("""\
+        kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: kubemarine-unauthenticated-service-account-issuer-discovery
+        subjects:
+        - apiGroup: rbac.authorization.k8s.io
+          kind: Group
+          name: system:unauthenticated
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: system:service-account-issuer-discovery
+    """)
+
+    cluster.log.debug(f"Configuring {mode} service account issuer discovery...")
+    tmp_path = utils.get_remote_tmp_path()
+    node = cluster.nodes['control-plane'].get_first_member()
+    node.put(io.StringIO(issuer_discovery_crb), tmp_path, sudo=True)
+    node.sudo(f"kubectl {kubectl_cmd} -f {tmp_path}", hide=False)
+
+
 def install(cluster: KubernetesCluster) -> None:
+    # issuer discovery authentication is handled as part of deploy.accounts,
+    # because deploy.accounts is safe to re-run (idempotent) and
+    # discovery authentication does not worth a separate install task
+    handle_authenticated_sa_issuer_discovery(cluster)
+
     rbac = cluster.inventory['rbac']
     if not rbac.get("accounts"):
         cluster.log.debug("No accounts specified to install, skipping...")

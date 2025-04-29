@@ -62,6 +62,7 @@ This section provides information about the inventory, features, and steps for i
       - [Application Prerequisites](#application-prerequisites)
     - [RBAC Accounts](#rbac-accounts)
       - [RBAC account_defaults](#rbac-account_defaults)
+    - [RBAC Authenticated Issuer Discovery](#rbac-authenticated-issuer-discovery)
     - [Plugins](#plugins)
       - [Predefined Plugins](#predefined-plugins)
         - [calico](#calico)
@@ -3743,6 +3744,29 @@ rbac:
 ```
 
 The yaml file that is created from the above template is applied to the cluster during the installation procedure.
+
+### RBAC Authenticated Issuer Discovery
+
+*Installation task*: `deploy.accounts`
+
+To configure service account issuer discovery authentication you can use
+following flag:
+```yaml
+rbac:
+  authenticated-issuer-discovery: false
+```
+
+By default KubeMarine sets this flag to `false`, 
+which allows unauthenticated access to 
+service account issuer discovery endpoint, usually found at 
+`https://<cluster_ip>:6443/.well-known/openid-configuration/`. 
+
+This is different from default K8s behavior, 
+where this endpoint requires authentication.
+We disable authentication by default, 
+because some applications do not support authentication 
+on OIDC discovery endpoints.
+For more information see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery
 
 ### Plugins
 
