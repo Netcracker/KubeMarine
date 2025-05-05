@@ -38,7 +38,7 @@ RUN apt update && \
     else \
       pip3 install --no-cache-dir $(ls dist/*.whl)[ansible]; \
       apt install -y wget; \
-      wget -O - https://get.helm.sh/helm-v3.14.4-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1; \
+      wget -O - https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1; \
       apt autoremove -y wget; \
       rm -r *; \
     fi && \

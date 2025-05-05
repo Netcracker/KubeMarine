@@ -29,12 +29,8 @@ import (
 	"os"
 	"time"
 
-	// Some packages have indirect dependancy which require their version to be updated. For such packages we have blank imports here as _"package_name"
-	_ "github.com/docker/docker/client"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	_ "github.com/open-policy-agent/opa/v1"
-	_ "golang.org/x/crypto/ssh"
 )
 
 var (
