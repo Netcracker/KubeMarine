@@ -24,6 +24,8 @@ kubeadm:
     sha1: 981cdd31d4072fe65fb251c1158090f511d34610
   v1.32.2:
     sha1: 7aef86d97edf97e50ac7112a4ada49fe74619ebc
+  v1.33.0:
+    sha1: bc411a208e067c63976eeecf02d1bf5c5c823bff
 kubelet:
   v1.29.1:
     sha1: aa871f4656bf1cc6393058f28d5c938268df3d4e
@@ -47,6 +49,8 @@ kubelet:
     sha1: e81e622c57721ddb31b92e09e2f2f0fc9f58562b
   v1.32.2:
     sha1: 9d8446943a6aab092156b7ee0a6d74c27f742ffc
+  v1.33.0:
+    sha1: 984fc4e063e8df34f4beaa9212e5429ee70e5997
 kubectl:
   v1.29.1:
     sha1: 5867f210ce90c62e0551062492751e43c2ae6a46
@@ -70,6 +74,8 @@ kubectl:
     sha1: 0bc860f7bc83b991ee3b099e21504a60c515cfd7
   v1.32.2:
     sha1: 87e59e4ae4a6b99d3ee8c37dea2db6b3466b41bc
+  v1.33.0:
+    sha1: aab40d38db50c728dbbe2e7b8144ba18f93480c2
 calicoctl:
 # calicoctl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # It also corresponds to the plugin version in kubemarine/resources/configurations/compatibility/internal/plugins.yaml
@@ -104,6 +110,9 @@ calicoctl:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.32.2:
+    version: v3.29.1
+    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
+  v1.33.0:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
 crictl:
@@ -142,3 +151,6 @@ crictl:
   v1.32.2:
     version: v1.32.0
     sha1: c503051cf6e809a691f776ddf544abfc2a15e790
+  v1.33.0:
+    version: v1.33.0
+    sha1: d702fd5792aba3ebf451e4488df2916010a76a0d
