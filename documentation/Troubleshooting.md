@@ -2197,10 +2197,10 @@ Ensure that the cluster's certificate management process is aligned with the sec
 
 **Note**: Not applicable.
 
-## OpenSSH server becomes unavailable during cluster installation on Centos9
+## OpenSSH server becomes unavailable during cluster installation
 
 ### Description
-During cluster installation on Centos9, the OpenSSH server becomes unavailable, leading to a failure in the installation process at the `kubemarine.system.reboot_nodes` stage. This issue is caused by a version mismatch between OpenSSL and OpenSSH, which results in OpenSSH being unable to start.
+During cluster installation on Centos9 or Oracle Linux 9, the OpenSSH server becomes unavailable, leading to a failure in the installation process at the `kubemarine.system.reboot_nodes` stage. This issue is caused by a version mismatch between OpenSSL and OpenSSH, which results in OpenSSH being unable to start.
 
 ### Alerts
 Not applicable.
