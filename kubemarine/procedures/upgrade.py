@@ -38,10 +38,10 @@ def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
 
-    # We exclude kubelet from global thirdparties upgrade, 
-    # because kubelet upgrade is disruptive.
-    # We upgrade kubelet per-node later during kubernetes upgrade process.
-    all_nodes = cluster.nodes["all"]
+    # We exclude kubelet from global cross-nodes thirdparties upgrade, 
+    # because kubelet upgrade may be disruptive for running nodes.
+    # We upgrade kubelet per-node later, after draining the node.
+    all_nodes = cluster.make_group_from_roles(["control-plane", "worker"])
     all_nodes.call(thirdparties.install_all_thirdparties, exclude=["/usr/bin/kubelet"])
 
 
