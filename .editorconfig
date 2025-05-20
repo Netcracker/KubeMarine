@@ -1,0 +1,35 @@
+root = true
+
+[{*,.*}]
+charset = utf-8
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.sh]
+end_of_line = lf
+
+[{*.bat,*.cmd}]
+end_of_line = crlf
+
+[*.go]
+# gofmt defaults to LF for all the platforms: https://github.com/golang/go/issues/16355
+end_of_line = lf
+
+[*.md]
+# Trailing whitespace is important in Markdown (they distinguish a new line from a new paragraph)
+eclint_indent_style = unset
+trim_trailing_whitespace = false
+
+[{go.mod,go.sum,*.go,.gitmodules}]
+indent_size = 4
+indent_style = tab
+
+[Dockerfile]
+indent_size = 4
+
+[*.py]
+profile = black
+
+[*.sh]
+indent_size = 4
