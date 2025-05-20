@@ -392,7 +392,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
     return common_group.sudo(remote_commands, pty=True)
 
 
-def install_all_thirdparties(group: NodeGroup, exclude: List[str] = []) -> None:
+def install_all_thirdparties(group: NodeGroup, exclude: List[str] = None) -> None:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
@@ -402,7 +402,7 @@ def install_all_thirdparties(group: NodeGroup, exclude: List[str] = []) -> None:
     for destination in cluster.inventory['services']['thirdparties'].keys():
         managing_plugin: Optional[str] = None
 
-        if destination in exclude:
+        if exclude and destination in exclude:
             log.verbose(f'Thirdparty {destination} is excluded from installation')
             continue
 
