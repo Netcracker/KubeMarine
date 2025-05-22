@@ -70,7 +70,7 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
 def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install -y -q {include}'
+    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout=600 install -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")
@@ -98,7 +98,7 @@ def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] 
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt-get purge -y -q {include}'
+    command = f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout=600 purge -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")
@@ -114,7 +114,7 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install --only-upgrade -y -q {include}'
+    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout=600 install --only-upgrade -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")
