@@ -180,33 +180,33 @@ The actual information about the supported versions can be found in `compatibili
 
 * Opened TCP-ports:
   * Internal communication:
-    * 22 : SSH 
-    * 53 : CoreDNS, if access is needed from services bound to the host network.
+    * 22: SSH 
+    * 53: CoreDNS, if access is needed from services bound to the host network.
     * 80 (or 20080, if balancers are presented): HTTP
-    * 179 : Calico BGP
+    * 179: Calico BGP
     * 443 (or 20443, if balancers are presented): HTTPS
-    * 5443 : Calico API server, if enabled
-    * 5473 : Calico networking with Typha enabled
-    * 6443 : Kubernetes API server
-    * 8443 : Ingress NGINX validating webhook
-    * 2379-2380 : ETCD server & client API
-    * 9091 : Calico metrics port
-    * 9093 : Calico Typha metrics port
-    * 10250 : Kubelet API
-    * 30000-32767 : NodePort Services
+    * 5443: Calico API server, if enabled
+    * 5473: Calico networking with Typha enabled
+    * 6443: Kubernetes API server
+    * 8443: Ingress NGINX validating webhook
+    * 2379-2380: ETCD server & client API
+    * 9091: Calico metrics port
+    * 9093: Calico Typha metrics port
+    * 10250: Kubelet API
+    * 30000-32767: NodePort Services
     * Other ports if communication happens between services with any participant bound to the host network.
   * External communication:
-    * 22 : SSH, if you use external nodes' IP addresses to deploy the cluster.
+    * 22: SSH, if you use external nodes' IP addresses to deploy the cluster.
     * 80
     * 443
-    * 6443 : Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
+    * 6443: Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
 * Opened UDP-ports:
   * Internal communication:
-    * 53 : CoreDNS, if access is needed from services bound to the host network.
-    * 4789 : Calico VxLAN encapsulation, if that type of encapsulation is enabled
+    * 53: CoreDNS, if access is needed from services bound to the host network.
+    * 4789: Calico VxLAN encapsulation, if that type of encapsulation is enabled
 * Enabled additional protocols:
   * **VRRP**: protocol is using by keepalived to manage vIP between nodes with role **balancer**. IP protocol number - 112
-  * **IPIP**: protocol is using for communication between kubernetes nodes of several clusters in Active-Active scheme only. Make shure **IPIP** protocol is added to all Security Groups in OpenStack and allowed on all intermediate network devices. IP protocol number - 4
+  * **IPIP**: protocol is using for communication between kubernetes nodes of several clusters in Active-Active scheme only. Make shure **IPIP** protocol is added to all Security Groups in OpenStack and allowed on all intermediate network devices. IP protocol number - 4.
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
@@ -313,7 +313,7 @@ The recommended hardware requirements are as follows:
 
 Kubernetes clusters use the following important folders:
 
-**/var/lib/etcd** - It is used for the etcd database storage at the control-plane nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
+**/var/lib/etcd** - It is used for the etcd database storage at the control-plane nodes. Etcd is very sensitive to disk performance so it is recommended to put `/var/lib/etcd` to a separate fast disk, for example, SSD. The size of this disk depends on the etcd database size, but not less than 4 GB. 
 For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation) section.
 
 **/var/lib/containerd** - It is a working directory of containerd, and is used for active container runtimes and storage of local images. 
@@ -326,22 +326,22 @@ For control-plane nodes, it should be at least 20 GB, whereas, for worker nodes,
 #### Disk Pressure
 
 To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
-The `nodefs` (or `rootfs`) is the node's main filesystem used for local disk volumes, emptyDir, log storage, and so on. By default, it is /var/lib/kubelet.
+The `nodefs` (or `rootfs`) is the node's main filesystem used for local disk volumes, emptyDir, log storage, and so on. By default, it is `/var/lib/kubelet`.
 
 The `imagefs` is an optional filesystem that the container runtimes use to store container images and container writable layers.
-For containerd, it is the filesystem containing /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs.
+For containerd, it is the filesystem containing `/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs`.
 
 If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available`, `100% - imagefs.available`), the DiskPressure condition becomes true and the pods start being evicted from the node. So it is crucially important not to allow disk fulfillment coming to the eviction threshold for both nodefs and imagefs.
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Control-plane before the installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount the dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Control-plane before the installation.
 Mount point:
 
 ```
 /var/lib/etcd
 ```
-[General H/W recommendations](https://etcd.io/docs/latest/op-guide/hardware/)
+For more information about general hardware recommendations, refer to the _Official ETCD Documentation_ at [https://etcd.io/docs/latest/op-guide/hardware/](https://etcd.io/docs/latest/op-guide/hardware/).
 
 ### SSH Key Recommendation 
 
@@ -456,7 +456,7 @@ Where:
  * VALUE is the value for the taint.
  * EFFECT is the effect for the taint behavior. It can be one of NoSchedule, PreferNoSchedule, or NoExecute.
 
-To deploy pods on tainted nodes, you should define the toleration section:
+To deploy pods on tainted nodes, define the toleration section:
 
 ```YAML
 tolerations:
@@ -491,7 +491,7 @@ services:
 
 #### Plugins Deployment with Node Taints 
 
-The plugins also require the tolerations section in case of node taints. The Calico pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
+The plugins also require the tolerations section in case of node taints. The Calico pods already have tolerations to be assigned to all the cluster nodes. However, for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
 
 If you create your own plugins, the tolerations settings should be taken into account.
 
@@ -524,7 +524,7 @@ The known IDEs that support validation are:
 The inventory file consists of the following sections.
 
 ### globals
-In the `globals` section you can describe the global parameters that can be overridden. For example:
+In the `globals` section, you can describe the global parameters that can be overridden. For example:
 
 ```
 globals:
@@ -552,7 +552,6 @@ The following parameters are supported:
 | `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
 | `nodes.dpkg_lock_timeout_seconds` | int | no | 1200 | `-1` | Number of seconds to wait for acquiring dpkg lock if it is taken by e.g. unattended upgrade. Value of -1 means wait infinitely |
 | `ignore_unavailable_nodes_for_etchosts_update` | boolean  | no        | false            | false    | Allow to run `prepare.dns.etc_hosts`, `update.etc_hosts` tasks when some nodes are unavailable. **Do not change the default value unless you know what for!**                    |
-
 
 ### node_defaults
 
@@ -598,9 +597,9 @@ Following are the parameters allowed to be specified in the `node_defaults` sect
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 For more information about the listed parameters, refer to the following section.
 
-Note: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
+**Note**: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
 
-Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See more details about [environment variables](#environment-variables).
+**Note**: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See [environment variables](#environment-variables) for more details.
 
 ### nodes
 
@@ -610,7 +609,7 @@ The following options are supported:
 
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
-|keyfile|string|no| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
+|keyfile|string|no| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines, either a keyfile or a password should be provided|
 |password|string|no| |`password@123`|Password to access the cluster machines, either a keyfile or a password should be provided|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
 |name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
@@ -801,7 +800,7 @@ public_cluster_ip: "10.102.0.1"
 
 ### registry
 
-If you want to install Kubernetes in a private environment, without access to the internet, then you
+If you want to install Kubernetes in a private environment without access to the internet, then you
 need to redefine the addresses of remote resources. These resources are many, so for convenience 
 there is a single unified registry parameter that allows you to specify the registry for everything 
 at once. To do this, you need to specify `registry` section in the root of the inventory and fill it
@@ -941,8 +940,8 @@ The following parameters are supported:
 |**name**|string|**yes**|Gateway node name|
 |**address**|ip address|**yes**|Gateway node's IP or hostname address for connection|
 |**username**|string|**yes**|Username for SSH-access the gateway node|
-|**keyfile**|string|no|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
-|**password**|string|no|Password to access the cluster machines, Either a keyfile or a password should be provided|
+|**keyfile**|string|no|**Absolute** path to keyfile on local machine to access the cluster machines, either a keyfile or a password should be provided|
+|**password**|string|no|Password to access the cluster machines, either a keyfile or a password should be provided|
 
 An example is as follows:
 
@@ -1092,7 +1091,7 @@ In the `services` section, you can configure the service settings. The settings 
 *OS specific*: No
 
 In the `services.kubeadm` section, you can override the original settings for kubeadm.
-For more information about these settings, refer to the official Kubernetes documentation at [https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
+For more information about these settings, refer to the _Official Kubernetes Documentation_ at [https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
 | Parameter                                               | Default Value                                            | Description                                                                            |
@@ -1153,7 +1152,7 @@ services:
 
 **Note**: These kubeadm parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
-During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
+During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error, kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
 Kubemarine allows to configure kubeadm preflight errors to be ignored.
 
@@ -1176,7 +1175,7 @@ services:
 
 #### Kubernetes version
 
-By default, the `v1.30.3` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
+By default, the `v1.30.3` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations. All these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
 
 ```yaml
 services:
@@ -1371,11 +1370,11 @@ services:
 *OS specific*: No
 
 In the `services.kubeadm_kube-proxy` section, you can override the original settings for kube-proxy.
-For more information about these settings, refer to the official Kubernetes documentation at [https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration](https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration).
+For more information about these settings, refer to the _Official Kubernetes Documentation_ at [https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration](https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration).
 
 **Note**: `conntrack.min` inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value from [sysctl](#sysctl), therefore if you would like to change this variable, set the desired value in `services.sysctl.net.netfilter.nf_conntrack_max`.
 
-**Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+**Note**: These parameters can be reconfigured after installation using the [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
 #### kubeadm_patches
 
@@ -1430,7 +1429,7 @@ services:
 
 By default, Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
 
-**Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+**Note**: These parameters can be reconfigured after installation using the [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
 **Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `services.kubeadm_patches`, the pod manifest file will contain the same flag twice, the value taken from services.kubeadm_patches will be in the end of the arguments list.
 
@@ -1590,7 +1589,7 @@ The following parameters are supported:
 |replace-repositories|`false`|Deletes old repositories on hosts and installs new ones instead.|
 |repositories| |List of new repositories.|
 
-In the repositories section, you need to specify new repositories to install. The contents of their configurations can be arbitrary and is directly forwarded into the yum repo files.
+In the repositories section, you need to specify the new repositories to install. The contents of their configurations can be arbitrary and is directly forwarded into the yum repo files.
 
 For example in CentOS:
 
@@ -1630,7 +1629,7 @@ services:
         - "deb [arch=amd64 trusted=yes] http://example.com/deb/misc/docker-ce/debian/ buster stable"
 ```
 
-**Note**: You cannot and do not need to specify repositories for different package managers. The package manager is detected automatically and the specified configuration should match it.
+**Note**: You cannot specify the repositories for different package managers. The package manager is detected automatically and the specified configuration should match it.
 
 **Note**: You can use secure repositories with credentials as for [thirdparties](#secure-registries-for-thirdparties).
 
@@ -2032,7 +2031,7 @@ services:
         config_location: '/etc/containerd/config.toml'
 ```
 
-In case when you should redefine associations for multiple OS families at once, you should define their names in the root of `associations` in the following way:
+In case when you need to redefine associations for multiple OS families at once, you should define their names in the root of `associations` in the following way:
 
 ```yaml
 services:
@@ -2218,7 +2217,7 @@ services:
         sandbox_image: registry.k8s.io/pause:3.9
 ```
 
-Also, it is possible to specify registries configuration in registries hosts format using `containerdRegistriesConfig` section:
+Also, it is possible to specify the registries configuration in registries hosts format using `containerdRegistriesConfig` section:
 ```yaml
 services:
   cri:
@@ -2259,7 +2258,7 @@ services:
 ```
 
 **Note**: `registry.mirrors` and `registries.configs.tls` can't be used with `config_path` or `containerdRegistriesConfig`
-because it's restricted by containerd. In that case kubemarine fails with exception during enrichment.
+because it's restricted by containerd. In that case, kubemarine fails with exception during enrichment.
 
 Although, `registry.mirrors` and `registries.configs` are deprecated, when the registry requires an authentication, 
 it should be specified using `registries.configs.auth`, as in following example:
@@ -2313,7 +2312,7 @@ services:
 ```
 
 Note how `containerdConfig` and `containerdRegistriesConfig.<registry>` sections reflect the toml format structure.
-For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
+For more details on containerd configuration, refer to the _Official containerd configuration file documentation_ at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
 By default, the following parameters are used for `containerdConfig`:
 
 ```yaml
@@ -2534,7 +2533,7 @@ The following settings are supported in the extended format:
 |**nodes**|no|`None`|The list of node names where the parameter should be set.|
 |**install**|no|`true`|Whether the parameter is managed (installed, checked) by Kubemarine. The property is `true` for custom parameters by default, and calculated for standard parameters. To learn what parameters are installed by default, refer to their description in the previous table.|
 
-**Note**: You can specify nodes and groups at the same time.
+**Note**: You can specify the nodes and groups at the same time.
 
 **Note**: If no groups or nodes are specified, then the parameter is installed on all nodes.
 
