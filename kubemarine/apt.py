@@ -67,9 +67,15 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(f"{DEBIAN_HEADERS} apt clean -q", pty=True)
 
 
-def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, lock_timeout: int = -1) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, **kwargs) -> str:
+    """
+    Implements package manager protocol for "get_install_cmd".
+    In addition to include/exclude, accepts following kwargs:
+    * lock_timeout: integer, which specifies value for Dpkg::Lock::Timeout
+    """
     if isinstance(include, list):
         include = ' '.join(include)
+    lock_timeout = kwargs.get("lock_timeout", 0)
     command = f'{DEBIAN_HEADERS} apt update -q && ' \
               f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install -y -q {include}'
 
