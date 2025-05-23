@@ -71,7 +71,7 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
 def get_install_cmd(
         include: Union[str, List[str]], 
         exclude: Union[str, List[str]] = None, 
-        options: Dict[str, int] = None) -> str:
+        _options: Dict[str, int] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = 'yum install -y -d1 --color=never %s' % include
