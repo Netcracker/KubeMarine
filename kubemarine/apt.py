@@ -67,7 +67,7 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(f"{DEBIAN_HEADERS} apt clean -q", pty=True)
 
 
-def get_install_cmd(lock_timeout: int, include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, lock_timeout: int = -1) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install -y -q {include}'
@@ -87,7 +87,7 @@ def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
         raise Exception('You must specify included packages to install')
 
     lock_timeout = group.cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
-    command = get_install_cmd(lock_timeout, include, exclude)
+    command = get_install_cmd(include, exclude, lock_timeout=lock_timeout)
 
     return group.sudo(command, callback=callback, pty=pty)
 

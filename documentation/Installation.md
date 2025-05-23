@@ -550,7 +550,7 @@ The following parameters are supported:
 | `expect.pods.plugins.retries`    | int  | no        | 150           | `300`   | Number of retires to check pods readiness in `plugins`                                                             |
 | `nodes.ready.timeout`            | int  | no        | 5             | `10`    | Timeout between `nodes.ready.retries` for cluster node readiness waiting                                           |
 | `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
-| `nodes.dpkg_lock_timeout_seconds` | int | no | 1200 | `-1` | Number of seconds to wait for acquiring dpkg lock if it taken by e.g. unattended upgrade. Value of -1 means wait infinitely |
+| `nodes.dpkg_lock_timeout_seconds` | int | no | 1200 | `-1` | Number of seconds to wait for acquiring dpkg lock if it is taken by e.g. unattended upgrade. Value of -1 means wait infinitely |
 | `ignore_unavailable_nodes_for_etchosts_update` | boolean  | no        | false            | false    | Allow to run `prepare.dns.etc_hosts`, `update.etc_hosts` tasks when some nodes are unavailable. **Do not change the default value unless you know what for!**                    |
 
 
