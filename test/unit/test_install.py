@@ -52,7 +52,6 @@ class ManageMandatoryPackages(unittest.TestCase):
                 package_names.append(
                     cluster.inventory['services']['packages']['associations'][os_family][pkg]['package_name'])
 
-        options = {"lock_timeout": cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]}
         return [packages.get_package_manager(cluster.nodes['all']).get_install_cmd(cluster, package_names)]
 
     def _assert_installed(self, cluster: demo.FakeKubernetesCluster):
