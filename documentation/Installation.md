@@ -2559,7 +2559,7 @@ The following settings are supported in the extended format:
 
 *OS specific*: No
 
-For more information about Kubernetes auditing, refer to the official documentation at [https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/).
+For more information about Kubernetes auditing, refer to the _Official Documentation_ at [https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/).
 
 **Logging level**:
 `None` - do not log;
@@ -2762,7 +2762,7 @@ For Kubernetes and ETCD to work correctly, it is recommended to configure the sy
 
 *OS specific*: Yes, performs only on the RHEL OS family.
 
-**Warning:** incorrect time synchronization can lead to incorrect operation of the cluster or services. You can validate
+**Warning:** Incorrect time synchronization can lead to incorrect operation of the cluster or services. You can validate
 the time synchronization via the [Time difference](Kubecheck.md#218-time-difference) test between the nodes from 
 [PAAS Check procedure](Kubecheck.md#paas-procedure).
 
@@ -3002,7 +3002,7 @@ If `services.coredns.add_etc_hosts_generated` is set to `true`, `Hosts` is enric
 
 If `Hosts` is redefined in the `cluster.yaml` its default value is overridden. 
 
-Before working with the Corefile, refer to the official Coredns plugins documentation at [https://coredns.io/plugins/](https://coredns.io/plugins/).
+Before working with the Corefile, refer to the _Official Coredns plugins documentation_ at [https://coredns.io/plugins/](https://coredns.io/plugins/).
 
 The Corefile consists of the settings applied for a specific destination. By default, all settings are applied for `.:53` destination. 
 For example:
@@ -3328,7 +3328,7 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
 </tbody>
 </table>
 
-For more information on Haproxy-related parameters, refer to the official Haproxy documentation at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
+For more information on Haproxy-related parameters, refer to the _Official Haproxy documentation_ at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
 
 **Note**: you can use either `config` or `config_file` if you need to use custom config instead of default.
 
@@ -3756,7 +3756,7 @@ rbac:
   authenticated-issuer-discovery: false
 ```
 
-By default KubeMarine sets this flag to `false`, 
+By default, KubeMarine sets this flag to `false`, 
 which allows unauthenticated access to 
 service account issuer discovery endpoint, usually found at 
 `https://<cluster_ip>:6443/.well-known/openid-configuration/`. 
@@ -3790,11 +3790,11 @@ When you want to install a plugin, the installer includes pre-configured plug-in
 
 ##### calico
 
-Before proceeding, refer to the [Official Documentation of the Kubernetes Cluster Network](https://kubernetes.io/docs/concepts/cluster-administration/networking/).
+Before proceeding, refer to the _Official Documentation of the Kubernetes Cluster Network_ at [https://kubernetes.io/docs/concepts/cluster-administration/networking/](https://kubernetes.io/docs/concepts/cluster-administration/networking/).
 
-Calico plugin is installed by default and does not require any special enablement or configuration. However it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
+Calico plugin is installed by default and does not require any special enablement or configuration. However, it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
-**Warning**: According to the Calico kernel requirements, CentOS 7 with a kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. For more information, refer to [Kubernetes requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements).
+**Warning**: According to the Calico kernel requirements, CentOS 7 with a kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. For more information, refer to Kubernetes requirements_ at [https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements).
 
 The following is an example to enable the calico plugin:
 
@@ -4146,7 +4146,7 @@ If the intermediate certificate should be specified, set it in `/path/to/cert` f
 -----END CERTIFICATE-----
 ```
 
-* The `config_map` parameter is used to customize or fine tune NGINX behavior. Before proceeding, refer to the [Official NGINX Ingress Controller documentation](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/)
+* The `config_map` parameter is used to customize or fine tune NGINX behavior. Before proceeding, refer to the _Official NGINX Ingress Controller documentation_ at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/)
 For example:    
 ```yaml
   nginx-ingress-controller:
@@ -4179,7 +4179,7 @@ Default config_map settings:
 
 **Warning**: Ingress-nginx and HAproxy use proxy protocol in the default configuration. If you are using a load balancer without a proxy protocol, it **must** also be disabled in ingress-nginx. To do this, specify `use-proxy-protocol: "false"` in configmap.
 
-* The `custom_headers` parameter sets specified custom headers before sending the traffic to backends. Before proceeding, refer to the official NGINX Ingress Controller documentation at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/).
+* The `custom_headers` parameter sets specified custom headers before sending the traffic to backends. Before proceeding, refer to the _Official NGINX Ingress Controller documentation_ at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/).
 
 For example:    
 
@@ -4192,7 +4192,7 @@ For example:
       X-Using-Nginx-Controller: "true"
 ```
 
-* The `args` parameter is used to add cli arguments to ingress-nginx-controller. Before proceeding, refer to the official NGINX Ingress Controller documentation at [https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/](https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/).
+* The `args` parameter is used to add cli arguments to ingress-nginx-controller. Before proceeding, refer to the _Official NGINX Ingress Controller documentation_ at [https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/](https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/).
 
 For example:
 ```yaml
@@ -4209,7 +4209,7 @@ By default, 10254 port is opened and provides Prometheus metrics.
 
 ##### kubernetes-dashboard
 
-Before proceeding, refer to the [Official Documentation of the Kubernetes Dashboard UI](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) and visit [official Kubernetes Dashboard repository](https://github.com/kubernetes/dashboard).
+Before proceeding, refer to the _Official Documentation of the Kubernetes Dashboard UI_ at [https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) and visit [official Kubernetes Dashboard repository](https://github.com/kubernetes/dashboard).
 
 By default, the Kubernetes dashboard is not installed, as it is not a mandatory part of the cluster. However, you can install it by enabling the plugin.
 
@@ -4221,7 +4221,7 @@ plugins:
     install: true
 ```
 
-**Note**: By default Kubernetes dashboard is available at `dashboard.{{ cluster_name }}`.
+**Note**: By default, Kubernetes dashboard is available at `dashboard.{{ cluster_name }}`.
 
 **Note**: The Kubernetes Dashboards UI is available **only** via HTTPS.
 
