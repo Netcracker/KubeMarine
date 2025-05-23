@@ -67,15 +67,19 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(f"{DEBIAN_HEADERS} apt clean -q", pty=True)
 
 
-def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, **kwargs) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, options: Dict[str, int] = None) -> str:
     """
     Implements package manager protocol for "get_install_cmd".
-    In addition to include/exclude, accepts following kwargs:
-    * lock_timeout: integer, which specifies value for Dpkg::Lock::Timeout
+    In addition to include/exclude packages, accepts following options:
+    * lock_timeout: integer, specifies value for Dpkg::Lock::Timeout
     """
     if isinstance(include, list):
         include = ' '.join(include)
-    lock_timeout = kwargs.get("lock_timeout", 0)
+
+    if options is None:
+        options = {}
+
+    lock_timeout = options.get("lock_timeout", 0)
     command = f'{DEBIAN_HEADERS} apt update -q && ' \
               f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install -y -q {include}'
 
@@ -94,7 +98,7 @@ def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
         raise Exception('You must specify included packages to install')
 
     lock_timeout = group.cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
-    command = get_install_cmd(include, exclude, lock_timeout=lock_timeout)
+    command = get_install_cmd(include, exclude, options={"lock_timeout": lock_timeout})
 
     return group.sudo(command, callback=callback, pty=pty)
 
