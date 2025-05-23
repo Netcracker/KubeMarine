@@ -73,7 +73,8 @@ class TestAuditInstallation(unittest.TestCase):
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        installation_command = [apt.get_install_cmd(package_name)]
+        lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
+        installation_command = [apt.get_install_cmd(lock_timeout, package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
@@ -119,7 +120,8 @@ class TestAuditInstallation(unittest.TestCase):
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        installation_command = [apt.get_install_cmd(package_name)]
+        lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
+        installation_command = [apt.get_install_cmd(lock_timeout, package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
