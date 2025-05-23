@@ -103,7 +103,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         cluster.fake_shell.add(missing_package_result, 'sudo', missing_package_command)
 
         # simulate package installation
-        installation_command = [yum.get_install_cmd(package_associations['package_name'])]
+        installation_command = [yum.get_install_cmd(cluster, package_associations['package_name'])]
         expected_results = demo.create_nodegroup_result(cluster.nodes['balancer'], code=0,
                                                         stdout='Successfully installed haproxy')
         cluster.fake_shell.add(expected_results, 'sudo', installation_command)

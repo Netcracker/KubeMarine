@@ -95,6 +95,12 @@
       "description": "Section to hold mostly timeout-related settings, global for nodes",
       "additionalProperties": false,
       "properties": {
+         "dpkg_lock_timeout_seconds": {
+           "type": "integer",
+           "minimal": -1,
+           "default": 1200,
+           "description": "Number of seconds to wait for acquiring dpkg lock if it is taken by e.g. unattended upgrade. Value of -1 means wait infinitely."
+         },
          "ready": {
            "type": "object",
            "description": "Settings for Kubernetes nodes readiness check",
