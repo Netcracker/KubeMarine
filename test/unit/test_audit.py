@@ -49,7 +49,7 @@ class TestAuditInstallation(unittest.TestCase):
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
 
         # simulate package installation command
-        installation_command = [yum.get_install_cmd(package_name)]
+        installation_command = [yum.get_install_cmd(cluster, package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
@@ -73,8 +73,7 @@ class TestAuditInstallation(unittest.TestCase):
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
-        installation_command = [apt.get_install_cmd(package_name, options={"lock_timeout": lock_timeout})]
+        installation_command = [apt.get_install_cmd(cluster, package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
@@ -120,8 +119,7 @@ class TestAuditInstallation(unittest.TestCase):
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
-        installation_command = [apt.get_install_cmd(package_name, options={"lock_timeout": lock_timeout})]
+        installation_command = [apt.get_install_cmd(cluster, package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['control-plane'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)

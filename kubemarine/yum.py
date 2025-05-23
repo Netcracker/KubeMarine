@@ -17,6 +17,7 @@ import io
 from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, Callback
 from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
@@ -68,10 +69,7 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo("yum clean all", pty=True)
 
 
-def get_install_cmd(
-        include: Union[str, List[str]], 
-        exclude: Union[str, List[str]] = None, 
-        _options: Dict[str, int] = None) -> str:
+def get_install_cmd(_cluster: KubernetesCluster, include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = 'yum install -y -d1 --color=never %s' % include
@@ -95,7 +93,7 @@ def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
     if include is None:
         raise Exception('You must specify included packages to install')
 
-    command = get_install_cmd(include, exclude)
+    command = get_install_cmd(group.cluster, include, exclude)
 
     return group.sudo(command, pty=pty, callback=callback)
 

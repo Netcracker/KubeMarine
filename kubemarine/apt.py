@@ -16,6 +16,7 @@ import io
 from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, Callback
 from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
@@ -67,19 +68,11 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(f"{DEBIAN_HEADERS} apt clean -q", pty=True)
 
 
-def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None, options: Dict[str, int] = None) -> str:
-    """
-    Implements package manager protocol for "get_install_cmd".
-    In addition to include/exclude packages, accepts following options:
-    * lock_timeout: integer, specifies value for Dpkg::Lock::Timeout
-    """
+def get_install_cmd(cluster: KubernetesCluster, include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
 
-    if options is None:
-        options = {}
-
-    lock_timeout = options.get("lock_timeout", 0)
+    lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
     command = f'{DEBIAN_HEADERS} apt update -q && ' \
               f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install -y -q {include}'
 
@@ -97,8 +90,7 @@ def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
     if include is None:
         raise Exception('You must specify included packages to install')
 
-    lock_timeout = group.cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
-    command = get_install_cmd(include, exclude, options={"lock_timeout": lock_timeout})
+    command = get_install_cmd(group.cluster, include, exclude)
 
     return group.sudo(command, callback=callback, pty=pty)
 
