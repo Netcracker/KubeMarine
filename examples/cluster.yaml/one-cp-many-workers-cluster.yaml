@@ -1,1 +1,14 @@
 # TODO
+
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  password: '{{ env.PASS }}'     #Either keyfile or password can be used.
+  username: "centos"
+
+nodes:
+  - name: "k8s-control-plane"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["control-plane", "worker"]
+
+cluster_name: "k8s.example.com"
