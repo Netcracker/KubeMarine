@@ -396,6 +396,24 @@ The following image illustrates the All-in-one scheme.
 
 ![All-in-one Scheme](/documentation/images/all-in-one.png)
 
+#### One Control Plane and Many Workers Schema
+
+This schema might be useful if:
+* You want a development environment where you do not care about HA
+* AND you want to use multiple workers (otherwise All-in-one schema could be used)
+* AND you have slow disks, so you want to avoid etcd replication overhead (otherwise Mini-HA schema could be used)
+* AND you do not want to bother with vIP configuration (otherwise you could combine control-plane and balancer role on one node, without explicit ingress-nginx placement).
+
+In this case you could use schema with single control plane node (which runs ingress-nginx) and many (1 or more) workers.
+An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](../examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
+
+**Note:** optionally, if you want control-plane node to be able to run workloads, 
+you need to add "worker" role to this node.
+
+The following image illustrates the "One Control Plane and Many Workers" schema.
+
+![One Control Plane and Many Workers Schema](/documentation/images/one-cp-many-workers.png)
+
 ### HA Deployment Schemes
 
 This deployment type provides a highly available and reliable solution.
