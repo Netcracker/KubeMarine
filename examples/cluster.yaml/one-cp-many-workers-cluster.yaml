@@ -14,7 +14,7 @@ nodes:
     address: "10.101.0.2"
     internal_address: "192.168.0.2"
     roles: ["worker"]
-  - name: "k8s-worker-N"
+  - name: "k8s-worker-n"
     address: "10.101.0.99"
     internal_address: "192.168.0.99"
     roles: ["worker"]
