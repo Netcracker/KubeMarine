@@ -13,6 +13,7 @@ This section provides information about the inventory, features, and steps for i
   - [Deployment Schemes](#deployment-schemes)
     - [Non-HA Deployment Schemes](#non-ha-deployment-schemes)
       - [All-in-one Scheme](#all-in-one-scheme)
+      - [One Control Plane and Many Workers Schema](#one-control-plane-and-many-workers-schema)
     - [HA Deployment Schemes](#ha-deployment-schemes)
       - [Mini-HA Scheme](#mini-ha-scheme)
       - [Full-HA Scheme](#full-ha-scheme)
