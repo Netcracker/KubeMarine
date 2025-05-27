@@ -1,5 +1,3 @@
-# TODO
-
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
   password: '{{ env.PASS }}'     #Either keyfile or password can be used.
@@ -9,6 +7,28 @@ nodes:
   - name: "k8s-control-plane"
     address: "10.101.0.1"
     internal_address: "192.168.0.1"
-    roles: ["control-plane", "worker"]
+    # Optionally, if you want control-plane to run workloads,
+    # you could use `roles: ["control-plane", "worker"]`
+    roles: ["control-plane"]
+  - name: "k8s-worker-1"
+    address: "10.101.0.2"
+    internal_address: "192.168.0.2"
+    roles: ["worker"]
+  - name: "k8s-worker-N"
+    address: "10.101.0.99"
+    internal_address: "192.168.0.99"
+    roles: ["worker"]
+
+# NodeSelector and Tolerations are required to make sure
+# nginx-ingress runs on control-plane node
+plugins:
+  nginx-ingress-controller:
+    controller:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
 
 cluster_name: "k8s.example.com"
