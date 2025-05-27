@@ -412,6 +412,7 @@ An example of this schema is available in the [One Control Plane and Many Worker
 you need to add "worker" role to this node.
 
 The following image illustrates the "One Control Plane and Many Workers" schema.
+
 <img src="/documentation/images/one-cp-many-workers.png" width="600"/>
 
 ### HA Deployment Schemes
