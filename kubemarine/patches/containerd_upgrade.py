@@ -123,8 +123,8 @@ class ContainerdUpgrade(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch upgrades containerd 1.6 to 1.7 on the cluster.
-            Attention: upgrade is performed node-by-node with node draining,
-            so it takes time and is disruptive for cluster/workloads.
+            This patch upgrades containerd on the cluster if its version is not consistent with cluster.yaml.
+            The upgrade is performed per-node: 
+            drain, stop kubelet, remove containers, upgrade containerd, start kubelet, uncordon, wait for control plane pods.
             """.rstrip()
         )
