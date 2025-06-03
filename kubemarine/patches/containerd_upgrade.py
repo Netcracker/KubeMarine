@@ -24,7 +24,7 @@ from kubemarine.kubernetes import components
 
 class ContainerdUpgradeAction(Action):
     def __init__(self) -> None:
-        super().__init__("Upgrade containerd")
+        super().__init__("Containerd Upgrade")
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
@@ -128,7 +128,7 @@ class ContainerdUpgrade(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch upgrades containerd on the cluster if its version is not consistent with cluster.yaml.
+            This patch upgrades containerd on ubuntu nodes if containerd version is not consistent with cluster.yaml.
             The upgrade is performed per-node: 
             drain, stop kubelet, remove containers, upgrade containerd, start kubelet, uncordon, wait for control plane pods.
             """.rstrip()
