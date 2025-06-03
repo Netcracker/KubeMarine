@@ -79,10 +79,10 @@ class ContainerdUpgradeAction(Action):
             node.sudo("systemctl start kubelet")
             # we wait here, because kube-apiserver pod may need to start before uncordon will work
             expect_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
-            node.wait_command_successful(f"sudo kubectl uncordon {node.get_node_name()}",
+            node.wait_command_successful(f"kubectl uncordon {node.get_node_name()}",
                                         timeout=expect_config['timeout'],
                                         retries=expect_config['retries'],
-                                        sudo=False, pty=True)
+                                        pty=True)
 
             # we need to make sure that control-plane pods are OK after restart, before moving to next node
             if "control-plane" in node.get_config()["roles"]:
