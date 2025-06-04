@@ -413,7 +413,7 @@ you need to add "worker" role to this node.
 
 The following image illustrates the "One Control Plane and Many Workers" schema.
 
-![One Control Plane and Many Workers](/documentation/images/one-cp-many-workers.png)
+<img src="/documentation/images/one-cp-many-workers.png" width="600"/>
 
 ### HA Deployment Schemes
 
