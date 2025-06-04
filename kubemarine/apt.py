@@ -16,6 +16,7 @@ import io
 from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, Callback
 from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
@@ -67,10 +68,13 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(f"{DEBIAN_HEADERS} apt clean -q", pty=True)
 
 
-def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
+def get_install_cmd(cluster: KubernetesCluster, include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install -y -q {include}'
+
+    lock_timeout = cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
+    command = f'{DEBIAN_HEADERS} apt update -q && ' \
+              f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")
@@ -86,7 +90,7 @@ def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
     if include is None:
         raise Exception('You must specify included packages to install')
 
-    command = get_install_cmd(include, exclude)
+    command = get_install_cmd(group.cluster, include, exclude)
 
     return group.sudo(command, callback=callback, pty=pty)
 
@@ -98,7 +102,8 @@ def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] 
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt-get purge -y -q {include}'
+    lock_timeout = group.cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
+    command = f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} purge -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")
@@ -114,7 +119,9 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = f'{DEBIAN_HEADERS} apt update -q && {DEBIAN_HEADERS} apt-get install --only-upgrade -y -q {include}'
+    lock_timeout = group.cluster.inventory["globals"]["nodes"]["dpkg_lock_timeout_seconds"]
+    command = f'{DEBIAN_HEADERS} apt update -q && ' \
+              f'{DEBIAN_HEADERS} apt-get -o Dpkg::Lock::Timeout={lock_timeout} install --only-upgrade -y -q {include}'
 
     if exclude is not None:
         raise Exception("Option 'exclude' is not supported for apt package manager")

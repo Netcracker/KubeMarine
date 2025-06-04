@@ -13,6 +13,7 @@ globals:
         timeout: 5
         retries: 150
   nodes:
+    dpkg_lock_timeout_seconds: 1200
     ready:
       timeout: 5
       retries: 15

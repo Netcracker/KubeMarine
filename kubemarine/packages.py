@@ -511,7 +511,9 @@ class PackageManager(Protocol):
 
     def clean(self, group: NodeGroup) -> RunnersGroupResult: ...
 
-    def get_install_cmd(self, include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str: ...
+    def get_install_cmd(self, cluster: KubernetesCluster, 
+                        include: Union[str, List[str]], 
+                        exclude: Union[str, List[str]] = None) -> str: ...
 
     def install(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
                 exclude: Union[str, List[str]] = None,
