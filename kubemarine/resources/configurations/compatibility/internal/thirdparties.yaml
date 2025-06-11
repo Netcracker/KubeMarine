@@ -80,17 +80,17 @@ calicoctl:
 # calicoctl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # It also corresponds to the plugin version in kubemarine/resources/configurations/compatibility/internal/plugins.yaml
   v1.29.1:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.1
+    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.29.4:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.1
+    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.29.7:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.1
+    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.29.10:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.1
+    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.30.1:
     version: v3.29.4
     sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
