@@ -47,7 +47,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
   - [Calico Generates High Amount of Logs and Consumes a lot of CPU](#calico-generates-high-amount-of-logs-and-consumes-a-lot-of-cpu) 
-  - [Calico 3.29.0 leading to kubernetes controller manager GC failures](#calico-3.29.0-leading-to-kubernetes-controller-manager-GC-failures) 
+  - [Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures](#calico-3.29.0-leading-to-kubernetes-controller-manager-GC-failures) 
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -1690,9 +1690,10 @@ And run `kubemarine install --tasks=deploy.plugins`
 Pods should stop generating such amount of logs and resource consumption should normalize.
 
 
-## Calico 3.29.0 leading to kubernetes controller manager GC failures
+## Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures
 
 ### Description
+
 The Kubernetes garbage collector is not deleting objects with ownerReferences because it fails to build the dependency graph.
 Such logs can be found in kube-controller-manager pod:
 
@@ -1742,7 +1743,6 @@ subjects:
   kind: User
   name: system:kube-controller-manager
 ```
-
 
 # Troubleshooting Kubemarine
 
