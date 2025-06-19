@@ -392,7 +392,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
     return common_group.sudo(remote_commands, pty=True)
 
 
-def install_all_thirparties(group: NodeGroup) -> None:
+def install_all_thirdparties(group: NodeGroup, exclude: List[str] = None) -> None:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
@@ -401,6 +401,10 @@ def install_all_thirparties(group: NodeGroup) -> None:
 
     for destination in cluster.inventory['services']['thirdparties'].keys():
         managing_plugin: Optional[str] = None
+
+        if exclude and destination in exclude:
+            log.verbose(f'Thirdparty {destination} is excluded from installation')
+            continue
 
         # install and upgrade procedures have separate tasks for thirdparties managed by plugins
         if cluster.context.get("initial_procedure") in ("install", "upgrade"):
