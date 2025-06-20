@@ -23,7 +23,7 @@ import paramiko
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, apparmor, sysctl, modprobe
+from kubemarine import selinux, apparmor, sysctl, modprobe, kubernetes
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -375,8 +375,7 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)
         if cordon_required:
-            res = first_control_plane.sudo(f'kubectl uncordon {node_name}', warn=True)
-            log.verbose(res)
+            kubernetes.wait_uncordon(node)
         results.update(raw_results)
 
     return RunnersGroupResult(cluster, results)
