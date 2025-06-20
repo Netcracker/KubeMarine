@@ -23,7 +23,7 @@ import paramiko
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, apparmor, sysctl, modprobe, kubernetes
+from kubemarine import selinux, apparmor, sysctl, modprobe
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
