@@ -37,8 +37,7 @@ RUN apt update && \
       find -not -path "./dist*" -delete; \
     else \
       pip3 install --no-cache-dir $(ls dist/*.whl)[ansible]; \
-      # minizip is installed to fix CVE-2023-45853
-      apt install -y wget minizip; \
+      apt install -y wget; \
       wget -O - https://get.helm.sh/helm-v3.18.3-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1; \
       apt autoremove -y wget; \
       rm -r *; \
