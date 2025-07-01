@@ -47,7 +47,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
   - [Calico Generates High Amount of Logs and Consumes a lot of CPU](#calico-generates-high-amount-of-logs-and-consumes-a-lot-of-cpu) 
-  - [Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures](#calico-3.29.0-leading-to-kubernetes-controller-manager-GC-failures) 
+  - [Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures](#calico-3290-leading-to-kubernetes-controller-manager-gc-failures) 
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -56,7 +56,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1283-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
-  - [OpenSSH server becomes unavailable during cluster installation on Centos9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos9)
+  - [OpenSSH server becomes unavailable during cluster installation on Centos 9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos-9)
   - [Packets Loss During the Transmission Between Nodes](#packets-loss-during-the-transmission-between-nodes)
 
 # Kubemarine Errors
@@ -2248,7 +2248,7 @@ Ensure that the cluster's certificate management process is aligned with the sec
 
 **Note**: Not applicable.
 
-## OpenSSH server becomes unavailable during cluster installation
+## OpenSSH server becomes unavailable during cluster installation on Centos 9
 
 ### Description
 During cluster installation on Centos9 or Oracle Linux 9, the OpenSSH server becomes unavailable, leading to a failure in the installation process at the `kubemarine.system.reboot_nodes` stage. This issue is caused by a version mismatch between OpenSSL and OpenSSH, which results in OpenSSH being unable to start.
