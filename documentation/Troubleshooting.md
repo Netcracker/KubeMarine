@@ -1694,7 +1694,7 @@ Pods should stop generating such amount of logs and resource consumption should 
 
 ### Description
 
-The Kubernetes garbage collector is not deleting objects with ownerReferences because it fails to build the dependency graph.
+On Calico versions 3.29.0 and 3.29.1, the Kubernetes garbage collector is not deleting objects with ownerReferences because it fails to build the dependency graph.
 Such logs can be found in kube-controller-manager pod:
 
 ```bash
