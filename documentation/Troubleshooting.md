@@ -47,6 +47,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
   - [Calico Generates High Amount of Logs and Consumes a lot of CPU](#calico-generates-high-amount-of-logs-and-consumes-a-lot-of-cpu) 
+  - [Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures](#calico-3290-leading-to-kubernetes-controller-manager-gc-failures) 
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Operation not Permitted Error in Kubemarine Docker Run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -55,7 +56,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1283-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
-  - [OpenSSH server becomes unavailable during cluster installation on Centos9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos9)
+  - [OpenSSH server becomes unavailable during cluster installation on Centos 9](#openssh-server-becomes-unavailable-during-cluster-installation-on-centos-9)
   - [Packets Loss During the Transmission Between Nodes](#packets-loss-during-the-transmission-between-nodes)
 
 # Kubemarine Errors
@@ -1689,6 +1690,60 @@ And run `kubemarine install --tasks=deploy.plugins`
 Pods should stop generating such amount of logs and resource consumption should normalize.
 
 
+## Calico 3.29.0 Leading to kubernetes Controller Manager GC Failures
+
+### Description
+
+On Calico versions 3.29.0 and 3.29.1, the Kubernetes garbage collector is not deleting objects with ownerReferences because it fails to build the dependency graph.
+Such logs can be found in kube-controller-manager pod:
+
+```bash
+E0508 08:05:31.194320       1 shared_informer.go:316] unable to sync caches for garbage collector
+E0508 08:05:31.194365       1 garbagecollector.go:268] timed out waiting for dependency graph builder sync during GC sync (attempt 9425) 
+```
+
+### Alerts
+Not applicable.
+
+### Stack trace(s)
+Not applicable.
+
+### How to resolve
+Root cause of the issue is the garbage collector cannot proceed because it is unable to list or watch `tier.[global]networkpolicies.projectcalico.org`, which prevents it from syncing its internal cache.
+
+The best way to resolve this issue is to upgrade Calico to a newer version. However, the following workaround is also applicable:
+
+Create the necessary `RBAC` permissions to allow kube-controller-manager to read `tier.[global]networkpolicies.projectcalico.org` resources.
+
+```yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: tier-default-reader
+rules:
+  - apiGroups: ['projectcalico.org']
+    resources: ['tiers']
+    resourceNames: ['default']
+    verbs: ['get']
+  - apiGroups: ['projectcalico.org']
+    resources: ['tier.networkpolicies']
+    resourceNames: ['default.*']
+    verbs: ['get', 'list']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-controller-manager-tier-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tier-default-reader
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:kube-controller-manager
+```
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
@@ -2193,7 +2248,7 @@ Ensure that the cluster's certificate management process is aligned with the sec
 
 **Note**: Not applicable.
 
-## OpenSSH server becomes unavailable during cluster installation
+## OpenSSH server becomes unavailable during cluster installation on Centos 9
 
 ### Description
 During cluster installation on Centos9 or Oracle Linux 9, the OpenSSH server becomes unavailable, leading to a failure in the installation process at the `kubemarine.system.reboot_nodes` stage. This issue is caused by a version mismatch between OpenSSL and OpenSSH, which results in OpenSSH being unable to start.
