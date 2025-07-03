@@ -17,7 +17,7 @@ import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
 import uuid
-from kubemarine import kubernetes, plugins, admission, jinja
+from kubemarine import kubernetes, plugins, admission, jinja, thirdparties
 from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
@@ -38,7 +38,11 @@ def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
 
-    install.system_prepare_thirdparties(cluster)
+    # We exclude kubelet from global cross-nodes thirdparties upgrade, 
+    # because kubelet upgrade may be disruptive for running nodes.
+    # We upgrade kubelet per-node later, after draining the node.
+    all_nodes = cluster.make_group_from_roles(["control-plane", "worker"])
+    all_nodes.call(thirdparties.install_all_thirdparties, exclude=["/usr/bin/kubelet"])
 
 
 def prepull_images(cluster: KubernetesCluster) -> None:
