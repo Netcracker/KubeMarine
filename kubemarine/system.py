@@ -375,6 +375,8 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)
         if cordon_required:
+            # it is important to perform uncordon from control-plane node,
+            # because worker nodes may not have admin kubeconfig
             timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
             first_control_plane.wait_command_successful(f"kubectl uncordon {node_name}",
                                     hide=False, pty=True,
