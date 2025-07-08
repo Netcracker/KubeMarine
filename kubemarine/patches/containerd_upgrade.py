@@ -38,7 +38,8 @@ class ContainerdUpgradeAction(Action):
         containerd_package = packages.get_association_packages(cluster, os_family, "containerd")
 
         # find hosts where this expected package version is not present
-        hosts_to_packages = {host: containerd_package for host in cluster.nodes["all"].get_hosts()}
+        containerd_hosts = cluster.nodes["control-plane"].include_group(cluster.nodes["worker"]).get_hosts()
+        hosts_to_packages = {host: containerd_package for host in containerd_hosts}
         packages_map = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
         bad_hosts = set()
         for package, version_map in packages_map.items():
