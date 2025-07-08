@@ -350,7 +350,7 @@ def system_prepare_thirdparties(group: NodeGroup) -> None:
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
 
-    group.call(thirdparties.install_all_thirparties)
+    group.call(thirdparties.install_all_thirdparties)
 
 
 @_applicable_for_new_nodes_with_roles('balancer')

@@ -25,7 +25,7 @@ import yaml
 from jinja2 import Template
 from ordered_set import OrderedSet
 
-from kubemarine import system, admission, etcd, packages, jinja, sysctl
+from kubemarine import system, admission, etcd, packages, jinja, sysctl, thirdparties
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import Token
@@ -754,6 +754,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
     first_control_plane.sudo(drain_cmd, hide=False, pty=True)
 
+    thirdparties.install_thirdparty(first_control_plane, "/usr/bin/kubelet")
     upgrade_cri_if_required(first_control_plane)
     fix_flag_kubelet(first_control_plane)
 
@@ -789,6 +790,7 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
             node.sudo(drain_cmd, hide=False, pty=True)
 
+            thirdparties.install_thirdparty(node, "/usr/bin/kubelet")
             upgrade_cri_if_required(node)
             fix_flag_kubelet(node)
 
@@ -824,6 +826,7 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
         first_control_plane.sudo(drain_cmd, hide=False, pty=True)
 
+        thirdparties.install_thirdparty(node, "/usr/bin/kubelet")        
         upgrade_cri_if_required(node)
         fix_flag_kubelet(node)
 
