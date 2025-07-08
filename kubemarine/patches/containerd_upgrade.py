@@ -53,13 +53,14 @@ class ContainerdUpgradeAction(Action):
         # but do it carefully with drain, kubelet stop/start, pods sandboxes removal, uncordon, wait for pods
         group = cluster.make_group(bad_hosts)
         log = cluster.log
+        first_control_plane = cluster.nodes["control-plane"].get_first_member()
         for node in group.get_ordered_members_list():
             log.debug(f"Containerd will be upgraded on node {node.get_node_name()}")
 
             # drain the node, but only best-effort
             log.debug(f"Draining node {node.get_node_name()}")
             drain_cmd = kubernetes.prepare_drain_command(cluster, node.get_node_name())
-            node.sudo(drain_cmd, warn=True, hide=False, pty=True)
+            first_control_plane.sudo(drain_cmd, warn=True, hide=False, pty=True)
 
             log.debug(f"Stopping kubelet on node: {node.get_node_name()}")
             node.sudo("systemctl stop kubelet")
@@ -80,7 +81,7 @@ class ContainerdUpgradeAction(Action):
             node.sudo("systemctl start kubelet")
             # we wait here, because kube-apiserver pod may need to start before uncordon will work
             expect_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
-            node.wait_command_successful(f"kubectl uncordon {node.get_node_name()}",
+            first_control_plane.wait_command_successful(f"kubectl uncordon {node.get_node_name()}",
                                         timeout=expect_config['timeout'],
                                         retries=expect_config['retries'],
                                         pty=True)
