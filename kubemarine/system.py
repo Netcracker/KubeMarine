@@ -375,7 +375,12 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)
         if cordon_required:
-            kubernetes.wait_uncordon(node)
+            timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+            first_control_plane.wait_command_successful(f"kubectl uncordon {node_name}",
+                                    hide=False, pty=True,
+                                    timeout=timeout_config['timeout'],
+                                    retries=timeout_config['retries'])
+
         results.update(raw_results)
 
     return RunnersGroupResult(cluster, results)
