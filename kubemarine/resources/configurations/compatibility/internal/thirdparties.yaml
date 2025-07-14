@@ -2,20 +2,6 @@
 # This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 
 kubeadm:
-  v1.29.1:
-    sha1: 14390d6df2bb0b6546efd2238068c300461053fd
-  v1.29.4:
-    sha1: de2dbed32d3ba125522aa7a7a4e278400d6d4855
-  v1.29.7:
-    sha1: 1c3204a3ba2139e65dc6353da8cc23d5c2d4c449
-  v1.29.10:
-    sha1: 0440c45c500ecf57433fc00ecab5c51d7e333465
-  v1.30.1:
-    sha1: 85385f4b78b79bd1cd4d1ad5244422d372d5f758
-  v1.30.3:
-    sha1: f840e75f5dc1001ebdd7e286c0e87e1090df011b
-  v1.30.10:
-    sha1: 2624809a42a5543f86093c7f63ee45dbea033720
   v1.31.1:
     sha1: 0a682af6436ce4e7188f93ddeebff5c2f3be1592
   v1.31.6:
@@ -27,20 +13,6 @@ kubeadm:
   v1.33.0:
     sha1: bc411a208e067c63976eeecf02d1bf5c5c823bff
 kubelet:
-  v1.29.1:
-    sha1: aa871f4656bf1cc6393058f28d5c938268df3d4e
-  v1.29.4:
-    sha1: f019ec5abe443bf20ef711ebbc971f51b7a1a34d
-  v1.29.7:
-    sha1: a8be6dadd57062577102ddcad029f7b23a5ce925
-  v1.29.10:
-    sha1: 824488f6e25a8abe03625a6e646e25e0dea39906
-  v1.30.1:
-    sha1: c62da6ab918b8e56d7c9b77e642ffc73ffdbffac
-  v1.30.3:
-    sha1: fbae53efc43ec715a45b05415294ab991ea087a2
-  v1.30.10:
-    sha1: b78c1f4c84938a01996d3b990c4af13457c5b071
   v1.31.1:
     sha1: fc7d0a9859c97ec2a2a4ac9ec1814b131e8d875f
   v1.31.6:
@@ -52,20 +24,6 @@ kubelet:
   v1.33.0:
     sha1: 984fc4e063e8df34f4beaa9212e5429ee70e5997
 kubectl:
-  v1.29.1:
-    sha1: 5867f210ce90c62e0551062492751e43c2ae6a46
-  v1.29.4:
-    sha1: ea298117fbf1d3f4b85f491ccec622e0599c9248
-  v1.29.7:
-    sha1: 6be79225976da1bdbbafc2f63118263fc35f224f
-  v1.29.10:
-    sha1: ed464573af46655d6ed9643f50977ccdc7479217
-  v1.30.1:
-    sha1: bced94239f1dbdb04d3a661a067bf9587865b6e8
-  v1.30.3:
-    sha1: 097d6b02fabb284418a9c95ea81fa86fc3c85bb7
-  v1.30.10:
-    sha1: 91f768a0579aacb64d25d38cb9c331df0b80bc78
   v1.31.1:
     sha1: a0fd9dc942f533e2bdeaa4b2691fc408e334f922
   v1.31.6:
@@ -79,27 +37,6 @@ kubectl:
 calicoctl:
 # calicoctl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # It also corresponds to the plugin version in kubemarine/resources/configurations/compatibility/internal/plugins.yaml
-  v1.29.1:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.29.4:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.29.7:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.29.10:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.30.1:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.30.3:
-    version: v3.29.1
-    sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
-  v1.30.10:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
   v1.31.1:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
@@ -118,27 +55,6 @@ calicoctl:
 crictl:
 # crictl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # for backward compatibility with clusters in a private environment.
-  v1.29.1:
-    version: v1.29.0
-    sha1: c4224ed25f729dbf73976198c8bc73dec0bf5a5f
-  v1.29.4:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
-  v1.29.7:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
-  v1.29.10:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
-  v1.30.1:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
-  v1.30.3:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
-  v1.30.10:
-    version: v1.30.0
-    sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
   v1.31.1:
     version: v1.30.0
     sha1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b
