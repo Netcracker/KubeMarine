@@ -181,6 +181,8 @@ class IngressNginxManifestProcessor(Processor):
         config_map = self.inventory['plugins']['nginx-ingress-controller'].get('config_map')
         if config_map:
             source_yaml = manifest.get_obj(key, patch=True)
+            if 'data' not in source_yaml or not isinstance(source_yaml['data'], dict):
+                source_yaml['data'] = {}
             data: dict = source_yaml['data']
             data.update(config_map)
             self.log.verbose(f"The {key} has been patched in 'data' "
