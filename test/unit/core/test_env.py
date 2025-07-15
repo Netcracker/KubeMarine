@@ -146,7 +146,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_kubernetes_version_env_variable(self):
-        kubernetes_version = 'v1.30.3'
+        kubernetes_version = 'v1.31.6'
         self.prepare_context(['--without-act'])
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
@@ -163,7 +163,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
 
     @test_utils.temporary_directory
     def test_kubernetes_version_upgrade_env_variable(self):
-        before, after = 'v1.29.7', 'v1.30.10'
+        before, after = 'v1.31.6', 'v1.32.2'
         self.prepare_context(['fake_path.yaml', '--without-act'], procedure='upgrade')
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
@@ -199,7 +199,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
         self.inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = 'containerd'
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
 
-        env_kubernetes_version = 'v1.29.7'
+        env_kubernetes_version = 'v1.31.6'
         changed_upgrade_config = {
             'thirdparties': {'crictl': [env_kubernetes_version]},
             'packages': {

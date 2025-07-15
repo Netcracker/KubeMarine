@@ -53,7 +53,7 @@ class _AbstractReconfigureTest(unittest.TestCase):
 class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
     def test_enrich_and_finalize_inventory(self):
         self.inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.29.1',
+            'kubernetesVersion': 'v1.31.6',
             'apiServer': {
                 'extraArgs': {'api_k1': 'api_v1'},
                 'extraVolumes': [{'name': 'api_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
@@ -222,7 +222,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
 
     def test_error_kubelet_patch_refers_balancer(self):
         self.setUpScheme(demo.FULLHA)
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.7'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.6'
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
                 {'nodes': ['balancer-1'], 'patch': {'maxPods': 111}},
@@ -233,7 +233,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
             self.new_cluster()
 
     def test_kubeadm_supports_patches(self):
-        kubernetes_version = 'v1.29.1'
+        kubernetes_version = 'v1.31.6'
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         self.reconfigure['services']['kubeadm_patches'] = {
             'apiServer': [
@@ -409,7 +409,7 @@ class RunTasks(_AbstractReconfigureTest):
             self._run()
 
     def test_kubernetes_reconfigure_empty_patch_sections(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.6'
         self.reconfigure.setdefault('services', {})['kubeadm_patches'] = {
             'apiServer': [], 'scheduler': [], 'controllerManager': [], 'etcd': [], 'kubelet': [],
         }
@@ -426,7 +426,7 @@ class RunTasks(_AbstractReconfigureTest):
             self._run()
 
     def test_kubernetes_reconfigure_detect_kube_proxy_conntrack_min_changes(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.6'
         self.reconfigure['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': 1000001
         }
