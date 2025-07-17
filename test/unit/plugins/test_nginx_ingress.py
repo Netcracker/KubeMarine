@@ -126,6 +126,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         default_cm = self.get_obj(manifest, "ConfigMap_ingress-nginx-controller")['data']
         self.assertEqual({
             "allow-snippet-annotations": "true",
+            "annotations-risk-level": "Critical",
             "foo": "bar",
             "proxy-set-headers": "ingress-nginx/custom-headers",
             "use-proxy-protocol": "true"
