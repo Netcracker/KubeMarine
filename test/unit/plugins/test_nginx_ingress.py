@@ -127,6 +127,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertEqual({
             "allow-snippet-annotations": "true",
             "annotations-risk-level": "Critical",
+            "strict-validate-path-type": "false",
+            "allow-cross-namespace-resources": "true",
             "foo": "bar",
             "proxy-set-headers": "ingress-nginx/custom-headers",
             "use-proxy-protocol": "true"
