@@ -711,7 +711,7 @@ plugins:
     config_map:
       use-proxy-protocol: '{% if nodes | select("has_role", "balancer") | first %}true{% else %}false{% endif %}'
       # redefine default value for controller >= v1.9.0 because we need to use snippet annotations for dashboard
-      # values for anotaions risk level, path-type validation and cross NS resources are redfined for controller version >= v1.20.0
+      # values for anotaions risk level, path-type validation and cross NS resources are redfined for controller version >= v1.12.0
       allow-snippet-annotations: "true"
       annotations-risk-level: "Critical"
       strict-validate-path-type: "false"
