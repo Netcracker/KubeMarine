@@ -171,8 +171,7 @@ For cluster machines, ensure the following requirements are met:
   * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3 ,9.4, 9.5
   * Ubuntu 20.04, 22.04.1, 24.04.1
  
-**Note**: Ubuntu 24.04 is supported only with latest kubernetes versions: v1.29.7, v1.30.3, v1.31.1. 
-
+**Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.8 and above.
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L256).
 <!-- #GFCFilterMarkerEnd# -->
@@ -1115,7 +1114,7 @@ By default, the installer uses the following parameters:
 
 | Parameter                                               | Default Value                                            | Description                                                                            |
 |---------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------------------------------------|
-| kubernetesVersion                                       | `v1.30.3`                                               |                                                                                        |
+| kubernetesVersion                                       | `v1.32.2`                   |                                           |
 | controlPlaneEndpoint                                    | `{{ cluster_name }}:6443`                                |                                                                                        |
 | networking.podSubnet                                    | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                        |
 | networking.serviceSubnet                                | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                        |
