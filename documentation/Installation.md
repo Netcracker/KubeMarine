@@ -171,7 +171,8 @@ For cluster machines, ensure the following requirements are met:
   * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3 ,9.4, 9.5
   * Ubuntu 20.04, 22.04.1, 24.04.1
  
-**Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.8 and above.
+**Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.7 and above.
+
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L256).
 <!-- #GFCFilterMarkerEnd# -->
