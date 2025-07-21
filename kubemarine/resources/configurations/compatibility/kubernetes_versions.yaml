@@ -10,31 +10,31 @@ compatibility_map:
 # This section should be changed manually.
   v1.31.1:
     calico: v3.29.1
-    nginx-ingress-controller: v1.11.6
+    nginx-ingress-controller: v1.12.4
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
     crictl: v1.30.0
   v1.31.6:
     calico: v3.29.4
-    nginx-ingress-controller: v1.11.6
+    nginx-ingress-controller: v1.12.4
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
     crictl: v1.30.0
   v1.32.0:
     calico: v3.29.1
-    nginx-ingress-controller: v1.11.6
+    nginx-ingress-controller: v1.12.4
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
     crictl: v1.32.0
   v1.32.2:
     calico: v3.29.4
-    nginx-ingress-controller: v1.11.6
+    nginx-ingress-controller: v1.12.4
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
     crictl: v1.32.0
   v1.33.0:
     calico: v3.29.4
-    nginx-ingress-controller: v1.11.6
+    nginx-ingress-controller: v1.13.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.31
     crictl: v1.33.0
