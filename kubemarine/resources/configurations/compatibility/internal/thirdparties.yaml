@@ -41,17 +41,17 @@ calicoctl:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.31.6:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.5
+    sha1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126
   v1.32.0:
     version: v3.29.1
     sha1: 00be749d257eee5035d3ba408aca15fcaf8be7c2
   v1.32.2:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.5
+    sha1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126
   v1.33.0:
-    version: v3.29.4
-    sha1: 899eba9872bd7362e19a17d4380ed16bf4d39717
+    version: v3.29.5
+    sha1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126
 crictl:
 # crictl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # for backward compatibility with clusters in a private environment.

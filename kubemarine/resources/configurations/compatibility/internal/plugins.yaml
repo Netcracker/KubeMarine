@@ -8,13 +8,13 @@ calico:
   v1.31.1:
     version: v3.29.1
   v1.31.6:
-    version: v3.29.4
+    version: v3.29.5
   v1.32.0:
     version: v3.29.1
   v1.32.2:
-    version: v3.29.4
+    version: v3.29.5
   v1.33.0:
-    version: v3.29.4
+    version: v3.29.5
 nginx-ingress-controller:
   v1.31.1:
     version: v1.12.4
