@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Go module in ipip_check
+  - package-ecosystem: "gomod"
+    directory: "/kubemarine/resources/scripts/source/ipip_check"
+    schedule:
+      interval: "weekly"
+  
+  # Main Dockerfile in root
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  
+  # Dockerfile-transfer in ci directory
+  - package-ecosystem: "docker"
+    directory: "/ci"
+    schedule:
+      interval: "weekly"
