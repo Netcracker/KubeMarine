@@ -348,13 +348,8 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    if try_graceful is None:
-        if 'controlplain_uri' not in cluster.context.keys():
-            kubernetes.is_cluster_installed(cluster)
-
-    graceful_reboot = try_graceful is True or \
-                      (try_graceful is None and cluster.context['controlplain_uri'] is not None)
-
+    cluster_installed = kubernetes.is_cluster_installed(cluster)
+    graceful_reboot = try_graceful is True or (try_graceful is None and cluster_installed)
     if not graceful_reboot:
         return perform_group_reboot(group)
 
@@ -366,8 +361,12 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
     for node in group.get_ordered_members_list():
         node_config = node.get_config()
         node_name = node.get_node_name()
-        cordon_required = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
+
+        is_new_node = cluster.get_new_nodes().has_node(node_name)
+        is_k8s_node = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
+        cordon_required = cluster_installed and is_k8s_node and not is_new_node
         if cordon_required:
+            # we drain node in "best effort" manner, so that failed drain does not prevent reboot
             res = first_control_plane.sudo(
                 kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
                 warn=True, pty=True)
@@ -375,7 +374,12 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
         log.debug(f'Rebooting node "{node_name}"')
         raw_results = perform_group_reboot(node)
         if cordon_required:
-            res = first_control_plane.sudo(f'kubectl uncordon {node_name}', warn=True)
+            # we require that uncordon succeed after drain-reboot
+            timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+            first_control_plane.wait_command_successful(f"kubectl uncordon {node_name}",
+                                    hide=False, pty=True,
+                                    timeout=timeout_config['timeout'],
+                                    retries=timeout_config['retries'])
             log.verbose(res)
 
         results.update(raw_results)
