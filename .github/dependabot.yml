@@ -17,3 +17,9 @@ updates:
     directory: "/ci"
     schedule:
       interval: "weekly"
+  
+  # Python dependencies (requirements files in repo root)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
