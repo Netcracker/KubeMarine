@@ -934,11 +934,11 @@ Also pay attention to the following:
 Removing a node from a Kubernetes cluster is done in the following order:
 
 1. Pods are gracefully evacuated.
-2. The ETCD member is stopped and removed from the ETCD cluster.
-3. Kubelet is stopped.
-4. ETCD and Kubernetes data is deleted.
-5. Containers are stopped and deleted. Images are deleted and container runtime is entirely pruned. 
-6. Kubernetes node is deleted from the Kubernetes cluster.
+1. The ETCD member is stopped and removed from the ETCD cluster.
+1. Kubelet is stopped.
+1. ETCD and Kubernetes data is deleted.
+1. Containers are stopped and deleted. Images are deleted and container runtime is entirely pruned. 
+1. Kubernetes node is deleted from the Kubernetes cluster.
 
 **Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
 
