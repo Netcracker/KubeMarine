@@ -229,7 +229,7 @@ The configuration format for the plugins is the same.
   The target version must also be the latest patch version supported by Kubemarine.
   For example, upgrade is allowed from v1.26.7 to v1.26.11, or from v1.26.7 to v1.27.8, or from v1.26.7 to v1.28.4 through v1.27.8,
   but not from v1.26.7 to v1.27.1 as v1.27.1 is not the latest supported patch version of Kubernetes v1.27.
-* Once `upgrade` procedure is executed, it may not be restarted again without additional considerations. For example, once upgrade procedure reaches certain point, it changes `cluster.yaml` to reflect updated k8s version, so running upgrade procedure with updated `cluster.yaml` and old `procedure.yaml` may effectively mean k8s version downgrade, which KubeMarine does not allow. You may need to change `cluster.yaml` or `procedure.yaml` accordingly to re-run procedure.
+* Once `upgrade` procedure is executed, it may not be restarted again without additional considerations. For example, once upgrade procedure reaches to the certain point, it changes the `cluster.yaml` file to reflect the updated k8s version. Hence, running upgrade procedure with updated `cluster.yaml` file and old `procedure.yaml` file may effectively mean k8s version downgrade, which KubeMarine does not allow. You may need to change the `cluster.yaml` file or `procedure.yaml` file accordingly to re-run the procedure.
 
 ### Upgrade Procedure Parameters
 
@@ -703,7 +703,7 @@ The `backup` procedure executes the following sequence of tasks:
 
 **Note**: Before starting the restore, make sure that all nodes are online and accessible.
 
-**Note**: the topology of the cluster being restored must be the same as the topology of the cluster from which the backup was created. Everything should be the same, down to the names and addresses of the nodes, their amounts and roles. If they differ, then it is recommended to perform manual recovery using the backed up Kubernetes resources from your backup archive.
+**Note**: The topology of the cluster being restored must be the same as the topology of the cluster from which the backup was created. Everything should be the same, down to the names and addresses of the nodes, their amounts and roles. If they differ, then it is recommended to perform manual recovery using the backed up Kubernetes resources from your backup archive.
 
 **Note**: It is not necessary to define cluster.yaml for the restore procedure. In case of a missing or empty cluster, the yaml is retrieved from the backup archive.
 
@@ -805,7 +805,7 @@ Also pay attention to the following:
 * Only new nodes can be rebooted.
 * The file `/etc/hosts` is updated and uploaded to all nodes in the cluster.
 * If there are some offline workers during the procedure, you should exclude `prepare.dns.etc_hosts` task and update `/etc/hosts` on new nodes manually.
-* Once `add_node` procedure is executed, it may not be restarted again without additional considerations. For example, once add node procedure completes (even with one task), it changes `cluster.yaml` to reflect added node, so running add node procedure with updated `cluster.yaml` and old `procedure.yaml` may effectively mean adding already added node, which KubeMarine does not allow. You may need to change `cluster.yaml` or `procedure.yaml` accordingly to re-run procedure.
+* Once the `add_node` procedure is executed, it may not be restarted again without additional considerations. For example, once add node procedure completes (even with one task), it changes the `cluster.yaml` file to reflect the added node. Hence, running add node procedure with updated `cluster.yaml` file and old `procedure.yaml` file may effectively mean adding already added node, which KubeMarine does not allow. You may need to change the `cluster.yaml` file or `procedure.yaml` file accordingly to re-run procedure.
 
 **Note**: It is not possible to change a node's role by adding an existing node again with a new role. You have to remove the node and add it again.
 
@@ -929,7 +929,7 @@ Also pay attention to the following:
 * The file `/etc/hosts` is updated and uploaded to all remaining nodes in the cluster. The control plane address may change.
 * This procedure only removes nodes and does not restore nodes to their original state. Packages, configurations, and Thirdparties are also not deleted.
 * If there are some offline workers during the procedure, you should exclude `update.etc_hosts` task.
-* Once `remove_node` procedure is executed, it may not be restarted again without additional considerations. For example, once remove node procedure completes (even with one task), it changes `cluster.yaml` to reflect removed node, so running remove node procedure with updated `cluster.yaml` and old `procedure.yaml` may effectively mean removing non-existent node, which KubeMarine does not allow. You may need to change `cluster.yaml` or `procedure.yaml` accordingly to re-run procedure.
+* Once the `remove_node` procedure is executed, it may not be restarted again without additional considerations. For example, once the remove node procedure completes (even with one task), it changes the `cluster.yaml` file to reflect the removed node. Hence, running remove node procedure with the updated `cluster.yaml` file and old `procedure.yaml` file may effectively mean removing non-existent node, which KubeMarine does not allow. You may need to change `cluster.yaml` file or `procedure.yaml` file accordingly to re-run procedure.
 
 Removing a node from a Kubernetes cluster is done in the following order:
 
