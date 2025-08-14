@@ -929,16 +929,16 @@ Also pay attention to the following:
 * The file `/etc/hosts` is updated and uploaded to all remaining nodes in the cluster. The control plane address may change.
 * This procedure only removes nodes and does not restore nodes to their original state. Packages, configurations, and Thirdparties are also not deleted.
 * If there are some offline workers during the procedure, you should exclude `update.etc_hosts` task.
-* Once `remove_node` procedure is executed, it may not be restarted again without additional considerations. For example, once remove node procedure completes (even with one task), it changes `cluster.yaml` to reflect remove node, so running remove node procedure with updated `cluster.yaml` and old `procedure.yaml` may effectively mean removing already removed node, which KubeMarine does not allow. You may need to change `cluster.yaml` or `procedure.yaml` accordingly to re-run procedure.
+* Once `remove_node` procedure is executed, it may not be restarted again without additional considerations. For example, once remove node procedure completes (even with one task), it changes `cluster.yaml` to reflect removed node, so running remove node procedure with updated `cluster.yaml` and old `procedure.yaml` may effectively mean removing non-existent node, which KubeMarine does not allow. You may need to change `cluster.yaml` or `procedure.yaml` accordingly to re-run procedure.
 
 Removing a node from a Kubernetes cluster is done in the following order:
 
 1. Pods are gracefully evacuated.
-1. The ETCD member is stopped and removed from the ETCD cluster.
-1. Kubelet is stopped.
-1. ETCD and Kubernetes data is deleted.
-1. Containers are stopped and deleted. Images are deleted and container runtime is entirely pruned. 
-1. Kubernetes node is deleted from the Kubernetes cluster.
+2. The ETCD member is stopped and removed from the ETCD cluster.
+3. Kubelet is stopped.
+4. ETCD and Kubernetes data is deleted.
+5. Containers are stopped and deleted. Images are deleted and container runtime is entirely pruned. 
+6. Kubernetes node is deleted from the Kubernetes cluster.
 
 **Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
 
