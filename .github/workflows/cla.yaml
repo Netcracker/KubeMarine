@@ -7,13 +7,16 @@ on:
     types: [opened, closed, synchronize]
 
 permissions:
-  actions: write
-  contents: write
-  pull-requests: write
-  statuses: write
+  contents: read
 
 jobs:
   CLAAssistant:
+    if: github.event.pull_request.draft == false
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      statuses: write
     runs-on: ubuntu-latest
     steps:
       - name: "CLA Assistant"
