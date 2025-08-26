@@ -327,11 +327,12 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        # After removing RHEL 7/8 support, the detected OS family should be rhel9
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'rhel', 'version': '9.2', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_not_sudoer_does_not_interrupt_enrichment(self):
@@ -345,11 +346,12 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        # Only rhel9 family is supported
+        self.assertEqual("rhel9", cluster.get_os_family())
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'rhel', 'version': '9.2', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_any_offline_node_interrupts(self):
@@ -480,11 +482,12 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        # Only rhel9 family is expected after dropping support for older RHEL versions
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'rhel', 'version': '9.2', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_detect_nodes_context_do_procedure(self):
@@ -503,11 +506,12 @@ class FlowTest(unittest.TestCase):
         flow.ActionsFlow([do.CLIAction(context)]).run_flow(res, print_summary=False)
 
         cluster = res.cluster(EnrichmentStage.LIGHT)
-        self.assertEqual("rhel", cluster.get_os_family())
+        # Only rhel9 family is expected
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(1, len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'rhel', 'version': '9.2', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_do_master_offline(self):

@@ -31,7 +31,8 @@ def enrich_kernel_modules(cluster: KubernetesCluster) -> None:
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
 
-    for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
+    # Only Debian and RHEL 9 families are supported.  Older RHEL families have been removed.
+    for os_family in ('debian', 'rhel9'):
         # Remove the section for OS families if no node has these OS families.
         modprobe_config = cluster.inventory["services"]["modprobe"]
         if cluster.nodes['all'].get_subgroup_with_os(os_family).is_empty():

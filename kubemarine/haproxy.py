@@ -226,7 +226,8 @@ def configure(group: DeferredGroup) -> None:
 
 
 def override_haproxy18(group: DeferredGroup) -> None:
-    rhel_nodes = group.get_subgroup_with_os('rhel')
+    # Haproxy 1.8 overrides apply only to RHEL 9 family nodes.  Older RHEL families are not supported.
+    rhel_nodes = group.get_subgroup_with_os('rhel9')
     if rhel_nodes.is_empty():
         group.cluster.log.debug('Haproxy18 override is not required')
         return

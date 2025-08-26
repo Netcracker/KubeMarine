@@ -97,7 +97,8 @@ def export_ansible_inventory(cluster: KubernetesCluster) -> None:
 
 def export_packages_list(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if cluster.get_os_family() in ['rhel', 'rhel8', 'rhel9']:
+    # Only the RHEL 9 family uses RPM; all older RHEL families (7, 8) have been dropped.
+    if cluster.get_os_family() == 'rhel9':
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"

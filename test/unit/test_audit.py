@@ -33,20 +33,25 @@ class TestAuditInstallation(unittest.TestCase):
     def get_detect_package_version_cmd(self, os_family: str, package_name: str):
         return packages.get_detect_package_version_cmd(os_family, package_name)
 
-    def test_audit_installation_for_centos(self):
+    def test_audit_installation_for_rhel(self):
+        """
+        Test installation of the audit package on an RHEL‑based cluster.  Support for CentOS/RHEL 7/8 has been removed,
+        so this test now uses RHEL 9.2.
+        """
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='rhel', os_version='9.2')
         cluster = demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['audit']
+        # retrieve package and service names from package associations for the rhel9 family
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
 
-        # simulate package detection command
+        # simulate package detection command (package not installed yet)
         exp_results1 = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=1,
-                                                    stderr='package %s is not installed' % package_name)
-        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
+                                                    stderr=f'package {package_name} is not installed')
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel9', package_name)])
 
         # simulate package installation command
         installation_command = [yum.get_install_cmd(cluster, package_name)]
@@ -56,7 +61,7 @@ class TestAuditInstallation(unittest.TestCase):
 
         # simulate enable package command
         exp_results3 = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout='ok')
-        cluster.fake_shell.add(exp_results3, 'sudo', ['systemctl enable %s --now' % service_name])
+        cluster.fake_shell.add(exp_results3, 'sudo', [f'systemctl enable {service_name} --now'])
 
         audit.install(cluster.nodes['control-plane'])
 

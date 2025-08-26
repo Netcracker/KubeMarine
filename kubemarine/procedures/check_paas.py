@@ -873,7 +873,9 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '213', "Security", "Selinux security policy") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
+        # Only consider nodes from the RHEL 9 family when checking SELinux.  Older RHEL families
+        # (7 and 8) are not supported.
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel9'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
         _, selinux_result, selinux_parsed_result = \
@@ -931,7 +933,8 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '214', "Security", "Selinux configuration") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
+        # Only consider nodes from the RHEL 9 family.  Older RHEL families (7 and 8) are unsupported.
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel9'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
         selinux_configured, selinux_result, _ = \

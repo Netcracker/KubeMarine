@@ -297,17 +297,8 @@ compatibility_map:
         amount: 8
 
   distributives:
+    # CentOS support is limited to version 9 only. Older versions (7.x and 8.x) are no longer supported.
     centos:
-      - os_family: 'rhel'
-        versions:
-          - '7.5'
-          - '7.6'
-          - '7.7'
-          - '7.8'
-          - '7.9'
-      - os_family: 'rhel8'
-        versions:
-          - '8.4'
       - os_family: 'rhel9'
         versions:
           - '9'

@@ -57,8 +57,10 @@ class KubernetesClusterTest(unittest.TestCase):
 
     def test_get_os_family(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.MINIHA_KEEPALIVED))
-        self.assertEqual('rhel', get_os_family(cluster),
-                         msg="Demo cluster should be created with 'rhel' OS family by default")
+        # Since support for RHEL 7/8 has been removed, the default OS family for a demo cluster
+        # is now rhel9.  The test validates that the cluster reflects this.
+        self.assertEqual('rhel9', get_os_family(cluster),
+                         msg="Demo cluster should be created with 'rhel9' OS family by default")
 
     def test_get_os_family_multiple(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -132,11 +134,16 @@ class KubernetesClusterTest(unittest.TestCase):
                          msg="Package associations are not redefined")
 
     def _nodes_context_one_different_os(self, inventory, host_different_os):
+        """
+        Construct a nodes context where most nodes run on Ubuntu 20.04 but one
+        node runs on a different OS.  Since support for CentOS 7/8 and RHEL 7/8 has been removed,
+        the different node now uses RHEL 9.2 instead of an older RHEL/CentOS version.
+        """
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
         nodes_context[host_different_os]['os'] = {
-            'name': 'centos',
-            'family': 'rhel',
-            'version': '7.9'
+            'name': 'rhel',
+            'family': 'rhel9',
+            'version': '9.2'
         }
         return nodes_context
 

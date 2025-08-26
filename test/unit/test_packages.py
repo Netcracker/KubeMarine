@@ -228,7 +228,8 @@ class AssociationsEnrichment(unittest.TestCase):
     def test_success_if_os_specific_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'containerd'
-        package_associations(inventory, 'rhel', 'containerd')['package_name'] = expected_pkgs
+        # Define package associations for the RHEL 9 family since older RHEL versions are unsupported
+        package_associations(inventory, 'rhel9', 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
@@ -257,21 +258,28 @@ class AssociationsEnrichment(unittest.TestCase):
             new_debian_cluster(inventory)
 
     def _nodes_context_one_different_os(self, inventory, host_different_os):
+        """
+        Construct a nodes context where most nodes run on Ubuntu 20.04 but one
+        node runs on a different operating system.  Since CentOS 7/8 and RHEL 7/8
+        support have been removed, the different node now uses RHEL 9.2.
+        """
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        # Map the different node to RHEL 9.2 since earlier releases are no longer supported
         nodes_context[host_different_os]['os'] = {
-            'name': 'centos',
-            'family': 'rhel',
-            'version': '7.9'
+            'name': 'rhel',
+            'family': 'rhel9',
+            'version': '9.2'
         }
         return nodes_context
 
 
 class PackagesUtilities(unittest.TestCase):
     def test_get_package_name_rhel(self):
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03.15-3.el7.x86_64'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce'))
+        # Verify package name parsing for RHEL 9.  Only RHEL 9 family is supported.
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-19.03.15-3.el9.x86_64'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-19.03*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce'))
 
     def test_get_package_name_debian(self):
         self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.9-0ubuntu1~20.04.4'))
@@ -305,14 +313,16 @@ class PackagesUtilities(unittest.TestCase):
     def test_detect_versions_rhel(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='7.9')
+        # Use RHEL 9 since support for earlier versions has been removed.
+        nodes_context = demo.generate_nodes_context(inventory, os_name='rhel', os_version='9.2')
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
 
-        expected_pkg = 'docker-ce-19.03.15-3.el7.x86_64'
+        expected_pkg = 'docker-ce-19.03.15-3.el9.x86_64'
         queried_pkg = 'docker-ce-19.03*'
         group = cluster.nodes['all']
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
-        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel', 'docker-ce')])
+        # Use rhel9 to build the detection command
+        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel9', 'docker-ce')])
 
         hosts_to_packages = {host: [queried_pkg] for host in group.get_hosts()}
         detected_packages = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)

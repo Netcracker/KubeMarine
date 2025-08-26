@@ -187,24 +187,15 @@ class ModulesEnrichment(unittest.TestCase):
 
                 cluster = self.new_cluster()
 
-                if os_family == 'rhel':
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack_ipv6',
-                        'ip6table_filter',
-                        'nf_nat_masquerade_ipv6',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
-                else:
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack',
-                        'ip6table_filter',
-                        'nf_nat',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
+                # For all supported OS families (Debian and RHEL 9) the default IPv6 modules are the same.
+                expected_all_modules_list = [
+                    'br_netfilter',
+                    'nf_conntrack',
+                    'ip6table_filter',
+                    'nf_nat',
+                    'nf_reject_ipv6',
+                    'nf_defrag_ipv6',
+                ]
 
                 kubernetes_only_modules_list = [
                     'br_netfilter',
@@ -222,12 +213,21 @@ class ModulesEnrichment(unittest.TestCase):
                     self.assertEqual(expected_modules_list, actual_modules_list)
 
     def _get_os_context(self, os_family: str) -> Tuple[str, str]:
-        return {
+        """
+        Return a tuple of (os_name, os_version) for the specified OS family.
+
+        Since support for CentOS and old RHEL versions has been removed, all
+        RHEL-based OS families (``rhel``, ``rhel8``, ``rhel9``) are mapped
+        to RHEL 9.2 for testing purposes.
+        """
+        mapping = {
             'debian': ('ubuntu', '22.04'),
-            'rhel': ('centos', '7.9'),
-            'rhel8': ('rhel', '8.7'),
+            # Map all RHEL families to RHEL 9.2 since earlier versions are no longer supported
+            'rhel': ('rhel', '9.2'),
+            'rhel8': ('rhel', '9.2'),
             'rhel9': ('rhel', '9.2')
-        }[os_family]
+        }
+        return mapping[os_family]
 
     def _nodes_having_modules(self, cluster: demo.FakeKubernetesCluster, module_name: str) -> Set[str]:
         return {node.get_node_name() for node in cluster.nodes['all'].get_ordered_members_list()

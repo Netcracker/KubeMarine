@@ -481,7 +481,12 @@ def disable_unattended_upgrade(group: NodeGroup) -> None:
 
 
 def get_associations_os_family_keys() -> Set[str]:
-    return {'debian', 'rhel', 'rhel8', 'rhel9'}
+    """
+    Return the set of operating system families that are supported for package associations.
+
+    CentOS 7/8 and RHEL 7/8 support have been removed.  Only Debian and RHEL 9 remain.
+    """
+    return {'debian', 'rhel9'}
 
 
 def get_compatibility_version_key(os_family: str) -> str:
@@ -535,8 +540,10 @@ class PackageManager(Protocol):
 def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]) -> PackageManager:
     os_family = group.get_nodes_os()
 
-    if os_family in ['rhel', 'rhel8', 'rhel9']:
+    # Use yum for RHEL-based systems. Only RHEL 9 is supported.
+    if os_family == 'rhel9':
         return yum
+    # Use apt for Debian-based systems.
     elif os_family == 'debian':
         return apt
 
@@ -595,7 +602,13 @@ def search_package(group: DeferredGroup, package: str, callback: Callback = None
 
 
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
-    if os_family in ["rhel", "rhel8", "rhel9"]:
+    """
+    Construct a command to query the installed version of a package on a node.
+
+    For RPM-based systems (RHEL), use `rpm -q`.  Only the RHEL 9 family is supported.
+    For Debian-based systems, use `dpkg-query`.
+    """
+    if os_family == "rhel9":
         cmd = r"rpm -q %s" % package_name
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
@@ -681,8 +694,9 @@ def get_package_name(os_family: str, package: str) -> str:
     package_name = ""
 
     if package:
-        if os_family in ["rhel", "rhel8", "rhel9"]:
-            # regexp is needed to split package and its version, the pattern start with '-' then should be number or '*'
+        if os_family == "rhel9":
+            # For RHEL-based systems the package name and version are separated by a hyphen
+            # followed by digits or a wildcard.  Earlier RHEL versions are not supported.
             package_name = re.split(r'-[\d,\*]', package)[0]
         else:
             # in ubuntu it is much easier to parse package name

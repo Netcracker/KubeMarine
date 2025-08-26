@@ -222,9 +222,10 @@ class UpgradeCRI(unittest.TestCase):
     def test_specific_os_family_cri_association_upgrade_required(self):
         for os_name, os_family, os_version in (
                 ('ubuntu', 'debian', '20.04'),
-                ('centos', 'rhel', '7.9'),
-                ('rhel', 'rhel8', '8.7'),
-                ('rhel', 'rhel9', '9.2')
+                # Only RHEL 9 series are supported.  Earlier versions have been removed.
+                ('rhel', 'rhel9', '9.2'),
+                ('rhel', 'rhel9', '9.3'),
+                ('rhel', 'rhel9', '9.4')
         ):
             for package_vary in ('containerd', 'containerdio'):
                 expected_upgrade_required = package_vary in self._packages_for_cri_os_family(os_family)
@@ -236,12 +237,11 @@ class UpgradeCRI(unittest.TestCase):
                                         EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
     def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
-        if os_family in ('rhel', 'rhel8', 'rhel9'):
-            package_names = ['containerdio']
+        # RHEL 9 uses containerdio, Debian uses containerd
+        if os_family == 'rhel9':
+            return ['containerdio']
         else:
-            package_names = ['containerd']
-
-        return package_names
+            return ['containerd']
 
     def test_procedure_inventory_upgrade_required_inventory_redefined(self):
         for global_section in (False, True):
