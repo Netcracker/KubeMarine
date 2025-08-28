@@ -286,7 +286,7 @@ class TestKeepalivedInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['keepalived']
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['keepalived']
 
         # simulate already installed keepalived package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['keepalived'], stdout='Keepalived v1.2.3')
@@ -319,7 +319,7 @@ class TestKeepalivedInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['keepalived']
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['keepalived']
 
         # simulate keepalived package missing
         missing_package_command = ['%s -v' % package_associations['executable_name']]
@@ -451,7 +451,7 @@ class TestKeepalivedConfigApply(unittest.TestCase):
         node = cluster.nodes['keepalived'].get_first_member()
         expected_config = keepalived.generate_config(cluster, node.get_config())
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['keepalived']
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['keepalived']
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
         # simulate mkdir for configs

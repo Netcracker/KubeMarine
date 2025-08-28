@@ -304,35 +304,10 @@ compatibility_map:
 
   distributives:
     centos:
-      - os_family: 'rhel'
-        versions:
-          - '7.5'
-          - '7.6'
-          - '7.7'
-          - '7.8'
-          - '7.9'
-      - os_family: 'rhel8'
-        versions:
-          - '8.4'
       - os_family: 'rhel9'
         versions:
           - '9'
     rhel:
-      - os_family: 'rhel'
-        versions:
-          - '7.5'
-          - '7.6'
-          - '7.7'
-          - '7.8'
-          - '7.9'
-      - os_family: 'rhel8'
-        versions:
-          - '8.4'
-          - '8.6'
-          - '8.7'
-          - '8.8'
-          - '8.9'
-          - '8.10'  
       - os_family: 'rhel9'
         versions:
           - '9.2'

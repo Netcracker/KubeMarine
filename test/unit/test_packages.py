@@ -48,6 +48,11 @@ def prepare_enriched_associations_defaults() -> dict:
 
         default_associations[os_family] = os_associations
 
+    # prune unsupported OS families (e.g., legacy rhel/rhel8) from defaults
+    for k in list(default_associations.keys()):
+        if k not in packages.get_associations_os_family_keys():
+            default_associations.pop(k)
+
     return default_associations
 
 
@@ -60,6 +65,11 @@ def get_compiled_defaults(cluster: FakeKubernetesCluster) -> dict:
     for association_name in packages.get_associations_os_family_keys():
         if cluster.nodes['all'].get_subgroup_with_os(association_name).is_empty():
             del defaults[association_name]
+
+    # Ensure unsupported families are not present
+    for k in list(defaults.keys()):
+        if k not in packages.get_associations_os_family_keys():
+            defaults.pop(k)
 
     return defaults
 
@@ -228,7 +238,7 @@ class AssociationsEnrichment(unittest.TestCase):
     def test_success_if_os_specific_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'containerd'
-        package_associations(inventory, 'rhel', 'containerd')['package_name'] = expected_pkgs
+        package_associations(inventory, 'rhel9', 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
@@ -259,9 +269,9 @@ class AssociationsEnrichment(unittest.TestCase):
     def _nodes_context_one_different_os(self, inventory, host_different_os):
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
         nodes_context[host_different_os]['os'] = {
-            'name': 'centos',
-            'family': 'rhel',
-            'version': '7.9'
+            'name': 'rhel',
+            'family': 'rhel9',
+            'version': '9.2'
         }
         return nodes_context
 
@@ -305,14 +315,14 @@ class PackagesUtilities(unittest.TestCase):
     def test_detect_versions_rhel(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='7.9')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='rhel', os_version='9.2')
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
 
-        expected_pkg = 'docker-ce-19.03.15-3.el7.x86_64'
+        expected_pkg = 'docker-ce-20.10.20-3.el9.x86_64'
         queried_pkg = 'docker-ce-19.03*'
         group = cluster.nodes['all']
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
-        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel', 'docker-ce')])
+        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel9', 'docker-ce')])
 
         hosts_to_packages = {host: [queried_pkg] for host in group.get_hosts()}
         detected_packages = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)

@@ -51,6 +51,11 @@ def enrich_inventory_associations(cluster: KubernetesCluster) -> None:
     associations: dict = inventory['services']['packages']['associations']
     inventory['services']['packages']['associations'] = enriched_associations = {}
 
+    # Drop associations for unsupported OS families (e.g., legacy RHEL/CentOS 7/8)
+    for legacy_family in ('rhel', 'rhel8'):
+        if legacy_family in associations:
+            associations.pop(legacy_family)
+
     # Move associations for OS families and merge with globals
     for association_name in get_associations_os_family_keys():
         redefined_associations = associations.pop(association_name)
@@ -481,7 +486,8 @@ def disable_unattended_upgrade(group: NodeGroup) -> None:
 
 
 def get_associations_os_family_keys() -> Set[str]:
-    return {'debian', 'rhel', 'rhel8', 'rhel9'}
+    # Supported OS families after dropping RHEL/CentOS 7/8
+    return {'debian', 'rhel9'}
 
 
 def get_compatibility_version_key(os_family: str) -> str:
