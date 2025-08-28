@@ -186,7 +186,7 @@ class TestEnvironmentVariables(test_utils.CommonTest):
         self.assertEqual(f'https://dl.k8s.io/{after}/bin/linux/amd64/kubeadm',
                          inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
         self.assertEqual('containerd_new',
-                         inventory['services']['packages']['associations']['rhel']['containerd']['package_name'])
+                         inventory['services']['packages']['associations']['rhel9']['containerd']['package_name'])
 
     @test_utils.temporary_directory
     def test_kubernetes_version_env_variable_migrate_kubemarine_upgrade_patches(self):
