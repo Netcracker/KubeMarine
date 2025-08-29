@@ -57,8 +57,8 @@ class KubernetesClusterTest(unittest.TestCase):
 
     def test_get_os_family(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.MINIHA_KEEPALIVED))
-        self.assertEqual('rhel', get_os_family(cluster),
-                         msg="Demo cluster should be created with 'rhel' OS family by default")
+        self.assertEqual('rhel9', get_os_family(cluster),
+                         msg="Demo cluster should be created with 'rhel9' OS family by default")
 
     def test_get_os_family_multiple(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -135,8 +135,8 @@ class KubernetesClusterTest(unittest.TestCase):
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
         nodes_context[host_different_os]['os'] = {
             'name': 'centos',
-            'family': 'rhel',
-            'version': '7.9'
+            'family': 'rhel9',
+            'version': '9'
         }
         return nodes_context
 
