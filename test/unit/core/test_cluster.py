@@ -134,9 +134,9 @@ class KubernetesClusterTest(unittest.TestCase):
     def _nodes_context_one_different_os(self, inventory, host_different_os):
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
         nodes_context[host_different_os]['os'] = {
-            'name': 'rhel',
+            'name': 'centos',
             'family': 'rhel9',
-            'version': '9.2'
+            'version': '9'
         }
         return nodes_context
 

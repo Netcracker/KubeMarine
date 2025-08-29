@@ -35,7 +35,7 @@ class TestAuditInstallation(unittest.TestCase):
 
     def test_audit_installation_for_centos(self):
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(self.inventory, os_name='rhel', os_version='9.2')
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='9')
         cluster = demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
         package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['audit']
