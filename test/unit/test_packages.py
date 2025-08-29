@@ -269,19 +269,19 @@ class AssociationsEnrichment(unittest.TestCase):
     def _nodes_context_one_different_os(self, inventory, host_different_os):
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
         nodes_context[host_different_os]['os'] = {
-            'name': 'rhel',
+            'name': 'centos',
             'family': 'rhel9',
-            'version': '9.2'
+            'version': '9'
         }
         return nodes_context
 
 
 class PackagesUtilities(unittest.TestCase):
     def test_get_package_name_rhel(self):
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03.15-3.el7.x86_64'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-20.10.20-3.el9.x86_64'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-19.03*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce'))
 
     def test_get_package_name_debian(self):
         self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.9-0ubuntu1~20.04.4'))
@@ -315,7 +315,7 @@ class PackagesUtilities(unittest.TestCase):
     def test_detect_versions_rhel(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='rhel', os_version='9.2')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='9')
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
 
         expected_pkg = 'docker-ce-20.10.20-3.el9.x86_64'

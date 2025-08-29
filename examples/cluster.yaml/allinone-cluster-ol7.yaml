@@ -1,3 +1,6 @@
+# LEGACY: This example targets OL7/CentOS7 which are unsupported.
+# Kept for historical reference only. Do not use for new deployments.
+
 node_defaults:
   keyfile: /home/user/id_rsa
   password: '{{ env.PASS }}'     #Either keyfile or password can be used.
