@@ -75,7 +75,8 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p /etc/systemd/system/{package_associations['service_name']}.service.d"])
+        service_dropin_dir = f"/etc/systemd/system/{package_associations['service_name']}.service.d"
+        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p {service_dropin_dir}"])
 
         # simulate systemd daemon reload
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])
@@ -118,7 +119,8 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p /etc/systemd/system/{package_associations['service_name']}.service.d"])
+        service_dropin_dir = f"/etc/systemd/system/{package_associations['service_name']}.service.d"
+        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p {service_dropin_dir}"])
 
         # simulate systemd daemon reload
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])

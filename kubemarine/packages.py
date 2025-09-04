@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-from typing import List, Dict, Tuple, Optional, Union, Mapping, Set, Protocol
+from typing import List, Dict, Tuple, Optional, Union, Mapping, Protocol
 from io import StringIO
 
 from kubemarine import yum, apt, jinja

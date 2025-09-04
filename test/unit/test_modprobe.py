@@ -188,24 +188,14 @@ class ModulesEnrichment(unittest.TestCase):
 
                 cluster = self.new_cluster()
 
-                if os_family == 'rhel' and False:
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack_ipv6',
-                        'ip6table_filter',
-                        'nf_nat_masquerade_ipv6',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
-                else:
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack',
-                        'ip6table_filter',
-                        'nf_nat',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
+                expected_all_modules_list = [
+                    'br_netfilter',
+                    'nf_conntrack',
+                    'ip6table_filter',
+                    'nf_nat',
+                    'nf_reject_ipv6',
+                    'nf_defrag_ipv6',
+                ]
 
                 kubernetes_only_modules_list = [
                     'br_netfilter',
