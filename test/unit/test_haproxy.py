@@ -66,7 +66,8 @@ class TestHaproxyInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['haproxy']
+        os_family = cluster.get_os_family()
+        package_associations = cluster.inventory['services']['packages']['associations'][os_family]['haproxy']
 
         # simulate already installed haproxy package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='Haproxy v1.2.3')
@@ -74,7 +75,7 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_2, 'sudo', ["mkdir -p /etc/systemd/system/haproxy.service.d"])
+        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p /etc/systemd/system/{package_associations['service_name']}.service.d"])
 
         # simulate systemd daemon reload
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])
@@ -94,7 +95,8 @@ class TestHaproxyInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel9']['haproxy']
+        os_family = cluster.get_os_family()
+        package_associations = cluster.inventory['services']['packages']['associations'][os_family]['haproxy']
 
         # simulate haproxy package missing
         missing_package_command = ['%s -v' % package_associations['executable_name']]
@@ -116,7 +118,7 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_2, 'sudo', ["mkdir -p /etc/systemd/system/haproxy.service.d"])
+        cluster.fake_shell.add(expected_results_2, 'sudo', [f"mkdir -p /etc/systemd/system/{package_associations['service_name']}.service.d"])
 
         # simulate systemd daemon reload
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])

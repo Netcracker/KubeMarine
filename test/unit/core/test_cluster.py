@@ -58,7 +58,7 @@ class KubernetesClusterTest(unittest.TestCase):
     def test_get_os_family(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.MINIHA_KEEPALIVED))
         self.assertEqual('rhel9', get_os_family(cluster),
-                         msg="Demo cluster should be created with 'rhel9' OS family by default")
+                         msg="Demo cluster should be created with 'rhel' OS family by default")
 
     def test_get_os_family_multiple(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
