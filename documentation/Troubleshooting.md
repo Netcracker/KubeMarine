@@ -1231,7 +1231,7 @@ To avoid this issue in the future:
 ## Pods Stuck in "Terminating" Status During Deletion
 
 ### Description
-This issue applies to legacy, unsupported OS releases (RHEL/CentOS 7.x) and should not occur on supported platforms.
+This issue occurs when pods get stuck in the "Terminating" status and are not deleted properly. It is specifically applicable to hosts running RHEL or CentOS 7.x versions (starting from 7.4) where the `containerd` container runtime is used.
 
 ### Alerts
 Not applicable.
@@ -1250,10 +1250,10 @@ sysctl -p
 ```
 
 ### Recommendations
-Note: The workaround described here was relevant for RHEL/CentOS 7.x, which are no longer supported.
+Ensure that this setting is only applied on RHEL or CentOS 7.x systems (starting from 7.4) where the `containerd` container runtime is being used.
 
 >**Note**  
->Legacy note: This solution targeted RHEL/CentOS 7.x environments and is retained for historical context.
+>This solution is specifically intended for RHEL and CentOS 7.x environments.
 
 ## Random 504 Error on Ingresses
 
@@ -1776,7 +1776,7 @@ To fix this issue:
    
 2. **Use additional grants** for the Kubemarine container by adding the `--privileged` or `--cap-add` options to the Docker command to provide the necessary permissions.
 
-Legacy example: Kubemarine image `v0.25.0` on `CentOS 7.5` with Docker `1.13.1-102`:
+Example of the problem: Kubemarine image `v0.25.0` runs the `ls -la` command on `CentOS 7.5` with Docker version `1.13.1-102`:
 ```bash
 $ docker run --entrypoint ls kubemarine:v0.25.0 -la
 ls: cannot access '.': Operation not permitted
