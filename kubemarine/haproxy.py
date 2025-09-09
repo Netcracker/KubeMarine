@@ -225,17 +225,4 @@ def configure(group: DeferredGroup) -> None:
             node.put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True, mkdir=True)
 
 
-def override_haproxy18(group: DeferredGroup) -> None:
-    rhel_nodes = group.get_subgroup_with_os('rhel')
-    if rhel_nodes.is_empty():
-        group.cluster.log.debug('Haproxy18 override is not required')
-        return
-
-    # Any node in group has rhel OS family, so association can be fetched from any node.
-    any_host = rhel_nodes.get_first_member().get_host()
-    package_associations = group.cluster.get_associations_for_node(any_host, 'haproxy')
-    # TODO: Do not replace the whole file, replace only parameter
-    rhel_nodes.put(
-        io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
-        '/etc/sysconfig/%s' % package_associations['service_name'],
-        backup=True, sudo=True)
+    

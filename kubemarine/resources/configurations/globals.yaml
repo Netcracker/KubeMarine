@@ -174,16 +174,6 @@ packages:
     keepalived:
       package_name:
         - keepalived: keepalived
-  rhel:
-    containerd:
-      package_name:
-        - containerd.io: containerdio
-    haproxy:
-      package_name:
-        - rh-haproxy18-haproxy: haproxy
-    keepalived:
-      package_name:
-        - keepalived: keepalived
   rhel8:
     containerd:
       package_name:

@@ -2063,13 +2063,13 @@ services:
         haproxy:
           executable_name: '/usr/sbin/haproxy'
           package_name: haproxy=1.8.*
-      rhel:
+      rhel9:
         haproxy:
-          executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
-          package_name: rh-haproxy18-haproxy-1.8*
+          executable_name: '/usr/sbin/haproxy'
+          package_name: haproxy-1.8*
 ```
 
-**Note**: There are only 4 supported OS families: **debian**, **rhel**, **rhel8** (for RHEL based version 8), and **rhel9** (for RHEL based version 8).
+**Note**: There are only 3 supported OS families: **debian**, **rhel8** (for RHEL-based version 8), and **rhel9** (for RHEL-based version 9).
 
 #### thirdparties
 
@@ -5833,20 +5833,20 @@ The above configuration is converted to the following finalized configuration, p
 services:
   packages:
     associations:
-      rhel:
+      rhel9:
         containerd:
           executable_name: 'containerd'
           package_name:
-            - containerd.io-1.6.32-3.1.el7.x86_64
+            - containerd.io-1.6.32-3.1.el9.x86_64
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
         conntrack:
-          package_name: conntrack-tools-1.4.4-7.el7.x86_64
+          package_name: conntrack-tools-1.4.7-1.el9.x86_64
     install:
       include:
-        - ethtool-4.8-10.el7.x86_64
-        - ebtables-2.0.10-16.el7.x86_64
-        - socat-1.7.3.2-2.el7.x86_64
+        - ethtool-6.2-3.el9.x86_64
+        - ebtables-2.0.11-6.el9.x86_64
+        - socat-1.7.4.4-1.el9.x86_64
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.

@@ -228,7 +228,7 @@ class AssociationsEnrichment(unittest.TestCase):
     def test_success_if_os_specific_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'containerd'
-        package_associations(inventory, 'rhel', 'containerd')['package_name'] = expected_pkgs
+        package_associations(inventory, 'rhel9', 'containerd')['package_name'] = expected_pkgs
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         nodes_context = self._nodes_context_one_different_os(inventory, host_different_os)
@@ -268,10 +268,10 @@ class AssociationsEnrichment(unittest.TestCase):
 
 class PackagesUtilities(unittest.TestCase):
     def test_get_package_name_rhel(self):
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03.15-3.el9.x86_64'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-*'))
-        self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-19.03.15-3.el9.x86_64'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-19.03*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce-*'))
+        self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce'))
 
     def test_get_package_name_debian(self):
         self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.9-0ubuntu1~20.04.4'))
@@ -312,7 +312,7 @@ class PackagesUtilities(unittest.TestCase):
         queried_pkg = 'docker-ce-19.03*'
         group = cluster.nodes['all']
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
-        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel', 'docker-ce')])
+        cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel9', 'docker-ce')])
 
         hosts_to_packages = {host: [queried_pkg] for host in group.get_hosts()}
         detected_packages = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)

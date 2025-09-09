@@ -236,7 +236,7 @@ class UpgradeCRI(unittest.TestCase):
                                         EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
     def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
-        if os_family in ('rhel', 'rhel8', 'rhel9'):
+        if os_family in ('rhel8', 'rhel9'):
             package_names = ['containerdio']
         else:
             package_names = ['containerd']

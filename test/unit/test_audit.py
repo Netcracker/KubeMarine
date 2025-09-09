@@ -47,7 +47,7 @@ class TestAuditInstallation(unittest.TestCase):
         # simulate package detection command
         exp_results1 = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=1,
                                                     stderr='package %s is not installed' % package_name)
-        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel9', package_name)])
 
         # simulate package installation command
         installation_command = [yum.get_install_cmd(cluster, package_name)]

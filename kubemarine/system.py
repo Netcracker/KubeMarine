@@ -497,7 +497,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
     # this method handles clusters with multiple OS
     os_family = group.get_nodes_os()
 
-    if os_family in ['rhel', 'rhel8', 'rhel9'] and cluster.is_task_completed('prepare.system.setup_selinux'):
+    if os_family in ['rhel8', 'rhel9'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, _ = \
             selinux.is_config_valid(group,

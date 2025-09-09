@@ -588,7 +588,7 @@ class KubernetesCluster(Environment):
         Returns the detected operating system family for hosts.
         The method skips inaccessible nodes unless all nodes are inaccessible.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+        :return: Detected OS family, possible values: "debian", "rhel8", "rhel9",
                  "multiple", "unknown", "unsupported", "<undefined>".
         """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
@@ -608,7 +608,7 @@ class KubernetesCluster(Environment):
         Returns common OS family name from all final remote hosts.
         The method skips inaccessible nodes unless all nodes are inaccessible.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+        :return: Detected OS family, possible values: "debian", "rhel8", "rhel9",
                  "multiple", "unknown", "unsupported", "<undefined>".
         """
         return self.nodes['all'].get_nodes_os()

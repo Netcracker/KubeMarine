@@ -633,7 +633,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         """
         Returns the detected operating system family for group.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+        :return: Detected OS family, possible values: "debian", "rhel8", "rhel9",
                  "multiple", "unknown", "unsupported", "<undefined>".
         """
         return self.cluster.get_os_family_for_nodes(self.nodes)
@@ -655,7 +655,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             os_families = [os_families]
 
         for os_family in os_families:
-            if os_family not in ['debian', 'rhel', 'rhel8', 'rhel9']:
+            if os_family not in ['debian', 'rhel8', 'rhel9']:
                 raise Exception('Unsupported OS family provided')
         hosts = []
         for host in self.nodes:
