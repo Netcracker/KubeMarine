@@ -187,16 +187,16 @@ services:
         - man_groff
 
   modprobe:
-    # For RHEL OS:
-    rhel:
+    # For RHEL 8/9 OS:
+    rhel9:
     - br_netfilter
     - ip_vs
     - ip_vs_rr
     - ip_vs_wrr
     - ip_vs_sh
     - ip6table_filter
-    - nf_conntrack_ipv6
-    - nf_nat_masquerade_ipv6
+    - nf_conntrack
+    - nf_nat
     - nf_reject_ipv6
     - nf_defrag_ipv6
     # For Debian OS:
