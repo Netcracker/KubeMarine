@@ -9,6 +9,7 @@
 
 thirdparties:
   calicoctl:
+  - v1.33.0
   - v1.34.0
   crictl: []
 packages:
@@ -30,6 +31,7 @@ packages:
     version_debian: false
 plugins:
   calico:
+  - v1.33.0
   - v1.34.0
   nginx-ingress-controller: []
   kubernetes-dashboard: []
