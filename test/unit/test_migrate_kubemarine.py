@@ -307,7 +307,7 @@ class UpgradeCRI(unittest.TestCase):
 
     def test_changed_other_os_family_upgrade_not_required(self):
         self.prepare_environment('ubuntu', '20.04')
-        self.changed_config['packages']['containerd']['version_rhel'] = [self.kubernetes_version]
+        self.changed_config['packages']['containerd']['version_rhel9'] = [self.kubernetes_version]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
@@ -753,7 +753,7 @@ class UpgradeBalancers(unittest.TestCase):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
                 self.prepare_environment('ubuntu', '20.04')
-                self.changed_config['packages'][package]['version_rhel'] = True
+                self.changed_config['packages'][package]['version_rhel9'] = True
                 self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_balancers_upgrade_not_required(self):

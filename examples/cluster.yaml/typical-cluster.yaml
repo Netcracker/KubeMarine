@@ -78,11 +78,11 @@ services:
       replace-repositories: true
       # For RHEL OS use yum-like format:
       repositories:
-        centos-sclo-haproxy18:
-          name: "CentOS SCLO rh-haproxy18"
+        centos9-yumsrv:
+          name: "BaseOS Packages CentOS Stream 9"
           enabled: 1
           gpgcheck: 0
-          baseurl: "http://mirror.centos.org/centos/7/sclo/x86_64/rh/rh-haproxy18/"
+          baseurl: "http://yumsrv03cn.netcracker.com/yum/CentOS/9-stream/BaseOS/x86_64/os/"
       # For Debian OS use apt-like format:
       # repositories:
       #   - "deb [arch=amd64 trusted=yes] http://example.com/deb/ubuntu/ focal main restricted"

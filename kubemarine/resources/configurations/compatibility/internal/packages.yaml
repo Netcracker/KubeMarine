@@ -19,23 +19,18 @@ containerd:
     version_debian: 1.7.*
 containerdio:
   v1.31.1:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.31.6:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.32.0:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.32.2:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.33.0:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.34.1:
@@ -43,12 +38,10 @@ containerdio:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
 haproxy:
-  version_rhel: 1.8*
   version_rhel8: 1.8*
   version_rhel9: 2.4*
   version_debian: 2.*
 keepalived:
-  version_rhel: 1.3*
   version_rhel8: 2.1*
   version_rhel9: 2.2*
   version_debian: 1:2.*

@@ -244,7 +244,7 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 **Note**:
 
 * You can install a version other than the recommended version, but it is not supported and can cause unpredictable consequences.
-* rh-haproxy18 (build provided by RedHat) is supported only for now.
+* haproxy is provided via standard repositories on supported RHEL/Rocky/OL 8/9.
 
 **Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
 * Install `python 3.9` from the standard RHEL repository:
@@ -1624,7 +1624,7 @@ services:
           name: "Kubernetes"
           enabled: 1
           gpgcheck: 0
-          baseurl: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64"
+          baseurl: "https://pkgs.k8s.io/core:/stable:/v1.32/rpm/"
         my_own_repo:
           name: "My repository"
           enabled: 1
@@ -1827,15 +1827,15 @@ The following associations are used by default:
   <tr>
     <td rowspan="4">haproxy</td>
     <td>executable_name</td>
-    <td>/opt/rh/rh-haproxy18/root/usr/sbin/haproxy</td>
+    <td>/usr/sbin/haproxy</td>
   </tr>
   <tr>
     <td>package_name</td>
-    <td>rh-haproxy18-haproxy-{{k8s-version-specific}}</td>
+    <td>haproxy-{{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
-    <td>rh-haproxy18-haproxy</td>
+    <td>haproxy</td>
   </tr>
   <tr>
     <td>config_location</td>
@@ -3823,7 +3823,7 @@ Before proceeding, refer to the _Official Documentation of the Kubernetes Cluste
 
 Calico plugin is installed by default and does not require any special enablement or configuration. However, it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
-**Warning**: According to the Calico kernel requirements, CentOS 7 with a kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. For more information, refer to Kubernetes requirements_ at [https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements).
+<!-- Removed legacy CentOS 7 warning; EL7 is no longer supported. -->
 
 The following is an example to enable the calico plugin:
 
