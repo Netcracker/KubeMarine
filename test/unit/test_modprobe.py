@@ -125,8 +125,7 @@ class ModulesEnrichment(unittest.TestCase):
             self.new_cluster()
 
     def test_multiple_os_family_merge(self):
-        # Exclude legacy 'rhel' family for merge behavior since no nodes run plain 'rhel'
-        supported_os_families = [f for f in packages.get_associations_os_family_keys() if f != 'rhel']
+        supported_os_families = packages.get_associations_os_family_keys()
         self.inventory = demo.generate_inventory(control_plane=len(supported_os_families))
         self.nodes_context = demo.generate_nodes_context(self.inventory)
 
@@ -215,7 +214,6 @@ class ModulesEnrichment(unittest.TestCase):
     def _get_os_context(self, os_family: str) -> Tuple[str, str]:
         return {
             'debian': ('ubuntu', '22.04'),
-            'rhel': ('centos', '9'),
             'rhel8': ('rhel', '8.7'),
             'rhel9': ('rhel', '9.2')
         }[os_family]

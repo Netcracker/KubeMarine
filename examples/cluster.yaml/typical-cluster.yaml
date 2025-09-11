@@ -82,7 +82,7 @@ services:
           name: "BaseOS Packages CentOS Stream 9"
           enabled: 1
           gpgcheck: 0
-          baseurl: "http://yumsrv03cn.netcracker.com/yum/CentOS/9-stream/BaseOS/x86_64/os/"
+          baseurl:  "http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/"
       # For Debian OS use apt-like format:
       # repositories:
       #   - "deb [arch=amd64 trusted=yes] http://example.com/deb/ubuntu/ focal main restricted"
