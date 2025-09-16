@@ -519,6 +519,7 @@ class CalicoApiServerManifestProcessor(Processor):
             self.enrich_service_account_secret_calico_apiserver,
             self.enrich_service_account_calico_apiserver,
             self.enrich_deployment_calico_apiserver,
+            self.enrich_clusterrole_calico_crds,
         ]
 
     def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
@@ -570,6 +571,14 @@ class CalicoApiServerManifestProcessor(Processor):
             manifest, key, plugin_service='apiserver', container_name='calico-apiserver',
             extra_args=additional_args)
 
+    def enrich_clusterrole_calico_crds(self, manifest: Manifest) -> None:
+        if self.inventory["plugins"]["calico"]["version"] != "v3.30.3":
+            return
+
+        # Below is a WA for calico-apiserver v3.30.3 issue with missing permissions
+        key = "ClusterRole_calico-crds"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml["rules"][1]["resources"].extend(["stagednetworkpolicies", "stagedkubernetesnetworkpolicies"])
 
 service_account_secret_calico_apiserver = dedent("""\
     apiVersion: v1
