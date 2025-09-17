@@ -578,7 +578,11 @@ class CalicoApiServerManifestProcessor(Processor):
         # Below is a WA for calico-apiserver v3.30.3 issue with missing permissions
         key = "ClusterRole_calico-crds"
         source_yaml = manifest.get_obj(key, patch=True)
-        source_yaml["rules"][1]["resources"].extend(["stagednetworkpolicies", "stagedkubernetesnetworkpolicies"])
+        source_yaml["rules"][1]["resources"].extend([
+            "stagednetworkpolicies",
+            "stagedglobalnetworkpolicies", 
+            "stagedkubernetesnetworkpolicies",
+        ])
 
 service_account_secret_calico_apiserver = dedent("""\
     apiVersion: v1
