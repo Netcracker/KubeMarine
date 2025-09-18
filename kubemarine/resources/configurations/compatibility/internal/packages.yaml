@@ -34,7 +34,6 @@ containerdio:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
   v1.34.1:
-    version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
 haproxy:
