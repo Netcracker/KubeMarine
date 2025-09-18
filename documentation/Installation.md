@@ -165,16 +165,16 @@ For cluster machines, ensure the following requirements are met:
 
 * The following distributives and versions are supported:
 
-  * Centos 7.5+, 8.4, 9
-  * RHEL 7.5+, 8.4, 8.6, 8.7, 8.8, 8.9, 9.2
-  * Oracle Linux 7.5+, 8.4, 9.2
-  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3 ,9.4, 9.5
+  * CentOS Stream 9
+  * RHEL 8.4, 8.6, 8.7, 8.8, 8.9, 8.10, 9.2, 9.3, 9.4
+  * Oracle Linux 8.4, 9.2
+  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3, 9.4, 9.5
   * Ubuntu 20.04, 22.04.1, 24.04.1
  
 **Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.7 and above.
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L256).
+The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L299).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -244,7 +244,7 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 **Note**:
 
 * You can install a version other than the recommended version, but it is not supported and can cause unpredictable consequences.
-* rh-haproxy18 (build provided by RedHat) is supported only for now.
+* haproxy is provided via standard repositories on supported RHEL/Rocky/OL 8/9.
 
 **Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
 * Install `python 3.9` from the standard RHEL repository:
@@ -1622,7 +1622,7 @@ services:
           name: "Kubernetes"
           enabled: 1
           gpgcheck: 0
-          baseurl: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64"
+          baseurl: "https://pkgs.k8s.io/core:/stable:/v1.32/rpm/"
         my_own_repo:
           name: "My repository"
           enabled: 1
@@ -1825,15 +1825,15 @@ The following associations are used by default:
   <tr>
     <td rowspan="4">haproxy</td>
     <td>executable_name</td>
-    <td>/opt/rh/rh-haproxy18/root/usr/sbin/haproxy</td>
+    <td>/usr/sbin/haproxy</td>
   </tr>
   <tr>
     <td>package_name</td>
-    <td>rh-haproxy18-haproxy-{{k8s-version-specific}}</td>
+    <td>haproxy-{{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
-    <td>rh-haproxy18-haproxy</td>
+    <td>haproxy</td>
   </tr>
   <tr>
     <td>config_location</td>
@@ -2061,13 +2061,13 @@ services:
         haproxy:
           executable_name: '/usr/sbin/haproxy'
           package_name: haproxy=1.8.*
-      rhel:
+      rhel9:
         haproxy:
-          executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
-          package_name: rh-haproxy18-haproxy-1.8*
+          executable_name: '/usr/sbin/haproxy'
+          package_name: haproxy-1.8*
 ```
 
-**Note**: There are only 4 supported OS families: **debian**, **rhel**, **rhel8** (for RHEL based version 8), and **rhel9** (for RHEL based version 8).
+**Note**: There are only 3 supported OS families: **debian**, **rhel8** (for RHEL-based version 8), and **rhel9** (for RHEL-based version 9).
 
 #### thirdparties
 
@@ -3813,7 +3813,7 @@ Before proceeding, refer to the _Official Documentation of the Kubernetes Cluste
 
 Calico plugin is installed by default and does not require any special enablement or configuration. However, it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
-**Warning**: According to the Calico kernel requirements, CentOS 7 with a kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. For more information, refer to Kubernetes requirements_ at [https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements).
+<!-- Removed legacy CentOS 7 warning; EL7 is no longer supported. -->
 
 The following is an example to enable the calico plugin:
 
@@ -5823,20 +5823,20 @@ The above configuration is converted to the following finalized configuration, p
 services:
   packages:
     associations:
-      rhel:
+      rhel9:
         containerd:
           executable_name: 'containerd'
           package_name:
-            - containerd.io-1.6.32-3.1.el7.x86_64
+            - containerd.io-1.6.32-3.1.el9.x86_64
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
         conntrack:
-          package_name: conntrack-tools-1.4.4-7.el7.x86_64
+          package_name: conntrack-tools-1.4.7-1.el9.x86_64
     install:
       include:
-        - ethtool-4.8-10.el7.x86_64
-        - ebtables-2.0.10-16.el7.x86_64
-        - socat-1.7.3.2-2.el7.x86_64
+        - ethtool-6.2-3.el9.x86_64
+        - ebtables-2.0.11-6.el9.x86_64
+        - socat-1.7.4.4-1.el9.x86_64
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.
@@ -6042,15 +6042,15 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.31.6
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: 01b061a1a828bca9986f532f086a2bf89879e87e          |
 |          | kubelet                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: 9c0cd5bf9f36a159d3d72a8241d743500c116cf5          |
 |          | kubectl                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: af8b272a4d21d427d502ce24d737ffe2d6fc2164          |
 |          | calicoctl                                                      | v3.29.5          | v3.29.5                      | v3.29.5      | v3.29.5      | v3.29.5           | v3.29.5   | v3.29.5   | SHA1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126 Required only if calico is installed.                       |
 |          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
-|          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.| 
-|          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
+|          | haproxy                                                        | 2.4*             | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.| 
+|          | keepalived                                                     | 2.2              | 2.1                          | 2.*          | 2.*          | 2.1               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   |                                                         |
 |          | registry.k8s.io/kube-controller-manager                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   |                                                         |
 |          | registry.k8s.io/kube-proxy                                     | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   |                                                         |
@@ -6073,15 +6073,15 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.32.2
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 7aef86d97edf97e50ac7112a4ada49fe74619ebc          |
 |          | kubelet                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 9d8446943a6aab092156b7ee0a6d74c27f742ffc          |
 |          | kubectl                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 87e59e4ae4a6b99d3ee8c37dea2db6b3466b41bc          |
 |          | calicoctl                                                      | v3.29.5          | v3.29.5                      | v3.29.5      | v3.29.5      | v3.29.5           | v3.29.5   | v3.29.5   | SHA1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126 Required only if calico is installed.  |
 |          | crictl                                                         | v1.32.0          | v1.32.0                      | v1.32.0      | v1.32.0      | v1.32.0           | v1.32.0   | v1.32.0   | SHA1: c503051cf6e809a691f776ddf544abfc2a15e790          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
-|          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.    |
-|          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.    |
+|          | haproxy                                                        | 2.4*             | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.    |
+|          | keepalived                                                     | 2.2              | 2.1                          | 2.*          | 2.*          | 2.1               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.    |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   |                                                         |
 |          | registry.k8s.io/kube-controller-manager                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   |                                                         |
 |          | registry.k8s.io/kube-proxy                                     | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   |                                                         |
@@ -6104,15 +6104,15 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.33.0
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: bc411a208e067c63976eeecf02d1bf5c5c823bff          |
 |          | kubelet                                                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: 984fc4e063e8df34f4beaa9212e5429ee70e5997          |
 |          | kubectl                                                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: aab40d38db50c728dbbe2e7b8144ba18f93480c2          |
 |          | calicoctl                                                      | v3.30.3          | v3.30.3                      | v3.30.3      | v3.30.3      | v3.30.3           | v3.30.3   | v3.30.3   | SHA1: 1f6e99f7a8da54c97e9aa5f2fa6380022e9fc81a Required only if calico is installed. |
 |          | crictl                                                         | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: d702fd5792aba3ebf451e4488df2916010a76a0d          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
-|          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.    |
-|          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.    |
+|          | haproxy                                                        | 2.4*             | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.    |
+|          | keepalived                                                     | 2.2              | 2.1                          | 2.*          | 2.*          | 2.1               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.    |
 | images   | registry.k8s.io/kube-apiserver                                 | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   |                                                         |
 |          | registry.k8s.io/kube-controller-manager                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   |                                                         |
 |          | registry.k8s.io/kube-proxy                                     | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   |                                                         |
@@ -6134,7 +6134,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.34.0
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 7.5+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 10053ced6ccfaa31739f18a62456f5d2ff3ea827          |
 |          | kubelet                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 1448d15d77bb94151c446b2757edd5d3f63ebea2          |
 |          | kubectl                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 1e96813f08143594f806c678171109eebc54149a          |

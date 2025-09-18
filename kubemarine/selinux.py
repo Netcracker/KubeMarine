@@ -178,7 +178,7 @@ def setup_selinux(group: NodeGroup) -> bool:
     log = group.cluster.log
 
     # this method handles cluster with multiple os, suppressing should be enabled
-    if group.get_nodes_os() not in ['rhel', 'rhel8', 'rhel9']:
+    if group.get_nodes_os() not in ['rhel8', 'rhel9']:
         log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
         return False
 

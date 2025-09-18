@@ -222,7 +222,7 @@ class UpgradeCRI(unittest.TestCase):
     def test_specific_os_family_cri_association_upgrade_required(self):
         for os_name, os_family, os_version in (
                 ('ubuntu', 'debian', '20.04'),
-                ('centos', 'rhel', '7.9'),
+                ('centos', 'rhel9', '9'),
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
         ):
@@ -236,7 +236,7 @@ class UpgradeCRI(unittest.TestCase):
                                         EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
     def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
-        if os_family in ('rhel', 'rhel8', 'rhel9'):
+        if os_family in ('rhel8', 'rhel9'):
             package_names = ['containerdio']
         else:
             package_names = ['containerd']
@@ -307,7 +307,7 @@ class UpgradeCRI(unittest.TestCase):
 
     def test_changed_other_os_family_upgrade_not_required(self):
         self.prepare_environment('ubuntu', '20.04')
-        self.changed_config['packages']['containerd']['version_rhel'] = [self.kubernetes_version]
+        self.changed_config['packages']['containerd']['version_rhel9'] = [self.kubernetes_version]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
@@ -753,7 +753,7 @@ class UpgradeBalancers(unittest.TestCase):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
                 self.prepare_environment('ubuntu', '20.04')
-                self.changed_config['packages'][package]['version_rhel'] = True
+                self.changed_config['packages'][package]['version_rhel9'] = True
                 self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_balancers_upgrade_not_required(self):
