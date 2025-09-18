@@ -27,8 +27,8 @@ class TheAction(Action):
         logger = res.logger()
         inventory = res.inventory()
         if 'kubernetesVersion' not in inventory.get('services', {}).get('kubeadm', {}):
-            logger.debug("Set services.kubeadm.kubernetesVersion = v1.33.0 in the inventory")
-            inventory.setdefault('services', {}).setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.0'
+            logger.debug("Set services.kubeadm.kubernetesVersion = v1.32.2 in the inventory")
+            inventory.setdefault('services', {}).setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.2'
         else:
             logger.info("Skipping the patch as services.kubeadm.kubernetesVersion is explicitly provided.")
 
