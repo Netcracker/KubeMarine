@@ -123,6 +123,8 @@ services:
     /usr/bin/etcdctl:
       source: 'resources/scripts/etcdctl.sh'
       group: control-plane
+    /usr/bin/etcd.tar.gz:
+      group: control-plane
     /usr/bin/kubeadm: {}
     /usr/bin/kubelet: {}
     /usr/bin/kubectl:

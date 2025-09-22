@@ -52,12 +52,12 @@ class Thirdparties(SoftwareType):
         """
         Download, calculate sha1 and actualize compatibility_map of all third-parties.
         """
-        thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl']
+        thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl', 'etcdutl']
         kubernetes_versions = summary_tracker.kubernetes_versions
         k8s_versions = summary_tracker.all_k8s_versions
         thirdparties_sha1 = calculate_sha1(self.thirdparty_resolver, kubernetes_versions, thirdparties)
 
-        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, ['calicoctl', 'crictl'])
+        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, ['calicoctl', 'crictl', 'etcdutl'])
         upgrade_software.prepare(summary_tracker)
 
         tracker = ComposedTracker(summary_tracker, upgrade_software)
@@ -112,6 +112,8 @@ def get_version(kubernetes_versions: Dict[str, Dict[str, str]], k8s_version: str
         return kubernetes_versions[k8s_version]['calico']
     elif thirdparty_name == 'crictl':
         return kubernetes_versions[k8s_version][thirdparty_name]
+    elif thirdparty_name == 'etcdutl':
+        return kubernetes_versions[k8s_version][thirdparty_name]
     else:
         raise Exception(f"Unsupported thirdparty {thirdparty_name!r}")
 
@@ -121,6 +123,8 @@ def get_destination(thirdparty_name: str) -> str:
         return f'/usr/bin/{thirdparty_name}'
     elif thirdparty_name == 'crictl':
         return '/usr/bin/crictl.tar.gz'
+    elif thirdparty_name == 'etcdutl':
+        return '/usr/bin/etcd.tar.gz'
     else:
         raise Exception(f"Unsupported thirdparty {thirdparty_name!r}")
 

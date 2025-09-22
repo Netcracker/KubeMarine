@@ -19,7 +19,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0013: Redefined Key in Containerd Configuration](#kme0013-redefined-key-in-containerd-configuration)
   - [KME0014: Invalid Helm Chart URL](#kme0014-invalid-helm-chart-url)
 - [Troubleshooting Tools](#troubleshooting-tools)
-  - [etcdctl Script](#etcdctl-script)
+  - [etcdctl Script](#etcdctl-script) // here
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
   - [CoreDNS Responds With High Latency](#coredns-responds-with-high-latency)
   - [Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted](#namespace-with-terminating-crcrd-cannot-be-deleted-terminating-crcrd-cannot-be-deleted)
@@ -494,6 +494,8 @@ This section describes the additional tools that Kubemarine provides for conveni
 
 ## Etcdctl Script
 
+// here
+
 This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
 To execute a command through this script, make sure you meet all the following prerequisites:
@@ -774,6 +776,8 @@ To avoid this issue in the future:
 
 ## Etcdctl Compaction and Defragmentation
 
+// here
+
 ### Description
 Errors related to etcd disk space can occur, such as the `database space exceeded` & `no space` messages in the `etcd` pod logs.
 Additionally, if the etcd database reaches 70% of the default storage size (2GB by default), defragmentation may be required.
@@ -809,6 +813,8 @@ Monitor the etcd database regularly to ensure it does not reach the 70% storage 
 > **Note**: Defragmentation of a live member blocks the system from reading and writing data while rebuilding its states. Avoid running defragmentation on all etcd members simultaneously.
 
 ## Etcdctl Defrag Return Context Deadline Exceeded
+
+// here
 
 ### Description
 When running the defrag procedure for the etcd database, the following error may occur:
@@ -918,6 +924,8 @@ Not applicable.
 
 ### How to resolve
 #### Manual Etcd Restoration from a Snapshot
+
+// here
 
 The community recommends to use snapshots to restore etcd database.
 

@@ -82,3 +82,22 @@ crictl:
   v1.34.0:
     version: v1.34.0
     sha1: 8d1c0fbbeb7a78a975fee674d4edd54da6124ddd
+etcdutl:
+  v1.31.1:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405
+  v1.31.6:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405
+  v1.32.0:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405
+  v1.32.2:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405
+  v1.33.0:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405
+  v1.34.0:
+    version: v3.6.4
+    sha1: a8e11a5007dbfd6559280e990ef7f9292da65405

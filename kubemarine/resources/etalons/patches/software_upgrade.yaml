@@ -10,6 +10,7 @@
 thirdparties:
   calicoctl: []
   crictl: []
+  etcdutl: []
 packages:
   containerd:
     version_debian: []

@@ -185,12 +185,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         control_plane_conn.sudo(
             f'chmod 777 {snap_name} && '
             f'sudo ls -la {snap_name} && '
-            f'sudo ETCD_IMAGE="{etcd_image}" ETCD_MOUNTS="{mount_options}" etcdctl '
-            f'--cert={etcd_cert} '
-            f'--key={etcd_key} '
-            f'--cacert={etcd_cacert} '
-            f'--endpoints={",".join(initial_cluster_list_without_names)} '
-            f'snapshot restore {snap_name} '
+            f'sudo etcdutl snapshot restore {snap_name} '
             f'--name={control_plane["name"]} '
             f'--data-dir=/var/lib/etcd/snapshot '
             f'--initial-cluster={initial_cluster} '
