@@ -14,10 +14,9 @@
 import re
 import unittest
 from unittest import mock
+from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 import yaml
-
-from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 from kubemarine import demo, plugins
 from kubemarine.core import errors, flow
