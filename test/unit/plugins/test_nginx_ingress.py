@@ -14,6 +14,9 @@
 import re
 import unittest
 from unittest import mock
+
+import yaml
+
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 from kubemarine import demo, plugins
@@ -136,6 +139,38 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
         custom_headers = self.get_obj(manifest, "ConfigMap_custom-headers")['data']
         self.assertEqual({'wheel': 'eggs'}, custom_headers, "Unexpected custom-headers ConfigMap content")
+
+    def test_config_map_values_are_stringified(self):
+        inventory = self.inventory(self.k8s_latest)
+        nginx = inventory.setdefault('plugins', {}).setdefault('nginx-ingress-controller', {})
+        nginx['config_map'] = {
+            'bool-option': True,
+            'numeric-option': 10,
+            'none-option': None,
+            'dict-option': {'foo': 'bar'},
+        }
+        nginx['custom_headers'] = {
+            'X-Enabled': False,
+        }
+        nginx.setdefault('installation', {})['registry'] = 'example.registry'
+        cluster = demo.new_cluster(inventory)
+        manifest = self.enrich_yaml(cluster)
+
+        rendered_objects = [obj for obj in yaml.safe_load_all(manifest.dump()) if obj]
+        controller_cm = next(
+            obj for obj in rendered_objects
+            if obj['kind'] == 'ConfigMap' and obj['metadata']['name'] == 'ingress-nginx-controller'
+        )
+        self.assertEqual('true', controller_cm['data']['bool-option'])
+        self.assertEqual('10', controller_cm['data']['numeric-option'])
+        self.assertEqual('', controller_cm['data']['none-option'])
+        self.assertEqual('{"foo": "bar"}', controller_cm['data']['dict-option'])
+
+        custom_headers_cm = next(
+            obj for obj in rendered_objects
+            if obj['kind'] == 'ConfigMap' and obj['metadata']['name'] == 'custom-headers'
+        )
+        self.assertEqual('false', custom_headers_cm['data']['X-Enabled'])
 
     def _test_controller(self, manifest: Manifest, k8s_version: str):
         template_spec = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")['spec']['template']['spec']

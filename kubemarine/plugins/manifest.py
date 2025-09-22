@@ -117,7 +117,14 @@ class Manifest:
         The method implements the dumping of the list of objects to the string that includes several YAMLs inside
         """
         with io.StringIO() as stream:
-            utils.yaml_structure_preserver().dump_all(self._obj_list, stream)
+            yaml_writer = utils.yaml_structure_preserver()
+            objects_to_dump = []
+            for obj in self._obj_list:
+                normalized = utils.deepcopy_yaml(obj)
+                utils.stringify_string_data_fields(normalized)
+                objects_to_dump.append(normalized)
+
+            yaml_writer.dump_all(objects_to_dump, stream)
             result = stream.getvalue()
 
         return result

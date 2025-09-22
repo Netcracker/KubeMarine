@@ -24,10 +24,11 @@ import time
 import tarfile
 import uuid
 from collections import OrderedDict
+from collections.abc import MutableMapping
 from copy import deepcopy
 from datetime import datetime
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn, BinaryIO
+from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn, BinaryIO, Any
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -354,6 +355,43 @@ def yaml_structure_preserver() -> ruamel.yaml.YAML:
     ruamel_yaml = ruamel.yaml.YAML()
     ruamel_yaml.preserve_quotes = True
     return ruamel_yaml
+
+
+def stringify_string_map_value(value: Any) -> str:
+    """
+    Normalize values that are destined to string-only maps such as ConfigMap.data or Secret.stringData.
+    """
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (list, tuple, dict)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def stringify_string_map(data: MutableMapping[str, Any]) -> None:
+    """
+    Convert every value inside the provided mapping into a string representation.
+    """
+    for key in list(data.keys()):
+        data[key] = stringify_string_map_value(data[key])
+
+
+def stringify_string_data_fields(obj: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+    """
+    Ensure data/stringData/binaryData sections of ConfigMaps and Secrets contain plain strings.
+    """
+    if obj.get('kind') in ('ConfigMap', 'Secret'):
+        for field in ('data', 'stringData', 'binaryData'):
+            section = obj.get(field)
+            if isinstance(section, MutableMapping):
+                stringify_string_map(section)
+    return obj
 
 
 def deepcopy_yaml(data: dict) -> dict:
