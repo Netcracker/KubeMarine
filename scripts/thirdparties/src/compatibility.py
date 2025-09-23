@@ -63,7 +63,7 @@ class KubernetesVersions:
 
     def _validate_mapping(self) -> None:
         mandatory_fields = set(static.GLOBALS['plugins'])
-        mandatory_fields.update(['crictl', 'etcdutl'])
+        mandatory_fields.update(['crictl'])
         optional_fields = {
             'webhook', 'metrics-scraper', 'busybox',
             # To support custom pause image, it is necessary to implement software upgrade patch.
