@@ -2,6 +2,8 @@ import os
 from kubemarine import thirdparties
 from ..shell import curl, TEMP_FILE, SYNC_CACHE
 
+# pylint: disable=bad-builtin
+
 def resolve_local_path(destination: str, version: str) -> str:
     filename = f"{destination.split('/')[-1]}-{version}"
     target_file = os.path.join(SYNC_CACHE, filename)
