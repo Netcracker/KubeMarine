@@ -15,12 +15,11 @@
 import os
 from typing import List, Tuple, Dict
 
-from kubemarine import thirdparties, kubernetes
+from kubemarine import kubernetes
 from kubemarine.core import utils
-from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
-from . import kubernetes_images
+from . import kubernetes_images, download
 
 # pylint: disable=bad-builtin
 
@@ -33,7 +32,7 @@ ERROR_ASCENDING_VERSIONS = \
 class ThirdpartyResolver:
     def resolve_sha1(self, thirdparty_name: str, version: str) -> str:
         destination = get_destination(thirdparty_name)
-        thirdparty_local_path = resolve_local_path(destination, version)
+        thirdparty_local_path = download.resolve_local_path(destination, version)
 
         print(f"Calculating sha1 for {os.path.basename(thirdparty_local_path)}")
         return utils.get_local_file_sha1(thirdparty_local_path)
@@ -134,22 +133,6 @@ def get_destination(thirdparty_name: str) -> str:
         return '/usr/bin/etcd.tar.gz'
     else:
         raise Exception(f"Unsupported thirdparty {thirdparty_name!r}")
-
-
-def resolve_local_path(destination: str, version: str) -> str:
-    filename = f"{destination.split('/')[-1]}-{version}"
-    target_file = os.path.join(SYNC_CACHE, filename)
-    if os.path.exists(target_file):
-        return target_file
-
-    source = thirdparties.get_default_thirdparty_source(destination, version, in_public=True)
-
-    print(f"Downloading thirdparty {destination} of version {version} from {source}")
-    curl(source, TEMP_FILE)
-    os.rename(TEMP_FILE, target_file)
-
-    return target_file
-
 
 def calculate_sha1(thirdparty_resolver: ThirdpartyResolver, image_resolver: kubernetes_images.KubernetesImagesResolver,
                    kubernetes_versions: Dict[str, Dict[str, str]], thirdparties: List[str]) -> Dict[Tuple[str, str], str]:
