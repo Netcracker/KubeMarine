@@ -140,6 +140,8 @@ However, your custom containers may be deleted, and you need to start them manua
 Patches that upgrade thirdparties have the following identifiers:
 * `upgrade_crictl` - It upgrades the `/usr/bin/crictl` third-party, if necessary.
 * `upgrade_calico` - It upgrades the `/usr/bin/calicoctl` third-party as part of the Calico plugin upgrade.
+* `upgrade_etcdutl` - It upgrades the `/usr/bin/etcdutl` third-party as part of the Calico plugin upgrade.
+
 
 If the cluster is located in an isolated environment,
 it is possible to specify the custom paths to new thirdparties with a similar syntax as in the `cluster.yaml`
@@ -150,6 +152,8 @@ upgrade:
     /usr/bin/calicoctl:
       source: https://example.com/thirdparty.files/projectcalico/calico/v3.25.1/calicoctl-linux-amd64
     /usr/bin/crictl.tar.gz:
+      source: https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/v1.27.0/crictl-v1.27.0-linux-amd64.tar.gz
+    /usr/bin/etcd.tar.gz:
       source: https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/v1.27.0/crictl-v1.27.0-linux-amd64.tar.gz
 ```
 

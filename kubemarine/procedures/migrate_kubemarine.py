@@ -385,7 +385,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
 
     # The order of upgrade is determined by the implementation below
 
-    for thirdparty_name in ['crictl']:
+    for thirdparty_name in ['crictl', 'etcdutl']:
         k8s_versions = upgrade_config['thirdparties'][thirdparty_name]
         if k8s_versions:
             verify_allowed_kubernetes_versions(k8s_versions)
