@@ -157,8 +157,8 @@ upgrade:
         globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version
         }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
     /usr/bin/etcd.tar.gz:
-      source: "https://example.com/thirdparty.files/etcdutl/etcd/{{
-        globals.compatibility_map.software.etcdtul[services.kubeadm.kubernetesVersion].version
+      source: "https://example.com/thirdparty.files/etcd-io/etcd/{{
+        globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version
         }}/etcd-{{ globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
 ```
 
