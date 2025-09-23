@@ -159,7 +159,7 @@ upgrade:
     /usr/bin/etcd.tar.gz:
       source: "https://example.com/thirdparty.files/etcdutl/etcd/{{
         globals.compatibility_map.software.etcdtul[services.kubeadm.kubernetesVersion].version
-        }}/etcdutl-{{ globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
+        }}/etcd-{{ globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
 ```
 
 This configuration replaces the configuration contained in the current `cluster.yaml`.
