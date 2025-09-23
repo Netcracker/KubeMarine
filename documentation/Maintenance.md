@@ -150,11 +150,16 @@ as shown in the following snippet:
 upgrade:
   thirdparties:
     /usr/bin/calicoctl:
-      source: https://example.com/thirdparty.files/projectcalico/calico/v3.25.1/calicoctl-linux-amd64
+      source: "https://example.com/thirdparty.files/projectcalico/calico/{{
+        plugins.calico.version }}/calicoctl-linux-amd64"
     /usr/bin/crictl.tar.gz:
-      source: https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/v1.27.0/crictl-v1.27.0-linux-amd64.tar.gz
+      source: "https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/{{
+        globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version
+        }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
     /usr/bin/etcd.tar.gz:
-      source: https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/v1.27.0/crictl-v1.27.0-linux-amd64.tar.gz
+      source: "https://example.com/thirdparty.files/etcdutl/etcd/{{
+        globals.compatibility_map.software.etcdtul[services.kubeadm.kubernetesVersion].version
+        }}/etcdutl-{{ globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
 ```
 
 This configuration replaces the configuration contained in the current `cluster.yaml`.

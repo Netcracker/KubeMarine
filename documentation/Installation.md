@@ -906,7 +906,7 @@ services:
           capabilities: [pull, resolve]
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/projectcalico/calico/{{calic-version}}/calicoctl-linux-amd64
+      source: http://example.com/projectcalico/calico/{{calico-version}}/calicoctl-linux-amd64
     /usr/bin/crictl.tar.gz:
       source: http://example.com/kubernetes-sigs/cri-tools/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz
     /usr/bin/etcd.tar.gz:
@@ -2162,7 +2162,6 @@ services:
       source: 'http://user:password@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
     /usr/bin/etcd.tar.gz:
       source: 'http://user:password@some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
-      group: control-plane
 ```
 
 **Note**: Percent-encoded (URL encoded) should be used for credentials. For example for username `user` and password `p@$$w0rD`:
@@ -2198,7 +2197,6 @@ services:
     /usr/bin/etcd.tar.gz:
       source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}
       @some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
-      group: control-plane
 ```
 
 #### CRI

@@ -801,7 +801,7 @@ Compaction is performed automatically every 5 minutes, and this interval can be 
 
 To fix this problem, defragment the etcd database for each cluster member sequentially to avoid cluster-wide latency spikes. Use the following command to defragment an etcd member:
 ```bash
-etcdutl defrag --endpoints=ENDPOINT_IP:2379
+etcdctl defrag --endpoints=ENDPOINT_IP:2379
 ```
 
 To defragment all cluster members sequentially, use:
