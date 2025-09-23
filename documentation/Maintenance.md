@@ -747,7 +747,7 @@ backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 By default, ETCD restore does not require additional parameters, however, if required, the following are supported:
 
 * image - the full name of the ETCD image, including the registry address. On its basis, the restoration is performed.
-* certificates - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
+* certificates - ETCD certificates. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
 
 #### thirdparties Parameter
 

@@ -19,7 +19,8 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0013: Redefined Key in Containerd Configuration](#kme0013-redefined-key-in-containerd-configuration)
   - [KME0014: Invalid Helm Chart URL](#kme0014-invalid-helm-chart-url)
 - [Troubleshooting Tools](#troubleshooting-tools)
-  - [etcdctl Script](#etcdctl-script) // here
+  - [etcdctl Script](#etcdctl-script)
+  - [etcdutl binary](#etcdutl-binary)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
   - [CoreDNS Responds With High Latency](#coredns-responds-with-high-latency)
   - [Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted](#namespace-with-terminating-crcrd-cannot-be-deleted-terminating-crcrd-cannot-be-deleted)
@@ -494,8 +495,6 @@ This section describes the additional tools that Kubemarine provides for conveni
 
 ## Etcdctl Script
 
-// here
-
 This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
 To execute a command through this script, make sure you meet all the following prerequisites:
@@ -524,6 +523,12 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 * `/var/lib/etcd`:`/var/lib/etcd`
 * `/etc/kubernetes/pki`:`/etc/kubernetes/pki`
+
+## Etcdutl binary
+
+Starting with etcd v3.6, in addition to `etcdctl` script, there is a new `etcdutl` binary, which took some responsibility from `etcdctl`. This binary is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
+
+To find out all the available `etcdutl` options and features, use the original ETCD documentation.
 
 # Troubleshooting Kubernetes Generic Issues
 
@@ -776,8 +781,6 @@ To avoid this issue in the future:
 
 ## Etcdctl Compaction and Defragmentation
 
-// here
-
 ### Description
 Errors related to etcd disk space can occur, such as the `database space exceeded` & `no space` messages in the `etcd` pod logs.
 Additionally, if the etcd database reaches 70% of the default storage size (2GB by default), defragmentation may be required.
@@ -798,7 +801,7 @@ Compaction is performed automatically every 5 minutes, and this interval can be 
 
 To fix this problem, defragment the etcd database for each cluster member sequentially to avoid cluster-wide latency spikes. Use the following command to defragment an etcd member:
 ```bash
-etcdctl defrag --endpoints=ENDPOINT_IP:2379
+etcdutl defrag --endpoints=ENDPOINT_IP:2379
 ```
 
 To defragment all cluster members sequentially, use:
@@ -813,8 +816,6 @@ Monitor the etcd database regularly to ensure it does not reach the 70% storage 
 > **Note**: Defragmentation of a live member blocks the system from reading and writing data while rebuilding its states. Avoid running defragmentation on all etcd members simultaneously.
 
 ## Etcdctl Defrag Return Context Deadline Exceeded
-
-// here
 
 ### Description
 When running the defrag procedure for the etcd database, the following error may occur:
@@ -925,8 +926,6 @@ Not applicable.
 ### How to resolve
 #### Manual Etcd Restoration from a Snapshot
 
-// here
-
 The community recommends to use snapshots to restore etcd database.
 
 A snapshot can be created at a control-plane node this way:
@@ -971,7 +970,7 @@ To restore etcd database from a snapshot created as it is described above, the f
 4. Restore etcd database into non-default catalog, for example, into `/var/lib/etcd/tmpdir`:
 
 ```
-etcdctl snapshot restore /var/lib/etcd/snapshot.db \
+etcdutl snapshot restore /var/lib/etcd/snapshot.db \
             --name=${CONTROL_PLANE_NODE_NAME} \
             --data-dir=/var/lib/etcd/tmpdir \
             --initial-cluster=${INITIAL_CLUSTER} \
