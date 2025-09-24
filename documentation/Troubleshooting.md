@@ -528,7 +528,9 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 Starting with etcd v3.6, in addition to `etcdctl` script, there is a new `etcdutl` binary, which took some responsibility from `etcdctl`. This binary is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
-To find out all the available `etcdutl` options and features, use the original ETCD documentation.
+To find out all the available `etcdutl` options and features, use the original ETCD documentation, for example:
+* [Disaster recovery](https://etcd.io/docs/v3.6/op-guide/recovery/)
+* [etcdutl README.md](https://github.com/etcd-io/etcd/tree/release-3.6/etcdutl)
 
 # Troubleshooting Kubernetes Generic Issues
 

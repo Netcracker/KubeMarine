@@ -140,7 +140,7 @@ However, your custom containers may be deleted, and you need to start them manua
 Patches that upgrade thirdparties have the following identifiers:
 * `upgrade_crictl` - It upgrades the `/usr/bin/crictl` third-party, if necessary.
 * `upgrade_calico` - It upgrades the `/usr/bin/calicoctl` third-party as part of the Calico plugin upgrade.
-* `upgrade_etcdutl` - It upgrades the `/usr/bin/etcdutl` third-party as part of the Calico plugin upgrade.
+* `upgrade_etcdutl` - It upgrades the `/usr/bin/etcdutl` third-party, if necessary.
 
 
 If the cluster is located in an isolated environment,
