@@ -195,7 +195,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         _ = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
             f'sudo rm -rf /var/lib/etcd/snapshot {snap_name} && '
-            f'sudo ETCD_IMAGE="{etcd_image}" etcdctl version && ' # this pulls etcd image, which is required to run below ctr command
+            f'sudo ETCD_IMAGE="{etcd_image}" etcdctl version && ' # this pulls etcd image, required to run below ctr command
             f'sudo ctr run -d --net-host '
             f'--env ETCDCTL_API=3 '
             f'{mount_options} '
