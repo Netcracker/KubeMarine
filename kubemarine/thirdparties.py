@@ -364,7 +364,9 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
 
     if destination == "/usr/bin/etcd.tar.gz":
         # etcdutl unpacking is specific, so we handle it specifically, instead of adding generic unpack wildcards/strip options
-        remote_commands += f" && sudo tar -zxf {destination} -C /usr/bin/ --wildcards '*/etcdutl' --strip-components 1"
+        remote_commands += f" && sudo tar -ozxf {destination} -C /usr/bin/ --wildcards '*/etcdutl' --strip-components 1"
+        remote_commands += f" && sudo chmod {config['mode']} /usr/bin/etcdutl"
+        remote_commands += ' && sudo ls -la /usr/bin/etcdutl'
 
     if config.get('unpack') is not None:
         cluster.log.verbose('Unpack request detected')
