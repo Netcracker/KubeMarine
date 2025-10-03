@@ -15,11 +15,11 @@
 import os
 from typing import List, Tuple, Dict
 
-from kubemarine import thirdparties, kubernetes
+from kubemarine import kubernetes
 from kubemarine.core import utils
-from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
+from . import kubernetes_images, download
 
 # pylint: disable=bad-builtin
 
@@ -32,7 +32,7 @@ ERROR_ASCENDING_VERSIONS = \
 class ThirdpartyResolver:
     def resolve_sha1(self, thirdparty_name: str, version: str) -> str:
         destination = get_destination(thirdparty_name)
-        thirdparty_local_path = resolve_local_path(destination, version)
+        thirdparty_local_path = download.resolve_local_path(destination, version)
 
         print(f"Calculating sha1 for {os.path.basename(thirdparty_local_path)}")
         return utils.get_local_file_sha1(thirdparty_local_path)
@@ -40,9 +40,11 @@ class ThirdpartyResolver:
 
 class Thirdparties(SoftwareType):
     def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig,
-                 thirdparty_resolver: ThirdpartyResolver):
+                 thirdparty_resolver: ThirdpartyResolver, 
+                 image_resolver: kubernetes_images.KubernetesImagesResolver):
         super().__init__(compatibility, upgrade_config)
         self.thirdparty_resolver = thirdparty_resolver
+        self.image_resolver = image_resolver
 
     @property
     def name(self) -> str:
@@ -52,12 +54,12 @@ class Thirdparties(SoftwareType):
         """
         Download, calculate sha1 and actualize compatibility_map of all third-parties.
         """
-        thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl']
+        thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl', 'etcdutl']
         kubernetes_versions = summary_tracker.kubernetes_versions
         k8s_versions = summary_tracker.all_k8s_versions
-        thirdparties_sha1 = calculate_sha1(self.thirdparty_resolver, kubernetes_versions, thirdparties)
+        thirdparties_sha1 = calculate_sha1(self.thirdparty_resolver, self.image_resolver, kubernetes_versions, thirdparties)
 
-        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, ['calicoctl', 'crictl'])
+        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, ['calicoctl', 'crictl', 'etcdutl'])
         upgrade_software.prepare(summary_tracker)
 
         tracker = ComposedTracker(summary_tracker, upgrade_software)
@@ -69,7 +71,7 @@ class Thirdparties(SoftwareType):
             compatibility_map.prepare_software_mapping(thirdparty_name, k8s_versions)
 
             for k8s_version in k8s_versions:
-                version = get_version(kubernetes_versions, k8s_version, thirdparty_name)
+                version = get_version(kubernetes_versions, k8s_version, thirdparty_name, self.image_resolver)
                 sha1 = thirdparties_sha1[(thirdparty_name, version)]
 
                 new_settings = {}
@@ -105,13 +107,19 @@ def validate_thirdparty_versions(kubernetes_versions: Dict[str, Dict[str, str]],
                 ))
 
 
-def get_version(kubernetes_versions: Dict[str, Dict[str, str]], k8s_version: str, thirdparty_name: str) -> str:
+def get_version(kubernetes_versions: Dict[str, Dict[str, str]], k8s_version: str, thirdparty_name: str, 
+                image_resolver: kubernetes_images.KubernetesImagesResolver) -> str:
     if thirdparty_name in ('kubeadm', 'kubelet', 'kubectl'):
         return k8s_version
     elif thirdparty_name == 'calicoctl':
         return kubernetes_versions[k8s_version]['calico']
     elif thirdparty_name == 'crictl':
         return kubernetes_versions[k8s_version][thirdparty_name]
+    elif thirdparty_name == 'etcdutl':
+        # for etcdutl, we resolve the version from k8s etcd image version
+        images_versions = kubernetes_images.get_k8s_images_mapping(image_resolver, [k8s_version])
+        etcd_version = images_versions["etcd"][k8s_version].split("-")[0]
+        return f"v{etcd_version}"
     else:
         raise Exception(f"Unsupported thirdparty {thirdparty_name!r}")
 
@@ -121,31 +129,17 @@ def get_destination(thirdparty_name: str) -> str:
         return f'/usr/bin/{thirdparty_name}'
     elif thirdparty_name == 'crictl':
         return '/usr/bin/crictl.tar.gz'
+    elif thirdparty_name == 'etcdutl':
+        return '/usr/bin/etcd.tar.gz'
     else:
         raise Exception(f"Unsupported thirdparty {thirdparty_name!r}")
 
-
-def resolve_local_path(destination: str, version: str) -> str:
-    filename = f"{destination.split('/')[-1]}-{version}"
-    target_file = os.path.join(SYNC_CACHE, filename)
-    if os.path.exists(target_file):
-        return target_file
-
-    source = thirdparties.get_default_thirdparty_source(destination, version, in_public=True)
-
-    print(f"Downloading thirdparty {destination} of version {version} from {source}")
-    curl(source, TEMP_FILE)
-    os.rename(TEMP_FILE, target_file)
-
-    return target_file
-
-
-def calculate_sha1(thirdparty_resolver: ThirdpartyResolver, kubernetes_versions: Dict[str, Dict[str, str]],
-                   thirdparties: List[str]) -> Dict[Tuple[str, str], str]:
+def calculate_sha1(thirdparty_resolver: ThirdpartyResolver, image_resolver: kubernetes_images.KubernetesImagesResolver,
+                   kubernetes_versions: Dict[str, Dict[str, str]], thirdparties: List[str]) -> Dict[Tuple[str, str], str]:
     thirdparties_sha1 = {}
     for thirdparty_name in thirdparties:
         for k8s_version in kubernetes_versions:
-            version = get_version(kubernetes_versions, k8s_version, thirdparty_name)
+            version = get_version(kubernetes_versions, k8s_version, thirdparty_name, image_resolver)
             thirdparty_identity = (thirdparty_name, version)
             if thirdparty_identity not in thirdparties_sha1:
                 thirdparties_sha1[thirdparty_identity] = thirdparty_resolver.resolve_sha1(thirdparty_name, version)

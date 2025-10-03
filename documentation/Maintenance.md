@@ -140,6 +140,8 @@ However, your custom containers may be deleted, and you need to start them manua
 Patches that upgrade thirdparties have the following identifiers:
 * `upgrade_crictl` - It upgrades the `/usr/bin/crictl` third-party, if necessary.
 * `upgrade_calico` - It upgrades the `/usr/bin/calicoctl` third-party as part of the Calico plugin upgrade.
+* `upgrade_etcdutl` - It upgrades the `/usr/bin/etcdutl` third-party, if necessary.
+
 
 If the cluster is located in an isolated environment,
 it is possible to specify the custom paths to new thirdparties with a similar syntax as in the `cluster.yaml`
@@ -148,9 +150,16 @@ as shown in the following snippet:
 upgrade:
   thirdparties:
     /usr/bin/calicoctl:
-      source: https://example.com/thirdparty.files/projectcalico/calico/v3.25.1/calicoctl-linux-amd64
+      source: "https://example.com/thirdparty.files/projectcalico/calico/{{
+        plugins.calico.version }}/calicoctl-linux-amd64"
     /usr/bin/crictl.tar.gz:
-      source: https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/v1.27.0/crictl-v1.27.0-linux-amd64.tar.gz
+      source: "https://example.com/thirdparty.files/kubernetes-sigs/cri-tools/{{
+        globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version
+        }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
+    /usr/bin/etcd.tar.gz: 
+      source: "https://example.com/thirdparty.files/etcd-io/etcd/{{
+        globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version
+        }}/etcd-{{ globals.compatibility_map.software.etcdutl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz"
 ```
 
 This configuration replaces the configuration contained in the current `cluster.yaml`.
@@ -743,7 +752,7 @@ backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 By default, ETCD restore does not require additional parameters, however, if required, the following are supported:
 
 * image - the full name of the ETCD image, including the registry address. On its basis, the restoration is performed.
-* certificates - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
+* certificates - ETCD certificates. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
 
 #### thirdparties Parameter
 

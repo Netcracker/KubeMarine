@@ -906,15 +906,17 @@ services:
           capabilities: [pull, resolve]
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/projectcalico/calico/v3.27.3/calicoctl-linux-amd64
+      source: http://example.com/projectcalico/calico/{{calico-version}}/calicoctl-linux-amd64
     /usr/bin/crictl.tar.gz:
-      source: http://example.com/kubernetes-sigs/cri-tools/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
+      source: http://example.com/kubernetes-sigs/cri-tools/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz
+    /usr/bin/etcd.tar.gz:
+      source: http://example.com/etcd-io/etcd/{{etcdutl-version)/etcd-{{etcdutl-version}}-linux-amd64.tar.gz
     /usr/bin/kubeadm:
-      source: http://example.com/kubernetes/kubeadm/v1.30.1/bin/linux/amd64/kubeadm
+      source: http://example.com/kubernetes/kubeadm/{{k8s-version}}/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
-      source: http://example.com/kubernetes/kubectl/v1.30.1/bin/linux/amd64/kubectl
+      source: http://example.com/kubernetes/kubectl/{{k8s-version}}/bin/linux/amd64/kubectl
     /usr/bin/kubelet:
-      source: http://example.com/kubernetes/kubelet/v1.30.1/bin/linux/amd64/kubelet
+      source: http://example.com/kubernetes/kubelet/{{k8s-version}}/bin/linux/amd64/kubelet
 plugin_defaults:
   installation:
     registry: example.com:5443
@@ -2128,6 +2130,9 @@ services:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
       group: control-plane
       unpack: /usr/bin/
+    /usr/bin/etcd.tar.gz:
+      source: 'https://github.com/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
+      group: control-plane
 ```
 
 If necessary, you can redefine or add thirdparties. For example:
@@ -2155,6 +2160,8 @@ services:
       source: 'http://user:password@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
     /usr/bin/crictl.tar.gz:
       source: 'http://user:password@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+    /usr/bin/etcd.tar.gz:
+      source: 'http://user:password@some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
 ```
 
 **Note**: Percent-encoded (URL encoded) should be used for credentials. For example for username `user` and password `p@$$w0rD`:
@@ -2187,6 +2194,9 @@ services:
       source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
     /usr/bin/crictl.tar.gz:
       source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+    /usr/bin/etcd.tar.gz:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}
+      @some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
 ```
 
 #### CRI
@@ -6046,6 +6056,7 @@ The tables below shows the correspondence of versions that are supported and is 
 | binaries | kubeadm                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: 01b061a1a828bca9986f532f086a2bf89879e87e          |
 |          | kubelet                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: 9c0cd5bf9f36a159d3d72a8241d743500c116cf5          |
 |          | kubectl                                                        | v1.31.6          | v1.31.6                      | v1.31.6      | v1.31.6      | v1.31.6           | v1.31.6   | v1.31.6   | SHA1: af8b272a4d21d427d502ce24d737ffe2d6fc2164          |
+|          | etcdutl                                                     | v3.5.15          | v3.5.15                      | v3.5.15      | v3.5.15      | v3.5.15           | v3.5.15   | v3.5.15   | SHA1: 971b3cb3742bce44c6ae5a1f719423165d755206 |
 |          | calicoctl                                                      | v3.29.5          | v3.29.5                      | v3.29.5      | v3.29.5      | v3.29.5           | v3.29.5   | v3.29.5   | SHA1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126 Required only if calico is installed.                       |
 |          | crictl                                                         | v1.30.0          | v1.30.0                      | v1.30.0      | v1.30.0      | v1.30.0           | v1.30.0   | v1.30.0   | SHA1: c81e76d5d4bf64d6b513485490722d2fc0a9a83b          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
@@ -6077,6 +6088,7 @@ The tables below shows the correspondence of versions that are supported and is 
 | binaries | kubeadm                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 7aef86d97edf97e50ac7112a4ada49fe74619ebc          |
 |          | kubelet                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 9d8446943a6aab092156b7ee0a6d74c27f742ffc          |
 |          | kubectl                                                        | v1.32.2          | v1.32.2                      | v1.32.2      | v1.32.2      | v1.32.2           | v1.32.2   | v1.32.2   | SHA1: 87e59e4ae4a6b99d3ee8c37dea2db6b3466b41bc          |
+|          | etcdutl                                                     | v3.5.16          | v3.5.16                      | v3.5.16      | v3.5.16      | v3.5.16           | v3.5.16   | v3.5.16   | SHA1: b4bf00b4adae87edba5a2aa3d7f2bb94deaed95a |
 |          | calicoctl                                                      | v3.29.5          | v3.29.5                      | v3.29.5      | v3.29.5      | v3.29.5           | v3.29.5   | v3.29.5   | SHA1: 19999e25caa5ebb663a3f5c8df2ce7ed48ad6126 Required only if calico is installed.  |
 |          | crictl                                                         | v1.32.0          | v1.32.0                      | v1.32.0      | v1.32.0      | v1.32.0           | v1.32.0   | v1.32.0   | SHA1: c503051cf6e809a691f776ddf544abfc2a15e790          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
@@ -6109,6 +6121,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubelet                                                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: 984fc4e063e8df34f4beaa9212e5429ee70e5997          |
 |          | kubectl                                                        | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: aab40d38db50c728dbbe2e7b8144ba18f93480c2          |
 |          | calicoctl                                                      | v3.30.3          | v3.30.3                      | v3.30.3      | v3.30.3      | v3.30.3           | v3.30.3   | v3.30.3   | SHA1: 1f6e99f7a8da54c97e9aa5f2fa6380022e9fc81a Required only if calico is installed. |
+|          | etcdutl                                                     | v3.5.21          | v3.5.21                      | v3.5.21      | v3.5.21      | v3.5.21           | v3.5.21   | v3.5.21   | SHA1: 17ef9d9345e573901ad444d46b0c2ba3af721245 |
 |          | crictl                                                         | v1.33.0          | v1.33.0                      | v1.33.0      | v1.33.0      | v1.33.0           | v1.33.0   | v1.33.0   | SHA1: d702fd5792aba3ebf451e4488df2916010a76a0d          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.    |
@@ -6138,6 +6151,7 @@ The tables below shows the correspondence of versions that are supported and is 
 | binaries | kubeadm                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 10053ced6ccfaa31739f18a62456f5d2ff3ea827          |
 |          | kubelet                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 1448d15d77bb94151c446b2757edd5d3f63ebea2          |
 |          | kubectl                                                        | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 1e96813f08143594f806c678171109eebc54149a          |
+|          | etcdutl                                                     | v3.6.4          | v3.6.4                      | v3.6.4      | v3.6.4      | v3.6.4           | v3.6.4   | v3.6.4   | SHA1: a8e11a5007dbfd6559280e990ef7f9292da65405 |
 |          | calicoctl                                                      | v3.30.3          | v3.30.3                      | v3.30.3      | v3.30.3      | v3.30.3           | v3.30.3   | v3.30.3   | SHA1: 1f6e99f7a8da54c97e9aa5f2fa6380022e9fc81a Required only if calico is installed. |
 |          | crictl                                                         | v1.34.0          | v1.34.0                      | v1.34.0      | v1.34.0      | v1.34.0           | v1.34.0   | v1.34.0   | SHA1: 8d1c0fbbeb7a78a975fee674d4edd54da6124ddd          |
 | rpms     | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.7.*        | 1.7.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                         |

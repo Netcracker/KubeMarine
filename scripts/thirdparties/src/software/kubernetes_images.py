@@ -17,7 +17,7 @@ from typing import List, Dict
 
 from kubemarine import kubernetes
 from kubemarine.core import utils
-from . import thirdparties, SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
+from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware, download
 from ..shell import run
 from ..tracker import SummaryTracker, ComposedTracker
 
@@ -31,7 +31,7 @@ ERROR_ASCENDING_VERSIONS = \
 
 class KubernetesImagesResolver:
     def resolve(self, k8s_version: str) -> List[str]:
-        kubeadm_path = thirdparties.resolve_local_path('/usr/bin/kubeadm', k8s_version)
+        kubeadm_path = download.resolve_local_path('/usr/bin/kubeadm', k8s_version)
         run(['chmod', '+x', kubeadm_path])
         return run([kubeadm_path, 'config', 'images', 'list', '--kubernetes-version', k8s_version]) \
             .strip().split('\n')
