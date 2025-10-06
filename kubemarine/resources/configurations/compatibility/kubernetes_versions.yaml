@@ -46,6 +46,12 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
+  v1.34.1:
+    calico: v3.30.3
+    nginx-ingress-controller: v1.13.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
+    crictl: v1.34.0
 # After any change, please run scripts/thirdparties/sync.py
 
 # The following optional keys are supported in addition to the 5 required software keys:
