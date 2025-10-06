@@ -143,7 +143,7 @@ class FakeThirdpartyResolver(ThirdpartyResolver):
         for k8s_version, software_settings in software_mapping.items():
             if thirdparty_name in ('kubeadm', 'kubelet', 'kubectl') and version == k8s_version:
                 return software_settings['sha1']
-            if thirdparty_name in ('calicoctl', 'crictl') and version == software_settings['version']:
+            if thirdparty_name in ('calicoctl', 'crictl', 'etcdutl') and version == software_settings['version']:
                 return software_settings['sha1']
 
         return 'fake-sha1'

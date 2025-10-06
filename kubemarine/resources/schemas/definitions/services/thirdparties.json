@@ -8,7 +8,8 @@
     "/usr/bin/kubelet": {"$ref": "#/definitions/ThirdParty"},
     "/usr/bin/kubectl": {"$ref": "#/definitions/ThirdParty"},
     "/usr/bin/calicoctl": {"$ref": "#/definitions/ThirdParty"},
-    "/usr/bin/crictl.tar.gz": {"$ref": "#/definitions/ThirdParty"}
+    "/usr/bin/crictl.tar.gz": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/etcd.tar.gz": {"$ref": "#/definitions/ThirdParty"}
   },
   "additionalProperties": {
     "$ref": "#/definitions/ThirdParty"

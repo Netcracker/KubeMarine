@@ -65,7 +65,8 @@
       "description": "Deliver files from third party sources and install them in the system",
       "properties": {
         "/usr/bin/calicoctl": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"},
-        "/usr/bin/crictl.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"}
+        "/usr/bin/crictl.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"},
+        "/usr/bin/etcd.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"}
       },
       "additionalProperties": false
     }

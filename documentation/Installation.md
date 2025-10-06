@@ -906,15 +906,17 @@ services:
           capabilities: [pull, resolve]
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/projectcalico/calico/v3.27.3/calicoctl-linux-amd64
+      source: http://example.com/projectcalico/calico/{{calico-version}}/calicoctl-linux-amd64
     /usr/bin/crictl.tar.gz:
-      source: http://example.com/kubernetes-sigs/cri-tools/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
+      source: http://example.com/kubernetes-sigs/cri-tools/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz
+    /usr/bin/etcd.tar.gz:
+      source: http://example.com/etcd-io/etcd/{{etcdutl-version)/etcd-{{etcdutl-version}}-linux-amd64.tar.gz
     /usr/bin/kubeadm:
-      source: http://example.com/kubernetes/kubeadm/v1.30.1/bin/linux/amd64/kubeadm
+      source: http://example.com/kubernetes/kubeadm/{{k8s-version}}/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
-      source: http://example.com/kubernetes/kubectl/v1.30.1/bin/linux/amd64/kubectl
+      source: http://example.com/kubernetes/kubectl/{{k8s-version}}/bin/linux/amd64/kubectl
     /usr/bin/kubelet:
-      source: http://example.com/kubernetes/kubelet/v1.30.1/bin/linux/amd64/kubelet
+      source: http://example.com/kubernetes/kubelet/{{k8s-version}}/bin/linux/amd64/kubelet
 plugin_defaults:
   installation:
     registry: example.com:5443
@@ -2128,6 +2130,9 @@ services:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
       group: control-plane
       unpack: /usr/bin/
+    /usr/bin/etcd.tar.gz:
+      source: 'https://github.com/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
+      group: control-plane
 ```
 
 If necessary, you can redefine or add thirdparties. For example:
@@ -2155,6 +2160,8 @@ services:
       source: 'http://user:password@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
     /usr/bin/crictl.tar.gz:
       source: 'http://user:password@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+    /usr/bin/etcd.tar.gz:
+      source: 'http://user:password@some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
 ```
 
 **Note**: Percent-encoded (URL encoded) should be used for credentials. For example for username `user` and password `p@$$w0rD`:
@@ -2187,6 +2194,9 @@ services:
       source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
     /usr/bin/crictl.tar.gz:
       source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+    /usr/bin/etcd.tar.gz:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}
+      @some-registry-url/etcd-io/etcd/releases/download/{{etcdutl-version}}/etcd-{{etcdutl-version}}-linux-amd64.tar.gz'
 ```
 
 #### CRI

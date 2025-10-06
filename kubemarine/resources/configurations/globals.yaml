@@ -156,6 +156,12 @@ thirdparties:
       public: https://github.com/kubernetes-sigs/cri-tools/releases/download
       private: '{registry}/kubernetes-sigs/cri-tools'
     relative_path: '{version}/crictl-{version}-linux-amd64.tar.gz'
+  /usr/bin/etcd.tar.gz:
+    software_name: etcdutl
+    source_prefix:
+      public: https://github.com/etcd-io/etcd/releases/download
+      private: '{registry}/etcd-io/etcd'
+    relative_path: '{version}/etcd-{version}-linux-amd64.tar.gz'
 
 packages:
   debian:

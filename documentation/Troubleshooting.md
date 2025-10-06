@@ -20,6 +20,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0014: Invalid Helm Chart URL](#kme0014-invalid-helm-chart-url)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl Script](#etcdctl-script)
+  - [etcdutl binary](#etcdutl-binary)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
   - [CoreDNS Responds With High Latency](#coredns-responds-with-high-latency)
   - [Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted](#namespace-with-terminating-crcrd-cannot-be-deleted-terminating-crcrd-cannot-be-deleted)
@@ -523,6 +524,14 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 * `/var/lib/etcd`:`/var/lib/etcd`
 * `/etc/kubernetes/pki`:`/etc/kubernetes/pki`
 
+## Etcdutl binary
+
+Starting with etcd v3.6, in addition to `etcdctl` script, there is a new `etcdutl` binary, which took some responsibility from `etcdctl`. This binary is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
+
+To find out all the available `etcdutl` options and features, use the original ETCD documentation, for example:
+* [Disaster recovery](https://etcd.io/docs/v3.6/op-guide/recovery/)
+* [etcdutl README.md](https://github.com/etcd-io/etcd/tree/release-3.6/etcdutl)
+
 # Troubleshooting Kubernetes Generic Issues
 
 This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubemarine installation.
@@ -963,7 +972,7 @@ To restore etcd database from a snapshot created as it is described above, the f
 4. Restore etcd database into non-default catalog, for example, into `/var/lib/etcd/tmpdir`:
 
 ```
-etcdctl snapshot restore /var/lib/etcd/snapshot.db \
+etcdutl snapshot restore /var/lib/etcd/snapshot.db \
             --name=${CONTROL_PLANE_NODE_NAME} \
             --data-dir=/var/lib/etcd/tmpdir \
             --initial-cluster=${INITIAL_CLUSTER} \

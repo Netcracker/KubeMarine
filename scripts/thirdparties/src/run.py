@@ -52,7 +52,7 @@ class Synchronization:
         tracker = SummaryTracker(self.kubernetes_versions.compatibility_map)
 
         software: List[SoftwareType] = [
-            Thirdparties(self.compatibility, self.upgrade_config, self.thirdparty_resolver),
+            Thirdparties(self.compatibility, self.upgrade_config, self.thirdparty_resolver, self.images_resolver),
             Packages(self.compatibility, self.upgrade_config),
             KubernetesImages(self.compatibility, self.upgrade_config, self.images_resolver),
             Plugins(self.compatibility, self.upgrade_config, self.manifest_resolver),
