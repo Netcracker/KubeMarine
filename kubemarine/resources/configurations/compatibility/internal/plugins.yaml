@@ -15,8 +15,6 @@ calico:
     version: v3.29.5
   v1.33.0:
     version: v3.30.3
-  v1.34.0:
-    version: v3.30.3
   v1.34.1:
     version: v3.30.3
 nginx-ingress-controller:
@@ -35,9 +33,6 @@ nginx-ingress-controller:
   v1.33.0:
     version: v1.13.0
     webhook-version: v1.6.0
-  v1.34.0:
-    version: v1.13.1
-    webhook-version: v1.6.1
   v1.34.1:
     version: v1.13.1
     webhook-version: v1.6.1
@@ -55,9 +50,6 @@ kubernetes-dashboard:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
   v1.33.0:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.34.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
   v1.34.1:
@@ -78,9 +70,6 @@ local-path-provisioner:
     busybox-version: 1.34.1
   v1.33.0:
     version: v0.0.31
-    busybox-version: 1.34.1
-  v1.34.0:
-    version: v0.0.32
     busybox-version: 1.34.1
   v1.34.1:
     version: v0.0.32
