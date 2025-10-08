@@ -10,7 +10,6 @@
 thirdparties:
   calicoctl:
   - v1.33.0
-  - v1.34.0
   crictl: []
   etcdutl:
   - v1.31.1
@@ -18,7 +17,6 @@ thirdparties:
   - v1.32.0
   - v1.32.2
   - v1.33.0
-  - v1.34.0
 packages:
   containerd:
     version_debian: []
@@ -39,7 +37,6 @@ packages:
 plugins:
   calico:
   - v1.33.0
-  - v1.34.0
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
