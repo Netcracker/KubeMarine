@@ -23,7 +23,7 @@ packages:
     - v1.32.0
     - v1.32.2
     - v1.33.0
-    - v1.34.0
+    - v1.34.1
   haproxy:
     version_rhel: false
     version_rhel8: false
