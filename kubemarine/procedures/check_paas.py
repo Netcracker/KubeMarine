@@ -23,7 +23,7 @@ from typing import List, Dict, Optional, Union, cast, Iterable
 
 import yaml
 import ruamel.yaml
-from deepdiff import DeepDiff  # type: ignore[import-untyped]
+from deepdiff import DeepDiff
 
 from ordered_set import OrderedSet
 

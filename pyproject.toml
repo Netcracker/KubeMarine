@@ -16,7 +16,6 @@ license = {text = "Apache-2.0"}
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -51,7 +50,7 @@ dependencies = [
     "useful_types==0.2.*",
     "packaging==24.1.*"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 ansible = ["ansible==11.4.*"]
@@ -100,7 +99,7 @@ push = true
 ]
 
 [tool.pylint.main]
-py-version = "3.8"
+py-version = "3.9"
 init-hook = 'import sys; sys.path.append("scripts/thirdparties")'
 
 load-plugins = [
