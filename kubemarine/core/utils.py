@@ -29,7 +29,7 @@ from datetime import datetime
 
 from typing import Tuple, Callable, List, TextIO, cast, Union, Dict, Sequence, Optional, NoReturn, BinaryIO
 
-import deepdiff  # type: ignore[import-untyped]
+import deepdiff
 import yaml
 import ruamel.yaml
 
