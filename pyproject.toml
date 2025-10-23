@@ -39,7 +39,7 @@ dependencies = [
     "pygelf==0.4.*",
     "toml==0.10.*",
     "python-dateutil==2.9.*",
-    "deepdiff==7.0.*",
+    "deepdiff==8.6.*",
     "ordered-set==4.1.*",
     # Each time cryptography version is updated, need to regenerate scripts/ci/custom-hooks/hook-cryptography.py
     "cryptography==44.0.1",
