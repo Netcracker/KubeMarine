@@ -17,7 +17,13 @@ packages:
   containerdio:
     version_rhel: []
     version_rhel8: []
-    version_rhel9: []
+    version_rhel9:
+    - v1.31.1
+    - v1.31.6
+    - v1.32.0
+    - v1.32.2
+    - v1.33.0
+    - v1.34.1
   haproxy:
     version_rhel: false
     version_rhel8: false
@@ -33,3 +39,4 @@ plugins:
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
+
