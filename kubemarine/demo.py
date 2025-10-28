@@ -507,7 +507,7 @@ def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict
 
 def generate_node_context(*,
                           online: bool = True, accessible: bool = True, sudo: str = 'Root',
-                          os_name: str = 'centos', os_version: str = '7.9',
+                          os_name: str = 'centos', os_version: str = '9',
                           net_interface: str = 'eth0') -> dict:
     os_family = system.detect_os_family_by_name_version(os_name, os_version)
 
@@ -534,7 +534,7 @@ def generate_node_context(*,
 
 def generate_nodes_context(inventory: dict, procedure_inventory: dict = None, context: dict = None,
                            *,
-                           os_name: str = 'centos', os_version: str = '7.9',
+                           os_name: str = 'centos', os_version: str = '9',
                            net_interface: str = 'eth0') -> dict:
     procedure = 'install' if context is None else context['initial_procedure']
     if procedure_inventory is None:

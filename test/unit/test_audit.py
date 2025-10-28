@@ -35,10 +35,11 @@ class TestAuditInstallation(unittest.TestCase):
 
     def test_audit_installation_for_centos(self):
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='9')
         cluster = demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['audit']
+        os_family = cluster.get_os_family()
+        package_associations = cluster.inventory['services']['packages']['associations'][os_family]['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
@@ -46,7 +47,7 @@ class TestAuditInstallation(unittest.TestCase):
         # simulate package detection command
         exp_results1 = demo.create_nodegroup_result(cluster.nodes['control-plane'], code=1,
                                                     stderr='package %s is not installed' % package_name)
-        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel9', package_name)])
 
         # simulate package installation command
         installation_command = [yum.get_install_cmd(cluster, package_name)]

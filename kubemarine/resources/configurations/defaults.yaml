@@ -145,22 +145,6 @@ services:
         SystemdCgroup: '{% if services.kubeadm_kubelet.cgroupDriver == "systemd" %}true{% else %}false{% endif %}'
 
   modprobe:
-    rhel:
-      - modulename: br_netfilter
-        groups: [control-plane, worker]
-      - modulename: nf_conntrack
-        groups: [control-plane, worker]
-        install: '{{ nodes[0]["internal_address"] | isipv4 }}'
-      - modulename: nf_conntrack_ipv6
-        install: '{{ nodes[0]["internal_address"] | isipv6 }}'
-      - modulename: ip6table_filter
-        install: '{{ nodes[0]["internal_address"] | isipv6 }}'
-      - modulename: nf_nat_masquerade_ipv6
-        install: '{{ nodes[0]["internal_address"] | isipv6 }}'
-      - modulename: nf_reject_ipv6
-        install: '{{ nodes[0]["internal_address"] | isipv6 }}'
-      - modulename: nf_defrag_ipv6
-        install: '{{ nodes[0]["internal_address"] | isipv6 }}'
     rhel8: &modprobe-default-modules
       - modulename: br_netfilter
         groups: [control-plane, worker]
@@ -492,18 +476,6 @@ services:
           package_name: 'auditd'
         conntrack:
           package_name: 'conntrack'
-      rhel:
-        containerd: {}
-        haproxy:
-          executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
-          service_name: 'rh-haproxy18-haproxy'
-        keepalived: {}
-        audit:
-          package_name: 'audit'
-        conntrack:
-          package_name: 'conntrack-tools'
-        semanage:
-          package_name: 'policycoreutils-python'
       rhel8:
         containerd: {}
         haproxy:
