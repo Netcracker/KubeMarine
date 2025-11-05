@@ -6048,7 +6048,6 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 
 The tables below shows the correspondence of versions that are supported and is used during the installation:
 
-
 ## Default Dependent Components Versions for Kubernetes Versions v1.31.6
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|

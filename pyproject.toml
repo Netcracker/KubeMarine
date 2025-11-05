@@ -16,7 +16,6 @@ license = {text = "Apache-2.0"}
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -39,7 +38,7 @@ dependencies = [
     "pygelf==0.4.*",
     "toml==0.10.*",
     "python-dateutil==2.9.*",
-    "deepdiff==7.0.*",
+    "deepdiff==8.6.*",
     "ordered-set==4.1.*",
     # Each time cryptography version is updated, need to regenerate scripts/ci/custom-hooks/hook-cryptography.py
     "cryptography==44.0.1",
@@ -51,7 +50,7 @@ dependencies = [
     "useful_types==0.2.*",
     "packaging==24.1.*"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 ansible = ["ansible==11.4.*"]
@@ -84,7 +83,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "v0.41.0"
+current_version = "v0.42.0"
 version_pattern = "vMAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true
@@ -100,7 +99,7 @@ push = true
 ]
 
 [tool.pylint.main]
-py-version = "3.8"
+py-version = "3.9"
 init-hook = 'import sys; sys.path.append("scripts/thirdparties")'
 
 load-plugins = [
