@@ -838,8 +838,8 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         fix_flag_kubelet(node)
 
         node.sudo(
-            "kubeadm upgrade node {flags} && "
-            "sudo systemctl restart kubelet", pty=True)
+            f"kubeadm upgrade node {flags} && "
+            f"sudo systemctl restart kubelet", pty=True)
 
         first_control_plane.sudo("kubectl uncordon %s" % node_name, hide=False)
 
