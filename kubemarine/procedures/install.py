@@ -386,7 +386,6 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
     with group.new_executor() as exe:
         exe.group.call_batch([
             haproxy.configure,
-            haproxy.override_haproxy18,
         ])
 
     haproxy.restart(group)

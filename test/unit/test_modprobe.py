@@ -125,7 +125,7 @@ class ModulesEnrichment(unittest.TestCase):
             self.new_cluster()
 
     def test_multiple_os_family_merge(self):
-        supported_os_families = list(packages.get_associations_os_family_keys())
+        supported_os_families = packages.get_associations_os_family_keys()
         self.inventory = demo.generate_inventory(control_plane=len(supported_os_families))
         self.nodes_context = demo.generate_nodes_context(self.inventory)
 
@@ -187,24 +187,14 @@ class ModulesEnrichment(unittest.TestCase):
 
                 cluster = self.new_cluster()
 
-                if os_family == 'rhel':
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack_ipv6',
-                        'ip6table_filter',
-                        'nf_nat_masquerade_ipv6',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
-                else:
-                    expected_all_modules_list = [
-                        'br_netfilter',
-                        'nf_conntrack',
-                        'ip6table_filter',
-                        'nf_nat',
-                        'nf_reject_ipv6',
-                        'nf_defrag_ipv6',
-                    ]
+                expected_all_modules_list = [
+                    'br_netfilter',
+                    'nf_conntrack',
+                    'ip6table_filter',
+                    'nf_nat',
+                    'nf_reject_ipv6',
+                    'nf_defrag_ipv6',
+                ]
 
                 kubernetes_only_modules_list = [
                     'br_netfilter',
@@ -224,7 +214,6 @@ class ModulesEnrichment(unittest.TestCase):
     def _get_os_context(self, os_family: str) -> Tuple[str, str]:
         return {
             'debian': ('ubuntu', '22.04'),
-            'rhel': ('centos', '7.9'),
             'rhel8': ('rhel', '8.7'),
             'rhel9': ('rhel', '9.2')
         }[os_family]

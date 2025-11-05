@@ -35,7 +35,7 @@ test_msg = "test_function_return_result"
 static.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
-def test_func(cluster: demo.FakeKubernetesCluster):
+def flow_test_func(cluster: demo.FakeKubernetesCluster):
     # Need to fill values in cluster context in some tests to know that function was called
     current_value = cluster.context.get("test_info", 0)
     cluster.context["test_info"] = current_value + 1
@@ -46,19 +46,19 @@ def test_func(cluster: demo.FakeKubernetesCluster):
 tasks: dict = {
     "deploy": {
         "loadbalancer": {
-            "haproxy": test_func,
-            "keepalived": test_func
+            "haproxy": flow_test_func,
+            "keepalived": flow_test_func
         },
-        "accounts": test_func
+        "accounts": flow_test_func
     },
-    "overview": test_func
+    "overview": flow_test_func
 }
 
 num_tasks = 4
 
 
 def replace_a_func_in_dict(test_res):
-    test_res_str = str(test_res).replace(str(test_func), "'a'")
+    test_res_str = str(test_res).replace(str(flow_test_func), "'a'")
     return ast.literal_eval(test_res_str)
 
 
@@ -165,9 +165,9 @@ class FlowTest(unittest.TestCase):
     def test_schedule_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
-        cluster.schedule_cumulative_point(test_func)
+        cluster.schedule_cumulative_point(flow_test_func)
         points = cluster.context["scheduled_cumulative_points"]
-        self.assertIn(test_func, points, "Test cumulative point was not added to cluster context")
+        self.assertIn(flow_test_func, points, "Test cumulative point was not added to cluster context")
 
     def test_add_task_to_proceeded_list(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
@@ -179,12 +179,12 @@ class FlowTest(unittest.TestCase):
 
     def test_proceed_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
-        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
+        method_full_name = flow_test_func.__module__ + '.' + flow_test_func.__qualname__
         cumulative_points = {
-            test_func: ['prepare.system.modprobe']
+            flow_test_func: ['prepare.system.modprobe']
         }
         flow.init_tasks_flow(cluster)
-        cluster.schedule_cumulative_point(test_func)
+        cluster.schedule_cumulative_point(flow_test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
         self.assertEqual(1, cluster.context.get("test_info"),
@@ -211,7 +211,7 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: ['deploy.loadbalancer.haproxy']
+            flow_test_func: ['deploy.loadbalancer.haproxy']
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
@@ -222,7 +222,7 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: ['deploy.loadbalancer.haproxy']
+            flow_test_func: ['deploy.loadbalancer.haproxy']
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
@@ -233,7 +233,7 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: [flow.END_OF_TASKS]
+            flow_test_func: [flow.END_OF_TASKS]
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
@@ -244,10 +244,10 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: ['overview']
+            flow_test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(flow_test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
@@ -261,7 +261,7 @@ class FlowTest(unittest.TestCase):
             proceeded_tasks = cluster.context["proceeded_tasks"]
             self.assertIn('deploy.loadbalancer.haproxy', proceeded_tasks,
                           f"Cumulative point should be executed at the end of tasks")
-            test_func(cluster)
+            flow_test_func(cluster)
 
         cumulative_points = {
             cumulative_func: [flow.END_OF_TASKS]
@@ -274,25 +274,25 @@ class FlowTest(unittest.TestCase):
                          f"Cumulative point should be executed at the end of tasks")
 
     def test_exclude_cumulative_point_scheduled(self):
-        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
+        method_full_name = flow_test_func.__module__ + '.' + flow_test_func.__qualname__
         context = demo.create_silent_context(['--exclude-cumulative-points-methods', method_full_name])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: ['overview']
+            flow_test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(flow_test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(num_tasks - 1, resources.cluster_if_initialized().context.get("test_info"),
                          f"Cumulative point should be excluded and not executed")
 
     def test_exclude_cumulative_point_not_scheduled(self):
-        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
+        method_full_name = flow_test_func.__module__ + '.' + flow_test_func.__qualname__
         context = demo.create_silent_context(['--exclude-cumulative-points-methods', f'{method_full_name} ,'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
-            test_func: ['overview']
+            flow_test_func: ['overview']
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
@@ -300,16 +300,16 @@ class FlowTest(unittest.TestCase):
                          f"Cumulative point should not be scheduled neither executed")
 
     def test_exclude_invalid_cumulative_point(self):
-        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
-        for invalid_point in ('invalid.point', f'{method_full_name}.', test_func.__module__):
+        method_full_name = flow_test_func.__module__ + '.' + flow_test_func.__qualname__
+        for invalid_point in ('invalid.point', f'{method_full_name}.', flow_test_func.__module__):
             context = demo.create_silent_context(['--exclude-cumulative-points-methods', invalid_point])
             inventory = demo.generate_inventory(**demo.FULLHA)
             cumulative_points = {
-                test_func: ['overview']
+                flow_test_func: ['overview']
             }
             tasks_copy = deepcopy(tasks)
             tasks_copy['deploy']['loadbalancer']['haproxy'] \
-                = lambda cluster: cluster.schedule_cumulative_point(cluster, test_func)
+                = lambda cluster: cluster.schedule_cumulative_point(cluster, flow_test_func)
             resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
             with self.assertRaisesRegex(
                     Exception, re.escape(flow.ERROR_UNRECOGNIZED_CUMULATIVE_POINT_EXCLUDE.format(point=invalid_point))):
@@ -327,11 +327,11 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'centos', 'version': '9', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_not_sudoer_does_not_interrupt_enrichment(self):
@@ -345,11 +345,11 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual("rhel9", cluster.get_os_family())
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'centos', 'version': '9', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_any_offline_node_interrupts(self):
@@ -480,11 +480,11 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'centos', 'version': '9', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_detect_nodes_context_do_procedure(self):
@@ -503,11 +503,11 @@ class FlowTest(unittest.TestCase):
         flow.ActionsFlow([do.CLIAction(context)]).run_flow(res, print_summary=False)
 
         cluster = res.cluster(EnrichmentStage.LIGHT)
-        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual("rhel9", cluster.get_os_family())
         self.assertEqual(1, len(cluster.nodes_context))
         for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
-            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual({'name': 'centos', 'version': '9', 'family': 'rhel9'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
     def test_do_master_offline(self):

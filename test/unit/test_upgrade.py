@@ -366,7 +366,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
     def test_compatibility_upgrade_required(self):
         for os_name, os_family, os_version in (
                 ('ubuntu', 'debian', '20.04'),
-                ('centos', 'rhel', '7.9'),
+                ('centos', 'rhel9', '9'),
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
         ):
@@ -386,7 +386,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                         f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def _packages_for_cri_os_family(self, os_family: str) -> List[str]:
-        if os_family in ('rhel', 'rhel8', 'rhel9'):
+        if os_family in ('rhel8', 'rhel9'):
             package_names = ['containerdio']
         else:
             package_names = ['containerd']

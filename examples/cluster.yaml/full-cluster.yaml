@@ -187,16 +187,16 @@ services:
         - man_groff
 
   modprobe:
-    # For RHEL OS:
-    rhel:
+    # For RHEL 8/9 OS:
+    rhel9:
     - br_netfilter
     - ip_vs
     - ip_vs_rr
     - ip_vs_wrr
     - ip_vs_sh
     - ip6table_filter
-    - nf_conntrack_ipv6
-    - nf_nat_masquerade_ipv6
+    - nf_conntrack
+    - nf_nat
     - nf_reject_ipv6
     - nf_defrag_ipv6
     # For Debian OS:
@@ -236,11 +236,11 @@ services:
       replace-repositories: true
       # For RHEL OS use yum-like format:
       repositories:
-        centos-sclo-haproxy18:
-          name: "CentOS SCLO rh-haproxy18"
+        centos9-yumsrv:
+          name: "BaseOS Packages CentOS Stream 9"
           enabled: 1
           gpgcheck: 0
-          baseurl: "http://mirror.centos.org/centos/7/sclo/x86_64/rh/rh-haproxy18/"
+          baseurl:  "http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/"
       # For Debian OS use apt-like format:
       # repositories:
       #   - "deb [arch=amd64 trusted=yes] http://example.com/deb/ubuntu/ focal main restricted"
