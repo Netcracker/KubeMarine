@@ -292,9 +292,11 @@ class IngressNginxManifestProcessor(Processor):
     def enrich_service_ingress_nginx_controller(self, manifest: Manifest) -> None:
         # The method needs some rework in case of dual stack support
         key = "Service_ingress-nginx-controller"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['spec']['type'] = 'ClusterIP'
+
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
         if utils.isipv(ip, [6]):
-            source_yaml = manifest.get_obj(key, patch=True)
             source_yaml['spec']['ipFamilies'] = ['IPv6']
             self.log.verbose(f"The {key} has been patched in 'spec.ipFamilies' with 'IPv6'")
 
