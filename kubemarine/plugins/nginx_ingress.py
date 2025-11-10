@@ -295,6 +295,9 @@ class IngressNginxManifestProcessor(Processor):
         source_yaml = manifest.get_obj(key, patch=True)
         source_yaml['spec']['type'] = 'ClusterIP'
 
+        if 'externalTrafficPolicy' in source_yaml['spec']:
+            del(source_yaml, 'externalTrafficPolicy')
+
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
         if utils.isipv(ip, [6]):
             source_yaml['spec']['ipFamilies'] = ['IPv6']
