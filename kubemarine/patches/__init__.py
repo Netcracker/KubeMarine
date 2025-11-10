@@ -22,7 +22,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from patches import nginx_cluster_ip
+from kubemarine.patches import nginx_cluster_ip
 
 patches: List[Patch] = [
     nginx_cluster_ip.NginxClusterIPPatch()
