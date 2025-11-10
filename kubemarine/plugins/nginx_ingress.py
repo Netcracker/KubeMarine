@@ -296,7 +296,7 @@ class IngressNginxManifestProcessor(Processor):
         source_yaml['spec']['type'] = 'ClusterIP'
 
         if 'externalTrafficPolicy' in source_yaml['spec']:
-            del(source_yaml['externalTrafficPolicy'])
+            del source_yaml['spec']['externalTrafficPolicy']
 
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
         if utils.isipv(ip, [6]):
