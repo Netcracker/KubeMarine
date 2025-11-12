@@ -168,7 +168,7 @@ For cluster machines, ensure the following requirements are met:
   * CentOS Stream 9
   * RHEL 8.4, 8.6, 8.7, 8.8, 8.9, 8.10, 9.2, 9.3, 9.4
   * Oracle Linux 8.4, 9.2
-  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3, 9.4, 9.5
+  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3, 9.4, 9.5, 9.6
   * Ubuntu 20.04, 22.04.1, 24.04.1
  
 **Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.7 and above.
