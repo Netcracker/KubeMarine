@@ -16,13 +16,7 @@ packages:
     version_debian: []
   containerdio:
     version_rhel8: []
-    version_rhel9:
-    - v1.31.1
-    - v1.31.6
-    - v1.32.0
-    - v1.32.2
-    - v1.33.0
-    - v1.34.1
+    version_rhel9: []
   haproxy:
     version_rhel8: false
     version_rhel9: false
@@ -36,4 +30,3 @@ plugins:
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
-
