@@ -489,10 +489,12 @@ class KubernetesCluster(Environment):
 
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         ips = self.get_addresses_from_node_names(node_names)
-        return self.make_group(ips)
+        group = self.make_group(ips)
+        return self._apply_cli_nodes_filter(group)
 
     def make_group_from_roles(self, roles: Sequence[str]) -> NodeGroup:
-        return self.nodes['all'].having_roles(roles)
+        group = self.nodes['all'].having_roles(roles)
+        return self._apply_cli_nodes_filter(group)
 
     def get_new_nodes(self) -> NodeGroup:
         return self.nodes['all'].exclude_group(self.previous_nodes['all'])
@@ -523,6 +525,59 @@ class KubernetesCluster(Environment):
             common_group = common_group.include_group(self.make_group_from_nodes(nodes_names))
 
         return common_group
+
+    def _get_cli_nodes_filter_selectors(self) -> Optional[dict]:
+        """
+        Returns structured nodes filter selectors parsed from CLI, if any.
+        """
+        args: dict = self.context.get('execution_arguments', {})
+        expr = args.get('nodes')
+        if not expr:
+            return None
+
+        cached = self.context.get('_cli_nodes_filter_selectors')
+        if cached is not None:
+            return cached
+
+        try:
+            selectors = utils.parse_nodes_filter_expr(expr)
+        except ValueError as exc:
+            # Fail fast with a clear message while preserving existing error handling flow.
+            raise Exception(f"Failed to parse --nodes argument: {exc}") from exc
+
+        self.context['_cli_nodes_filter_selectors'] = selectors
+        return selectors or None
+
+    def _apply_cli_nodes_filter(self, group: NodeGroup) -> NodeGroup:
+        """
+        Apply CLI-provided --nodes filter to the given group, if any filter is set.
+        """
+        selectors = self._get_cli_nodes_filter_selectors()
+        if not selectors or group.is_empty():
+            return group
+
+        labels_selector: Optional[Dict[str, str]] = selectors.get('labels')  # type: ignore[assignment]
+        roles_selector: Optional[Sequence[str]] = selectors.get('roles')  # type: ignore[assignment]
+
+        def match(node: NodeConfig) -> bool:
+            if labels_selector:
+                node_labels = node.get('labels') or {}
+                if not isinstance(node_labels, dict):
+                    return False
+                for key, expected_value in labels_selector.items():
+                    if node_labels.get(key) != expected_value:
+                        return False
+
+            if roles_selector:
+                node_roles = node.get('roles') or []
+                if not isinstance(node_roles, list):
+                    return False
+                if not set(roles_selector).intersection(node_roles):
+                    return False
+
+            return True
+
+        return group.new_group(match)
 
     def schedule_cumulative_point(self, point_method: Callable) -> None:
         self._check_within_flow()

@@ -114,7 +114,9 @@ def verify_roles(cluster: KubernetesCluster) -> None:
     if cluster.context['initial_procedure'] == 'do':
         control_plane_roles = ['control-plane', 'master']
 
-    if cluster.make_group_from_roles(control_plane_roles).is_empty():
+    # Use the base nodes group directly so that CLI runtime filters (e.g. --nodes)
+    # do not interfere with control plane presence validation.
+    if cluster.nodes['all'].having_roles(control_plane_roles).is_empty():
         raise KME("KME0004")
 
 
@@ -1113,20 +1115,57 @@ def get_group_for_upgrade(cluster: KubernetesCluster) -> NodeGroup:
         return upgrade_group
 
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    if cluster.procedure_inventory.get('upgrade_nodes'):
-        nodes_for_upgrade = []
-        for node in cluster.procedure_inventory['upgrade_nodes']:
-            if isinstance(node, str):
-                node_name = node
-            else:
-                node_name = node['name']
-            nodes_for_upgrade.append(node_name)
-            cluster.log.verbose("Node \"%s\" manually scheduled for upgrade." % node_name)
-            cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt', warn=True)
+    procedure_upgrade_nodes = cluster.procedure_inventory.get('upgrade_nodes')
+    if procedure_upgrade_nodes:
+        if isinstance(procedure_upgrade_nodes, list):
+            nodes_for_upgrade = []
+            for node in procedure_upgrade_nodes:
+                if isinstance(node, str):
+                    node_name = node
+                else:
+                    node_name = node['name']
+                nodes_for_upgrade.append(node_name)
+                cluster.log.verbose("Node \"%s\" manually scheduled for upgrade." % node_name)
+            # If nodes are specified explicitly, cached nodes versions file is no longer relevant.
+            cluster.nodes['control-plane'].get_first_member().sudo(
+                'rm -f /etc/kubernetes/nodes-k8s-versions.txt', warn=True)
+            upgrade_group = cluster.make_group_from_nodes(nodes_for_upgrade)
+        elif isinstance(procedure_upgrade_nodes, dict):
+            selectors = procedure_upgrade_nodes
+            labels_selector = selectors.get('labels') or {}
+            roles_selector = selectors.get('roles') or []
+
+            group = cluster.nodes['all']
+            if roles_selector:
+                group = cluster.make_group_from_roles(roles_selector)
+
+            if labels_selector:
+                def match_labels(node: dict) -> bool:
+                    node_labels = node.get('labels') or {}
+                    if not isinstance(node_labels, dict):
+                        return False
+                    for key, expected_value in labels_selector.items():
+                        if node_labels.get(key) != expected_value:
+                            return False
+                    return True
+
+                group = group.new_group(match_labels)
+
+            if group.is_empty():
+                raise Exception("No nodes match upgrade_nodes selector in procedure inventory.")
+
+            upgrade_group = group
+            for node_name in upgrade_group.get_nodes_names():
+                cluster.log.verbose("Node \"%s\" scheduled for upgrade by selector." % node_name)
+
+            cluster.nodes['control-plane'].get_first_member().sudo(
+                'rm -f /etc/kubernetes/nodes-k8s-versions.txt', warn=True)
+        else:
+            raise Exception("Unsupported 'upgrade_nodes' format in procedure inventory.")
     else:
         nodes_for_upgrade = autodetect_non_upgraded_nodes(cluster, version)
+        upgrade_group = cluster.make_group_from_nodes(nodes_for_upgrade)
 
-    upgrade_group = cluster.make_group_from_nodes(nodes_for_upgrade)
     cluster.context['upgrade_group'] = upgrade_group
 
     return upgrade_group
