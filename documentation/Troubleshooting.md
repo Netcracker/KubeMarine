@@ -2030,14 +2030,14 @@ The root cause is that `kubeadm v1.28.0` adds default fields that are incompatib
 
 1. **Remove the following parts from the `etcd.yaml` manifest** on each control plane node in the cluster, one by one. The lines to remove are marked by `-`:
 
-```yaml
+```
 apiVersion: v1
 kind: Pod
 ...
 spec:
   containers:
   - command:
-      ...  
+...
     image: registry.k8s.io/etcd:3.5.9-0
     imagePullPolicy: IfNotPresent
     livenessProbe:
@@ -2049,7 +2049,7 @@ spec:
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
-      successThreshold: 1
+-     successThreshold: 1
       timeoutSeconds: 15
     name: etcd
     resources:
@@ -2065,26 +2065,26 @@ spec:
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
-      successThreshold: 1
+-     successThreshold: 1
       timeoutSeconds: 15
-    terminationMessagePath: /dev/termination-log
-    terminationMessagePolicy: File
+-   terminationMessagePath: /dev/termination-log
+-   terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/lib/etcd
       name: etcd-data
     - mountPath: /etc/kubernetes/pki/etcd
       name: etcd-certs
-  dnsPolicy: ClusterFirst
-  enableServiceLinks: true
+- dnsPolicy: ClusterFirst
+- enableServiceLinks: true
   hostNetwork: true
   priority: 2000001000
   priorityClassName: system-node-critical
-  restartPolicy: Always
-  schedulerName: default-scheduler
+- restartPolicy: Always
+- schedulerName: default-scheduler
   securityContext:
     seccompProfile:
       type: RuntimeDefault
-  terminationGracePeriodSeconds: 30
+- terminationGracePeriodSeconds: 30
 ...
 ```
 
