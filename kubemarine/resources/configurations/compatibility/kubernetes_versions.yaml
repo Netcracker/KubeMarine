@@ -8,6 +8,8 @@ kubernetes_versions:
     supported: true
   v1.34:
     supported: true
+  v1.35:
+    supported: true
 compatibility_map:
 # This section should be changed manually.
   v1.31.1:
@@ -46,6 +48,12 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
+  v1.35.0:
+    calico: v3.30.5
+    nginx-ingress-controller: v1.14.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
+    crictl: v1.35.0
 # After any change, please run scripts/thirdparties/sync.py
 
 # The following optional keys are supported in addition to the 5 required software keys:
