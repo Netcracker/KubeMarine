@@ -88,8 +88,9 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         calico_node = self._get_calico_node_container(manifest)
         self.assertEqual(expected_image, calico_node.get('image'), "Unexpected calico-node image")
 
-        self.assertTrue(any(1 for c in init_containers if c['name'] == 'mount-bpffs' and c['image'] == expected_image),
-                        f"mount-bpffs init container with {expected_image} image is not found")
+        bootstrap_name = 'ebpf-bootstrap' if any(c['name'] == 'ebpf-bootstrap' for c in init_containers) else 'mount-bpffs'
+        self.assertTrue(any(1 for c in init_containers if c['name'] == bootstrap_name and c['image'] == expected_image),
+                        f"{bootstrap_name} init container with {expected_image} image is not found")
 
     def _get_calico_node_container(self, manifest: Manifest):
         containers = self.get_obj(manifest, "DaemonSet_calico-node")['spec']['template']['spec']['containers']

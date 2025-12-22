@@ -68,7 +68,7 @@ class RestoreEnrichmentTest(test_utils.CommonTest):
         backup.pack_to_tgz(self.backup_location, self.restore_tmpdir)
 
     def test_enrich_and_finalize_inventory_kubernetes_version(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.2'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.10'
         descriptor = {'kubernetes': {'version': 'v1.31.6'}}
         self._pack_descriptor(descriptor)
         self._pack_data()
