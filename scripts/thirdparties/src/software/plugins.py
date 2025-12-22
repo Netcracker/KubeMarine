@@ -316,6 +316,9 @@ def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[s
     for image in manifest.get_all_container_images():
         image = image.split('@sha256:')[0]
         image = image.replace('docker.io/', '')
+        # Calico upstream manifests may use quay.io registry (e.g. quay.io/calico/node:v3.31.2).
+        if manifest.identity.plugin_name == 'calico':
+            image = image.replace('quay.io/', '')
         # Currently only 'nginx-ingress-controller' contains images from GCR registry.
         # If some new image in this registry appear, we should emphasize this explicitly,
         # adopt the synchronization tool, and installation.registry of the plugin in defaults.yaml
