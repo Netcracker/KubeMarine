@@ -5,10 +5,6 @@
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.
 
 calico:
-  v1.31.1:
-    version: v3.29.1
-  v1.31.6:
-    version: v3.29.5
   v1.32.0:
     version: v3.29.1
   v1.32.2:
@@ -26,12 +22,6 @@ calico:
   v1.35.0:
     version: v3.31.2
 nginx-ingress-controller:
-  v1.31.1:
-    version: v1.12.4
-    webhook-version: v1.6.0
-  v1.31.6:
-    version: v1.12.4
-    webhook-version: v1.6.0
   v1.32.0:
     version: v1.12.4
     webhook-version: v1.6.0
@@ -57,12 +47,6 @@ nginx-ingress-controller:
     version: v1.14.1
     webhook-version: v1.6.5
 kubernetes-dashboard:
-  v1.31.1:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.31.6:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
   v1.32.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
@@ -88,12 +72,6 @@ kubernetes-dashboard:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
 local-path-provisioner:
-  v1.31.1:
-    version: v0.0.27
-    busybox-version: 1.34.1
-  v1.31.6:
-    version: v0.0.27
-    busybox-version: 1.34.1
   v1.32.0:
     version: v0.0.27
     busybox-version: 1.34.1

@@ -30,7 +30,7 @@ class EnrichmentValidation(unittest.TestCase):
 
 
 class SHACalculationTest(unittest.TestCase):
-    version = "v1.31.1"
+    version = "v1.32.0"
 
     customized_services = {
         'kubeadm': {

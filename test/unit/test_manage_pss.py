@@ -120,7 +120,7 @@ class EnrichmentAndFinalization(unittest.TestCase):
                                 context=self.context)
 
     def test_enrich_and_finalize_admission_configuration(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.10'
         self.inventory['rbac']['pss'] = {
             'exemptions': {
                 'namespaces': ['a', 'b'],
@@ -209,7 +209,7 @@ class RunTasks(unittest.TestCase):
         return resources
 
     def test_manage_pss_enable_pss(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.10'
         self.inventory['rbac']['pss']['pod-security'] = 'disabled'
         self.manage_pss['pss']['pod-security'] = 'enabled'
         with utils.mock_call(admission.label_namespace_pss), \

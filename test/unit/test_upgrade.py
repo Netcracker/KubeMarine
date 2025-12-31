@@ -68,15 +68,15 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
             upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version], self.logger)
 
     def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.31.6'
-        new_kubernetes_version = 'v1.33.6'
+        old_kubernetes_version = 'v1.32.10'
+        new_kubernetes_version = 'v1.34.2'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_downgrade(self):
         old_kubernetes_version = 'v1.33.6'
-        new_kubernetes_version = 'v1.31.1'
+        new_kubernetes_version = 'v1.32.0'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
@@ -89,8 +89,8 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_not_latest_patch_version(self):
-        old_kubernetes_version = 'v1.31.1'
-        new_kubernetes_version = 'v1.32.0'
+        old_kubernetes_version = 'v1.32.10'
+        new_kubernetes_version = 'v1.33.0'
         latest_supported_patch_version = next(v for v in self.latest_patch_k8s_versions()
                                               if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version))
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_LATEST_PATCH
@@ -166,7 +166,7 @@ class _AbstractUpgradeEnrichmentTest(unittest.TestCase):
 
 class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10'])
 
     def test_correct_inventory(self):
         cluster = self.new_cluster()
@@ -174,7 +174,7 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def test_upgrade_with_default_admission(self):
         # Upgrade PSS->PSS kuber version
-        old_kubernetes_version = 'v1.31.1'
+        old_kubernetes_version = 'v1.32.0'
         new_kubernetes_version = 'v1.32.10'
         self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         cluster = self.new_cluster()
@@ -192,8 +192,8 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_version_upgrade_not_possible_template(self):
-        old_kubernetes_version = 'v1.31.1'
-        new_kubernetes_version = 'v1.32.0'
+        old_kubernetes_version = 'v1.32.10'
+        new_kubernetes_version = 'v1.33.0'
         latest_supported_patch_version = max(
             (v for v in static.KUBERNETES_VERSIONS['compatibility_map']
              if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version)),
@@ -208,7 +208,7 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_failed_enrichment_raise_original_exception(self):
-        old_kubernetes_version = 'v1.31.1'
+        old_kubernetes_version = 'v1.32.0'
         new_kubernetes_version = 'v1.32.10'
 
         for stage in (EnrichmentStage.LIGHT, EnrichmentStage.FULL, EnrichmentStage.PROCEDURE):
@@ -239,7 +239,7 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -327,7 +327,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                     self.new_cluster()
 
     def test_require_package_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.31.1', 'v1.31.6', 'v1.32.10', 'v1.33.6'
+        before, through1, through2, after = 'v1.32.0', 'v1.32.10', 'v1.33.6', 'v1.34.2'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -352,7 +352,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_package_redefinition_first_step(self):
-        self.setUpVersions('v1.31.1', ['v1.31.6', 'v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10', 'v1.33.6'])
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
         self.upgrade[self.upgrade_plan[0]]['packages']['associations']['containerd']['package_name'] = 'containerd-upgrade1'
 
@@ -489,7 +489,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -550,7 +550,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
             self.new_cluster()
 
     def test_require_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.31.1', 'v1.31.6', 'v1.32.10', 'v1.33.6'
+        before, through1, through2, after = 'v1.32.0', 'v1.32.10', 'v1.33.6', 'v1.34.2'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -577,7 +577,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
                 self.run_actions()
 
     def test_require_image_redefinition_first_step(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10', 'v1.33.6'])
+        self.setUpVersions('v1.32.0', ['v1.32.10', 'v1.33.6'])
         self.inventory['plugins'].setdefault('kubernetes-dashboard', {})\
             .setdefault('dashboard', {})['image'] = 'dashboard-redefined'
         self.upgrade[self.upgrade_plan[0]]['plugins'].setdefault('kubernetes-dashboard', {})\
@@ -706,7 +706,7 @@ class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest)
 
 class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -823,7 +823,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_dont_require_redefinition_source_template_defaults_changed_second_step(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10', 'v1.33.6'])
+        self.setUpVersions('v1.32.0', ['v1.32.10', 'v1.33.6'])
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
 
@@ -864,7 +864,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_source_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.31.1', 'v1.31.6', 'v1.32.10', 'v1.33.6'
+        before, through1, through2, after = 'v1.32.0', 'v1.32.10', 'v1.33.6', 'v1.34.2'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -890,7 +890,7 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10'])
+        self.setUpVersions('v1.32.0', ['v1.32.10'])
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
@@ -939,7 +939,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
             self.new_cluster()
 
     def test_require_sandbox_image_redefinition_version_templates(self):
-        before, through1, through2, after = 'v1.31.1', 'v1.31.6', 'v1.32.10', 'v1.33.6'
+        before, through1, through2, after = 'v1.32.0', 'v1.32.10', 'v1.33.6', 'v1.34.2'
         for template in (False, True):
             with self.subTest(f"template: {template}"), \
                     utils.assert_raises_kme(
@@ -961,7 +961,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
                 self.run_actions()
 
     def test_require_sandbox_image_redefinition_first_step(self):
-        self.setUpVersions('v1.31.1', ['v1.32.10', 'v1.33.6'])
+        self.setUpVersions('v1.32.0', ['v1.32.10', 'v1.33.6'])
         self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-redefined'
         self._grpc_cri(self.upgrade[self.upgrade_plan[0]])['sandbox_image'] = 'pause-upgrade1'
 
@@ -1023,7 +1023,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
 
 class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
     def setUp(self):
-        self.setUpVersions('v1.31.1', ['v1.31.6', 'v1.32.10', 'v1.33.6'])
+        self.setUpVersions('v1.32.0', ['v1.32.10', 'v1.33.6', 'v1.34.2'])
 
     def package_names(self, services: dict, package: str, package_names) -> None:
         services.setdefault('packages', {}).setdefault('associations', {}) \
