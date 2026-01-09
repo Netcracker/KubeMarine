@@ -1,27 +1,15 @@
 # This section can be changed manually, but it is also synchronized automatically with the 'compatibility_map' section below.
 kubernetes_versions:
-  v1.31:
-    supported: true
   v1.32:
     supported: true
   v1.33:
     supported: true
   v1.34:
     supported: true
+  v1.35:
+    supported: true
 compatibility_map:
 # This section should be changed manually.
-  v1.31.1:
-    calico: v3.29.1
-    nginx-ingress-controller: v1.12.4
-    kubernetes-dashboard: v2.7.0
-    local-path-provisioner: v0.0.27
-    crictl: v1.30.0
-  v1.31.6:
-    calico: v3.29.5
-    nginx-ingress-controller: v1.12.4
-    kubernetes-dashboard: v2.7.0
-    local-path-provisioner: v0.0.27
-    crictl: v1.30.0
   v1.32.0:
     calico: v3.29.1
     nginx-ingress-controller: v1.12.4
@@ -34,11 +22,23 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
     crictl: v1.32.0
+  v1.32.10:
+    calico: v3.31.2
+    nginx-ingress-controller: v1.14.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
+    crictl: v1.32.0
   v1.33.0:
     calico: v3.30.3
     nginx-ingress-controller: v1.13.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.31
+    crictl: v1.33.0
+  v1.33.6:
+    calico: v3.31.2
+    nginx-ingress-controller: v1.14.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
     crictl: v1.33.0
   v1.34.1:
     calico: v3.30.3
@@ -46,6 +46,18 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
+  v1.34.2:
+    calico: v3.31.2
+    nginx-ingress-controller: v1.14.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
+    crictl: v1.34.0
+  v1.35.0:
+    calico: v3.31.2
+    nginx-ingress-controller: v1.14.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.32
+    crictl: v1.35.0
 # After any change, please run scripts/thirdparties/sync.py
 
 # The following optional keys are supported in addition to the 5 required software keys:

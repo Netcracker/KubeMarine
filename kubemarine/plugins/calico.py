@@ -273,6 +273,11 @@ class CalicoManifestProcessor(Processor):
             self.enrich_image_for_container(manifest, key,
                 plugin_service='cni', container_name=container_name, is_init_container=True)
 
+        # Calico v3.31+ introduces init container 'ebpf-bootstrap' that may use quay.io images in upstream manifest.
+        # Ensure it is patched to use configured registry.
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='node', container_name='ebpf-bootstrap', is_init_container=True, allow_absent=True)
+
         self.enrich_image_for_container(manifest, key,
             plugin_service='node', container_name='mount-bpffs', is_init_container=True, allow_absent=True)
         self.enrich_image_for_container(manifest, key,

@@ -263,7 +263,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
     def test_default_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         
 
         cluster = demo.new_cluster(inventory)
@@ -280,7 +280,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
     def test_sysctl_override_blank(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': ''
         }
@@ -307,14 +307,14 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         inventory = demo.new_cluster(inventory).inventory
 
         self.assertEqual(1000000, inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
 
     def test_v1_29_kube_proxy_conntrack_overridden(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': 1
         }
@@ -334,7 +334,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
     def test_ambiguous_conntrack_max(self):
         inventory = demo.generate_inventory(control_plane=1, worker=1)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': {
                 'value': 1000000,
@@ -347,7 +347,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
     def test_correct_conntrack_max_kubernetes_nodes(self):
         inventory = demo.generate_inventory(control_plane=1, worker=1)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.31.1'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
         inventory['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': {
                 'value': 1000000,

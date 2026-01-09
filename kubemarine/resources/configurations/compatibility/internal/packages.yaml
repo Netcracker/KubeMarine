@@ -5,35 +5,45 @@
 #
 # After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 containerd:
-  v1.31.1:
-    version_debian: 1.7.*
-  v1.31.6:
-    version_debian: 1.7.*
   v1.32.0:
     version_debian: 1.7.*
   v1.32.2:
+    version_debian: 1.7.*
+  v1.32.10:
     version_debian: 1.7.*
   v1.33.0:
     version_debian: 1.7.*
+  v1.33.6:
+    version_debian: 1.7.*
   v1.34.1:
     version_debian: 1.7.*
+  v1.34.2:
+    version_debian: 1.7.*
+  v1.35.0:
+    version_debian: 1.7.*
 containerdio:
-  v1.31.1:
-    version_rhel8: 1.6*
-    version_rhel9: 1.7*
-  v1.31.6:
-    version_rhel8: 1.6*
-    version_rhel9: 1.7*
   v1.32.0:
     version_rhel8: 1.6*
     version_rhel9: 1.7*
   v1.32.2:
+    version_rhel8: 1.6*
+    version_rhel9: 1.7*
+  v1.32.10:
     version_rhel8: 1.6*
     version_rhel9: 1.7*
   v1.33.0:
     version_rhel8: 1.6*
     version_rhel9: 1.6*
+  v1.33.6:
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
   v1.34.1:
+    version_rhel8: 1.6*
+    version_rhel9: 1.7*
+  v1.34.2:
+    version_rhel8: 1.6*
+    version_rhel9: 1.7*
+  v1.35.0:
     version_rhel8: 1.6*
     version_rhel9: 1.7*
 haproxy:
