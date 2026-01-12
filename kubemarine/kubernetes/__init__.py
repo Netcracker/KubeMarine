@@ -786,6 +786,9 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
 
             # put control-plane patches
             components.create_kubeadm_patches_for_node(cluster, node)
+            flags = ("--certificate-renewal=true "
+                     f"--ignore-preflight-errors='{cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']}' "
+                     f"--patches=/etc/kubernetes/patches")
 
             drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
             node.sudo(drain_cmd, hide=False, pty=True)
@@ -795,7 +798,7 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             fix_flag_kubelet(node)
 
             node.sudo(
-                f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
+                f"sudo kubeadm upgrade node {flags} && "
                 f"sudo kubectl uncordon {node_name} && "
                 f"sudo systemctl restart kubelet",
                 hide=False, pty=True)
@@ -822,6 +825,10 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
 
         # put control-plane patches
         components.create_kubeadm_patches_for_node(cluster, node)
+        flags = ("--certificate-renewal=true "
+                 f"--ignore-preflight-errors='{cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']}' "
+                 f"--patches=/etc/kubernetes/patches")
+
 
         drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
         first_control_plane.sudo(drain_cmd, hide=False, pty=True)
@@ -831,8 +838,8 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         fix_flag_kubelet(node)
 
         node.sudo(
-            "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-            "sudo systemctl restart kubelet", pty=True)
+            f"kubeadm upgrade node {flags} && "
+            f"sudo systemctl restart kubelet", pty=True)
 
         first_control_plane.sudo("kubectl uncordon %s" % node_name, hide=False)
 
