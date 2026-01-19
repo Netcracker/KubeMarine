@@ -24,7 +24,7 @@ COPY . /opt/kubemarine/
 COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
 
-RUN apt update && \
+RUN apt update && apt upgrade -y\
     pip3 install --no-cache-dir setuptools wheel && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
