@@ -4759,36 +4759,36 @@ The following is an example of applying a Kubernetes configuration:
 
 ```yaml
 plugins:
-  nginx-ingress-controller:
+  example-plugin:
     installation:
       procedures:
         - template:
-            source: /var/data/plugins/nginx-ingress-controller.yaml.j2
+            source: /var/data/plugins/example-plugin/config.yaml.j2
 ```
 
 The following is an example of applying configuration with custom ctl:
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - template:
-            source: /var/data/plugins/calico-ippool.yaml.j2
-            destination: /etc/calico/ippool.yaml
-            apply_command: 'calicoctl apply -f /etc/calico/ippool.yaml'
+            source: /var/data/plugins/example-plugin/resource.yaml.j2
+            destination: /etc/example-plugin/resource.yaml
+            apply_command: 'kubectl apply -f /etc/example-plugin/resource.yaml'
 ```
 
 The following is an example of uploading a compiled Jinja2 template to control-planes and workers without applying it:
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - template:
-            source: /var/data/plugins/calicoctl.cfg.j2
-            destination: /etc/calico/calicoctl.cfg
+            source: /var/data/plugins/example-plugin/config.cfg.j2
+            destination: /etc/example-plugin/config.cfg
             destination_groups: ['control-plane', 'worker']
             apply_required: false
 ```
@@ -4836,14 +4836,14 @@ For example:
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - expect:
             pods:
-              - coredns
-              - calico-kube-controllers
-              - calico-node
+              - example-controller
+              - example-agent
+              - example-worker
 ```
 
 **Note**: You can specify some part of the pod name instead of the full name of the container.
@@ -4862,7 +4862,7 @@ If you are not satisfied with the default wait values, you can use the advanced 
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - expect:
@@ -4870,9 +4870,9 @@ plugins:
               timeout: 10
               retries: 60
               list:
-                - coredns
-                - calico-kube-controllers
-                - calico-node
+                - example-controller
+                - example-agent
+                - example-worker
 ```
 
 Default values for plugins pods expect timeout and retries are:
@@ -4899,15 +4899,14 @@ This procedure is similar to `expect pods`, but it is intended to wait for deplo
 
 ```
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - expect:
             daemonsets:
-              - calico-node
+              - example-agent
             deployments:
-              - calico-kube-controllers
-
+              - example-controller
 ```
 
 **Note**: You can specify some part of the resource name instead of its full name.
@@ -4925,20 +4924,19 @@ If you are not satisfied with the default wait values, you can use the advanced 
 
 ```
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - expect:
             daemonsets:
               list:
-               - calico-node
+                - example-agent
               timeout: 10
               retries: 100
             deployments:
               list:
-               - calico-kube-controllers
-               retries: 60
-
+                - example-controller
+              retries: 60
 ```
 
 Default values for deployments/daemonsets/replicasets/statefulsets expect timeout and retries are:
@@ -4979,15 +4977,15 @@ For example:
 
 ```yaml
 plugins:
-  nginx-ingress-controller:
+  example-plugin:
     installation:
       procedures:
         - python:
             module: plugins/builtin.py
             method: apply_yaml
             arguments:
-              plugin_name: nginx-ingress-controller
-              original_yaml_path: plugins/yaml/nginx-ingress-controller-{{ plugins.nginx-ingress-controller.version }}-original.yaml
+              plugin_name: example-plugin
+              original_yaml_path: plugins/yaml/example-plugin-{{ plugins.example-plugin.version }}-original.yaml
 ```
 
 ##### thirdparty
