@@ -4955,7 +4955,8 @@ globals:
       timeout: 10
       retries: 15
 ```
-
+**Note**: If it is needed to change the timeout or retries for built-in plugins like `calico`, `ingress-nginx`, or `kubernetes-dashboard`, it should be modified in `globals`.
+Declaring them inside `installation.procedures.expect` will override Kubermarine’s internal installation/upgrade procedures and may break the intended workflow.
 
 ##### python
 
@@ -4996,13 +4997,13 @@ For example:
 ```yaml
 services:
   thirdparties:
-    /usr/bin/calicoctl:
-      source: 'https://example.com/calico/calicoctl-linux-amd64'
+    /usr/bin/example-tool:
+      source: 'https://example.com/examplectl/examplectl-linux-amd64'
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
-        - thirdparty: /usr/bin/calicoctl
+        - thirdparty: /usr/bin/examplectl
 ```
 
 ##### shell
@@ -5026,11 +5027,11 @@ For example:
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - shell:
-            command: mkdir -p /etc/calico
+            command: mkdir -p /etc/example-plugin
             groups: ['control-plane']
             sudo: true
 ```
@@ -5039,7 +5040,7 @@ There is support for a shortened format. In this case, you need to specify only 
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - shell: whoami
@@ -5072,17 +5073,17 @@ Also try to avoid complex shell features, for example pipe redirection. Shell pr
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - config:
             source: /var/data/plugins/script.sh
-            destination: /etc/calico/script.sh
+            destination: /etc/example-plugin/script.sh
             destination_nodes: ['control-plane-1']
             apply_required: false
             do_render: false
         - shell:
-            command: bash -x /etc/calico/script.sh
+            command: bash -x /etc/example-plugin/script.sh
             nodes: ['control-plane-1']
             sudo: true
 ```
@@ -5154,7 +5155,7 @@ There is support for a shortened format. In this case, you need to specify only 
 
 ```yaml
 plugins:
-  calico:
+  example-plugin:
     installation:
       procedures:
         - ansible: /var/data/plugins/playbook.yaml
@@ -5199,18 +5200,18 @@ For example:
 
 ```yaml
 plugins:
-  some_plugin: 
-    install: True   
+  example-plugin:
+    install: true
     installation:
       priority: 10
       procedures:
         - helm:
-            chart_path: /tmp/some-chart
+            chart_path: /tmp/example-chart
             values:
               serviceAccount:
                 create: false
-            namespace: elastic-search
-            release: elastic-search-1
+            namespace: example-namespace
+            release: example-release
             values_file: /tmp/custom_values.yaml
 ```
  
