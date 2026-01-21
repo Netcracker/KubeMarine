@@ -49,7 +49,7 @@ services:
   kubeadm:
     apiVersion: 'kubeadm.k8s.io/v1beta3'
     kind: ClusterConfiguration
-    kubernetesVersion: v1.34.1
+    kubernetesVersion: v1.34.2
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     imageRepository: registry.k8s.io
     dns: {}
