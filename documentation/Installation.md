@@ -4955,7 +4955,7 @@ globals:
       timeout: 10
       retries: 15
 ```
-**Note**: If it is needed to change the timeout or retries for built-in plugins like `calico`, `ingress-nginx`, or `kubernetes-dashboard`, it should be modified in `globals`.
+**Note**: If it is necessary to change the timeout or retries for built-in plugins like `calico`, `ingress-nginx`, or `kubernetes-dashboard`, it should be modified in `globals`.
 Declaring them inside `installation.procedures.expect` will override Kubermarine’s internal installation/upgrade procedures and may break the intended workflow.
 
 ##### python
