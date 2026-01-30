@@ -22,10 +22,8 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.pin_kubernetes_version_default import PinKubernetesVersion
 
 patches: List[Patch] = [
-    PinKubernetesVersion(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
