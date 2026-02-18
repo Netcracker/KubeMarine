@@ -25,6 +25,8 @@ COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scr
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \
+    # Ansible uses the local ssh binary by default; install it for ansible plugin execution.
+    apt install -y --no-install-recommends openssh-client && \
     pip3 install --no-cache-dir setuptools wheel && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
