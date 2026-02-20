@@ -18,6 +18,22 @@
             "source_node": {
               "$ref": "definitions/common/node_ref.json#/definitions/Name",
               "description": "The name of the node to create a snapshot from. The node must be a control-plane and have an ETCD data located on it."
+            },
+            "cron_job": {
+              "type": "string",
+              "description": "Create the CronJob for regular ETCD snapshots"
+            },
+            "storage_class": {
+              "type": "string",
+              "description": "StorageClass that will be used to create PersistentVolumeClaim"
+            },
+            "etcdctl_image": {
+              "type": "string",
+              "description": "Docker image with bash and etcdctl on board"
+            },
+            "busybox_image": {
+              "type": "string",
+              "description": "Docker image with find util on board"
             }
           },
           "additionalProperties": false

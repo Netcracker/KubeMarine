@@ -163,6 +163,11 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     cluster.log.verbose('ETCD will be restored from the following image: ' + etcd_image)
 
     cluster.log.debug('Uploading ETCD snapshot...')
+    # TODO: Custom path to ETCD snapshot
+    #snap_to_copy = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
+    # Check if snapshot exists
+    # Copy snapshot from first control-plane node to backup_location
+    # TODO: Other steps must be omitted
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
     cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name,
                                        sudo=True, compare_hashes=True)
