@@ -176,14 +176,14 @@ def export_etcd(cluster: KubernetesCluster) -> None:
                                               busybox_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('busybox_image', {}))
         first_control_plane.put(io.StringIO(config), path_to_yaml, sudo=True, mkdir=True)
         if cluster.procedure_inventory['backup_plan']['etcd']['cron_job'] == "enabled" :
-            cluster.log.verbose(f'Applying {path_to_yaml} file')
+            cluster.log.debug(f'Applying {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl apply -f {path_to_yaml}')
         elif cluster.procedure_inventory['backup_plan']['etcd']['cron_job'] == "disabled" :
-            cluster.log.verbose(f'Deleting resource from {path_to_yaml} file')
+            cluster.log.debug(f'Deleting resource from {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl delete -f {path_to_yaml}')
         else:
             raise Exception('Unknown option. It must be `enabled` or `disabled`')
-        cluster.log.verbose(f'Removing {path_to_yaml} file')
+        cluster.log.debug(f'Removing {path_to_yaml} file')
         first_control_plane.sudo(f'rm -f {path_to_yaml}')
         return
     

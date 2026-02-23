@@ -26,12 +26,18 @@ spec:
         spec:
           containers:
           - args:
-            - -c
-            - etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt
-              --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt --key=/etc/kubernetes/pki/etcd/healthcheck-client.key
-              snapshot save /backup/etcd-snapshot-$(date +%Y%m%d_%H%M%S).db
+            - |
+              etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt --key=/etc/kubernetes/pki/etcd/healthcheck-client.key snapshot save /backup/etcd-snapshot-$(date +%Y%m%d_%H%M%S).db
+              chmod 0644 /backup/*.db
             command:
             - /bin/sh
+            - -c
+          - args:
+            - |
+              find /backup -type f -mmin +20 -name '*.db' -exec rm -- '{}' \;
+            command:
+            - /bin/sh
+            - -c
             env:
             - name: ETCDCTL_API
               value: "3"

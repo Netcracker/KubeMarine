@@ -70,6 +70,12 @@ def unpack_data(resources: DynamicResources) -> None:
         raise Exception('Backup source not specified in procedure')
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
+
+    if resources.procedure_inventory().get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
+        if not os.path.isdir(backup_file_source):
+            raise FileNotFoundError('Backup location "%s" not found' % backup_file_source)
+        return
+
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
@@ -164,10 +170,16 @@ def import_etcd(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug('Uploading ETCD snapshot...')
     # TODO: Custom path to ETCD snapshot
-    #snap_to_copy = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
-    # Check if snapshot exists
-    # Copy snapshot from first control-plane node to backup_location
-    # TODO: Other steps must be omitted
+    if cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
+        cluster.log.debug('The particular snapshot will be used')
+        path_to_snap = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        # Check if snapshot exists
+        #first_control_plane.sudo(f'ls {path_to_snap}')
+        # Copy snapshot from first control-plane node to backup_location
+        cluster.log.debug('Coping snapshot from first control-plane node to the backup folder')
+        first_control_plane.get(path_to_snap, os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'))
+
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
     cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name,
                                        sudo=True, compare_hashes=True)
