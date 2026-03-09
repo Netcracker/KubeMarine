@@ -124,6 +124,8 @@ def import_nodes_data(cluster: KubernetesCluster) -> None:
 
 
 def restore_dns_resolv_conf(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
+        return
     import_nodes_data(cluster)
 
     unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite /etc/resolv.conf"
@@ -136,10 +138,14 @@ def restore_dns_resolv_conf(cluster: KubernetesCluster) -> None:
 
 
 def restore_thirdparties(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
+        return
     install.system_prepare_thirdparties(cluster)
 
 
 def import_nodes(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
+        return
     if not cluster.is_task_completed('restore.dns.resolv_conf'):
         import_nodes_data(cluster)
 
@@ -169,12 +175,12 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     cluster.log.verbose('ETCD will be restored from the following image: ' + etcd_image)
 
     cluster.log.debug('Uploading ETCD snapshot...')
-    # TODO: Custom path to ETCD snapshot
+    # Custom path to ETCD snapshot
     if cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
         cluster.log.debug('The particular snapshot will be used')
         path_to_snap = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
-        # Check if snapshot exists
+        # TODO: Check if snapshot exists
         #first_control_plane.sudo(f'ls {path_to_snap}')
         # Copy snapshot from first control-plane node to backup_location
         cluster.log.debug('Coping snapshot from first control-plane node to the backup folder')

@@ -85,6 +85,8 @@ def prepare_backup_tmpdir(logger: log.EnhancedLogger, context: dict) -> str:
 
 
 def verify_backup_location(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         raise FileNotFoundError('Backup location directory not exists')
@@ -98,6 +100,8 @@ def export_ansible_inventory(cluster: KubernetesCluster) -> None:
 
 
 def export_packages_list(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
     if cluster.get_os_family() in ['rhel8', 'rhel9']:
         cmd = r"rpm -qa"
@@ -109,6 +113,8 @@ def export_packages_list(cluster: KubernetesCluster) -> None:
 
 
 def export_hostname(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     cluster.context['backup_descriptor']['nodes']['hostnames'] = {}
     results = cluster.nodes['all'].sudo('hostnamectl status | head -n 1 | sed -e \'s/[a-zA-Z ]*://g\'')
     cluster.log.verbose(results)
@@ -117,6 +123,8 @@ def export_hostname(cluster: KubernetesCluster) -> None:
 
 
 def export_cluster_yaml(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     shutil.copyfile(utils.get_dump_filepath(cluster.context, 'cluster.yaml'),
                     os.path.join(backup_directory, 'cluster.yaml'))
@@ -126,6 +134,8 @@ def export_cluster_yaml(cluster: KubernetesCluster) -> None:
 
 
 def export_nodes(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     backup_nodes_data_dir = os.path.join(backup_directory, 'nodes_data')
     os.mkdir(backup_nodes_data_dir)
@@ -268,6 +278,8 @@ def retrieve_etcd_image(etcd_node: NodeGroup) -> str:
 
 
 def export_kubernetes_version(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     control_plane = cluster.nodes['control-plane'].get_any_member()
     version = control_plane.sudo('kubectl get nodes --no-headers | head -n 1 | awk \'{print $5; exit}\'').get_simple_out()
     cluster.context['backup_descriptor']['kubernetes']['version'] = version.strip()
@@ -613,6 +625,8 @@ class ExportKubernetesDownloader:
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     control_plane = cluster.nodes['control-plane'].get_any_member()
     backup_kubernetes = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {})
@@ -738,6 +752,8 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
 
 
 def make_descriptor(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
 
     cluster.context['backup_descriptor']['kubernetes']['thirdparties'] = cluster.inventory['services']['thirdparties']
@@ -748,6 +764,8 @@ def make_descriptor(cluster: KubernetesCluster) -> None:
 
 
 def pack_data(cluster: KubernetesCluster) -> None:
+    if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        return
     cluster_name = cluster.inventory['cluster_name']
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
 
