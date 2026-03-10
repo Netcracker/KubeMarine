@@ -16,7 +16,7 @@
           "properties": {
             "snapshot": {
               "type": "string",
-              "description": "Full path to the ETCD snapshot, that will be used instead the default one."
+              "description": "Full path to the ETCD snapshot, that will be used instead of the default one."
             },
             "image": {
               "type": "string",

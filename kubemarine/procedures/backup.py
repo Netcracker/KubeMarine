@@ -172,30 +172,23 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 def export_etcd(cluster: KubernetesCluster) -> None:
     if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
         path_to_yaml = '/tmp/etcd_backup.yaml'
-        if not cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('etcdctl_image', {}):
-            raise Exception('ETCDCTL image is not set')
-        if not cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('storage_class', {}):
-            raise Exception('PVC StorageClass is not set')
-        if not cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('busybox_image', {}):
-            raise Exception('BusyBox image is not set')
+        retention=int(cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_depth', {}))*60
         backup_yaml = utils.read_internal('templates/etcd_backup.yaml.j2')
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
-        # TODO: retention policy
         config = Template(backup_yaml).render(hostname=first_control_plane.get_node_name(),
-                                              etcdctl_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('etcdctl_image', {}),
-                                              storage_class=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('storage_class', {}),
-                                              busybox_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('busybox_image', {}))
+                                              etcdctl_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('etcdctl_image', {}),
+                                              storage_class=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_class', {}),
+                                              storage_name=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_name', {}),
+                                              busybox_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('busybox_image', {}),
+                                              schedule=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('schedule', {}),
+                                              retention=retention)
         first_control_plane.put(io.StringIO(config), path_to_yaml, sudo=True, mkdir=True)
-        if cluster.procedure_inventory['backup_plan']['etcd']['cron_job'] == "enabled" :
+        if cluster.procedure_inventory['backup_plan']['etcd']['cron_job']['enabled'] :
             cluster.log.debug(f'Applying {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl apply -f {path_to_yaml}')
-        elif cluster.procedure_inventory['backup_plan']['etcd']['cron_job'] == "disabled" :
+        else:
             cluster.log.debug(f'Deleting resource from {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl delete -f {path_to_yaml}')
-        else:
-            raise Exception('Unknown option. It must be `enabled` or `disabled`')
-        cluster.log.debug(f'Removing {path_to_yaml} file')
-        first_control_plane.sudo(f'rm -f {path_to_yaml}')
         return
     
     backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)

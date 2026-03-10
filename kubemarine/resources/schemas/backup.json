@@ -20,21 +20,44 @@
               "description": "The name of the node to create a snapshot from. The node must be a control-plane and have an ETCD data located on it."
             },
             "cron_job": {
-              "type": "string",
-              "description": "Create the CronJob for regular ETCD snapshots"
-            },
-            "storage_class": {
-              "type": "string",
-              "description": "StorageClass that will be used to create PersistentVolumeClaim"
-            },
-            "etcdctl_image": {
-              "type": "string",
-              "description": "Docker image with bash and etcdctl on board"
-            },
-            "busybox_image": {
-              "type": "string",
-              "description": "Docker image with find util on board"
-            }
+              "type": "object",
+              "description": "Create the CronJob for regular ETCD snapshots",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enabling CronJob"
+                },
+                "storage_class": {
+                  "type": "string",
+                  "default": "local-path",
+                  "description": "StorageClass that will be used to create PersistentVolumeClaim"
+                },
+                "storage_name": {
+                  "type": "string",
+                  "default": "etcd-backup",
+                  "description": "Name of the PersistentVolumeClaim"
+                },
+                "etcdctl_image": {
+                  "type": "string",
+                  "description": "Docker image with bash and etcdctl on board"
+                },
+                "busybox_image": {
+                  "type": "string",
+                  "description": "Docker image with find util on board"
+                },
+                "schedule": {
+                  "type": "string",
+                  "default": "*/5 * * * *",
+                  "description": "Crontab schedule"
+                },
+                "storage_depth": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 5,
+                  "description": "Backups retention time(hours)"
+                }
+	      }
+	    }
           },
           "additionalProperties": false
         },

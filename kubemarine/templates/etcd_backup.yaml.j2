@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: etcd-backup
+  name: {{ storage_name }}
   namespace: kube-system
 spec:
   accessModes:
@@ -32,12 +32,6 @@ spec:
             command:
             - /bin/sh
             - -c
-          - args:
-            - |
-              find /backup -type f -mmin +20 -name '*.db' -exec rm -- '{}' \;
-            command:
-            - /bin/sh
-            - -c
             env:
             - name: ETCDCTL_API
               value: "3"
@@ -54,10 +48,11 @@ spec:
             - mountPath: /backup
               name: backup
           - args:
-            - -c
-            - find /backup -type f -mmin +20 -name '*.db' -exec rm -- '{}' \;
+            - |
+              find /backup -type f -mmin +{{ retention }} -name '*.db' -exec rm -- '{}' \;
             command:
             - /bin/sh
+            - -c
             image: {{ busybox_image }}
             imagePullPolicy: IfNotPresent
             name: backup-purge
@@ -82,7 +77,7 @@ spec:
             name: etcd-certs
           - name: backup
             persistentVolumeClaim:
-              claimName: etcd-backup
-  schedule: "*/5 * * * *"
+              claimName: {{ storage_name }}
+  schedule: "{{ schedule }}"
   successfulJobsHistoryLimit: 3
   suspend: false
