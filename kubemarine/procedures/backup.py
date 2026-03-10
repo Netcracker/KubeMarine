@@ -180,6 +180,7 @@ def export_etcd(cluster: KubernetesCluster) -> None:
             raise Exception('BusyBox image is not set')
         backup_yaml = utils.read_internal('templates/etcd_backup.yaml.j2')
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        # TODO: retention policy
         config = Template(backup_yaml).render(hostname=first_control_plane.get_node_name(),
                                               etcdctl_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('etcdctl_image', {}),
                                               storage_class=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('storage_class', {}),
