@@ -184,10 +184,12 @@ def export_etcd(cluster: KubernetesCluster) -> None:
                                               retention=retention)
         first_control_plane.put(io.StringIO(config), path_to_yaml, sudo=True, mkdir=True)
         if cluster.procedure_inventory['backup_plan']['etcd']['cron_job']['enabled'] :
-            cluster.log.debug(f'Applying {path_to_yaml} file')
+            cluster.log.debug(f'Enabling periodic ETCD backup')
+            cluster.log.verbose(f'Deleting resources from {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl apply -f {path_to_yaml}')
         else:
-            cluster.log.debug(f'Deleting resource from {path_to_yaml} file')
+            cluster.log.debug(f'Disabling periodic ETCD backup')
+            cluster.log.verbose(f'Deleting resources from {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl delete -f {path_to_yaml}')
         return
     
