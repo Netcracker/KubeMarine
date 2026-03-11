@@ -7,7 +7,9 @@ This section describes the features and steps for performing maintenance procedu
       - [Software Upgrade Patches](#software-upgrade-patches)
     - [Upgrade Procedure](#upgrade-procedure)
     - [Backup Procedure](#backup-procedure)
+      - [Periodic ETCD Backups](#periodic-etcd-backups)
     - [Restore Procedure](#restore-procedure)
+      - [Restoration From Periodic ETCD Backups](#restoration-from-periodic-etcd-backups)
     - [Add Node Procedure](#add-node-procedure)
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
@@ -707,6 +709,47 @@ The `backup` procedure executes the following sequence of tasks:
 * make_descriptor
 * pack
 
+### Periodic ETCD backups
+
+It's posible to set the periodic ETCD backups via CronJob. The procedure config for that case is the following
+
+```yaml
+backup_location: '/tmp/tmp_folder'
+backup_plan:
+  etcd:
+    cron_job:
+      enabled: true
+      storage_class: "local-path"
+      storage_name: "etcd-backup"
+      etcdctl_image: ghcr.io/netcracker/etcdctl:0.0.1
+      busybox_image: busybox:1.37.0
+      schedule: "*/5 * * * *"
+      storage_depth: 5
+```
+
+`enabled` is a switcher to create or delete the CronJob
+`storage_class` is StorageClasss that is used to create a PersistentVolume for backups
+`storage_name` is PersistentVolumeClaim name
+`etcdctl_image` is Docker image with etcdctl and additional utilities on board
+`busybox_image` is Docker image with Linux shell
+`schedule` is a crontab notation schedule
+`storage_depth` is a storage time in days
+
+To disable the existing CronJob procedure config is the following:
+
+```yaml
+backup_location: '/tmp/tmp_folder'
+backup_plan:
+  etcd:
+    cron_job:
+      enabled: false
+```
+
+The procedure runs only the following tasks:
+
+* verify_backup_location
+* export
+  * etcd
 
 ## Restore Procedure
 
