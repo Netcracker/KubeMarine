@@ -735,6 +735,14 @@ backup_plan:
 `schedule` is a crontab notation schedule
 `storage_depth` is a storage time in days
 
+After the enabling, the CronJob must be created in `kube-system` Namespace:
+
+```shell
+$ kubectl -n kube-system get cronjob
+NAME          SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+etcd-backup   */5 * * * *   <none>     False     0        <none>          35s
+```
+
 To disable the existing CronJob procedure config is the following:
 
 ```yaml
@@ -832,6 +840,22 @@ The `restore` procedure executes the following sequence of tasks:
   * etcd
 * reboot
 
+### Restore From Periodic Backup
+
+To restore the existing periodic backup the procedure config should be like the following:
+
+```yaml
+backup_location: /tmp/backups
+
+restore_plan:
+  etcd:
+    image: registry.k8s.io/etcd:3.6.6-0
+    snapshot: /opt/local-path-provisioner/pvc-e3b0d6c5-495d-4887-90d9-000d6b3d4d00_kube-system_etcd-backup/etcd-snapshot-20260220_103000.db
+```
+
+**Notices**:
+* Images must be chosen according to the ETCD version that has been used originally to create a backup
+* Path to the snapshot must be checked preliminary
 
 ## Add Node Procedure
 
