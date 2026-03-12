@@ -189,7 +189,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             # Will work with particular snapshot
             snapshot = path_to_snap
         else:
-           raise Exception("ETCD snapshot is incorrect or doesn't exist")
+            raise Exception("ETCD snapshot is incorrect or doesn't exist")
         # Copy snapshot from first control-plane node to backup_location
         cluster.log.debug('Coping snapshot from first control-plane node to the backup folder')
         first_control_plane.get(snapshot, os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'))
