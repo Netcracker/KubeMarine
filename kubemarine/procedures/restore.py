@@ -181,8 +181,6 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         path_to_snap = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         result = first_control_plane.sudo(f'file -b {path_to_snap}').get_simple_out().split('\n')[0]
-        #############
-        cluster.log.debug(f'RES: "{result}"')
         if "directory" == result :
             # Getting the latest snapshot
             last_snapshot = first_control_plane.sudo(f'ls -1tr {path_to_snap} | tail -n 1').get_simple_out().split('\n')[0]
@@ -192,8 +190,6 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             snapshot = path_to_snap
         else:
            raise Exception("ETCD snapshot is incorrect or doesn't exist")
-        ##############
-        cluster.log.debug(f'SNAPSHOT: {snapshot}')
         # Copy snapshot from first control-plane node to backup_location
         cluster.log.debug('Coping snapshot from first control-plane node to the backup folder')
         first_control_plane.get(snapshot, os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'))
