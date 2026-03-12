@@ -172,19 +172,20 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 def export_etcd(cluster: KubernetesCluster) -> None:
     if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
         path_to_yaml = '/tmp/etcd_backup.yaml'
-        retention=int(cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_depth', {}))*60
+        retention = int(cluster.procedure_inventory.get('backup_plan', {}).get('etcd',
+                        {}).get('cron_job', {}).get('storage_depth', {}))*60
         backup_yaml = utils.read_internal('templates/etcd_backup.yaml.j2')
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         config = Template(backup_yaml).render(hostname=first_control_plane.get_node_name(),
-                                              etcdctl_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('etcdctl_image', {}),
-                                              storage_class=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_class', {}),
-                                              storage_name=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_name', {}),
-                                              storage_size=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_size', {}),
-                                              busybox_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('busybox_image', {}),
-                                              schedule=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('schedule', {}),
-                                              retention=retention)
+                    etcdctl_image=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('etcdctl_image', ''),
+                    storage_class=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('storage_class', ''),
+                    storage_name=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('storage_name', ''),
+                    storage_size=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('storage_size', ''),
+                    busybox_image=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('busybox_image', ''),
+                    schedule=cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('schedule', ''),
+                    retention=retention)
         first_control_plane.put(io.StringIO(config), path_to_yaml, sudo=True, mkdir=True)
-        if cluster.procedure_inventory['backup_plan']['etcd']['cron_job']['enabled'] :
+        if cluster.procedure_inventory['backup_plan']['etcd']['cron_job'].get('enabled', False) :
             cluster.log.debug(f'Enabling periodic ETCD backup')
             cluster.log.verbose(f'Deleting resources from {path_to_yaml} file')
             first_control_plane.sudo(f'kubectl apply -f {path_to_yaml}')
