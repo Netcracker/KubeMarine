@@ -7,9 +7,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Software Upgrade Patches](#software-upgrade-patches)
     - [Upgrade Procedure](#upgrade-procedure)
     - [Backup Procedure](#backup-procedure)
-      - [Periodic ETCD Backups](#periodic-etcd-backups)
     - [Restore Procedure](#restore-procedure)
-      - [Restoration From Periodic ETCD Backups](#restoration-from-periodic-etcd-backups)
     - [Add Node Procedure](#add-node-procedure)
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
@@ -721,6 +719,7 @@ backup_plan:
       enabled: true
       storage_class: "local-path"
       storage_name: "etcd-backup"
+      storage_size: "50Gi"
       etcdctl_image: ghcr.io/netcracker/etcdctl:0.0.1
       busybox_image: busybox:1.37.0
       schedule: "*/5 * * * *"
@@ -730,10 +729,13 @@ backup_plan:
 `enabled` is a switcher to create or delete the CronJob
 `storage_class` is StorageClasss that is used to create a PersistentVolume for backups
 `storage_name` is PersistentVolumeClaim name
+`storage_size` is PersistentVolume size
 `etcdctl_image` is Docker image with etcdctl and additional utilities on board
 `busybox_image` is Docker image with Linux shell
 `schedule` is a crontab notation schedule
-`storage_depth` is a storage time in days
+`storage_depth` is a storage time in hours
+
+**Warning**: Do not use StorageClass with `reclaimPolicy: Delete` if you wat to keep snapshots after disabling periodic backups.
 
 After the enabling, the CronJob must be created in `kube-system` Namespace:
 
@@ -742,6 +744,8 @@ $ kubectl -n kube-system get cronjob
 NAME          SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 etcd-backup   */5 * * * *   <none>     False     0        <none>          35s
 ```
+
+That CronJob runs two scripts periodically. The first one create ETCD snapshot with the name like `etcd-snapshot-20260311_114008_15743.db` on PersistentVolume. The second one delete the snapshots with the age more than `ststorage_depth`
 
 To disable the existing CronJob procedure config is the following:
 

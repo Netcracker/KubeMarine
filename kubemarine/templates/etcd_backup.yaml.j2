@@ -10,7 +10,7 @@ spec:
   storageClassName: {{ storage_class }}
   resources:
     requests:
-      storage: 50Gi
+      storage: {{ storage_size }}
 ---
 apiVersion: batch/v1
 kind: CronJob

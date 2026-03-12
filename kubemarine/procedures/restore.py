@@ -180,11 +180,23 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         cluster.log.debug('The particular snapshot will be used')
         path_to_snap = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('snapshot', {})
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
-        # TODO: Check if snapshot exists
-        #first_control_plane.sudo(f'ls {path_to_snap}')
+        result = first_control_plane.sudo(f'file -b {path_to_snap}').get_simple_out().split('\n')[0]
+        #############
+        cluster.log.debug(f'RES: "{result}"')
+        if "directory" == result :
+            # Getting the latest snapshot
+            last_snapshot = first_control_plane.sudo(f'ls -1tr {path_to_snap} | tail -n 1').get_simple_out().split('\n')[0]
+            snapshot = f'{path_to_snap}/{last_snapshot}'
+        elif "data" == result :
+            # Will work with particular snapshot
+            snapshot = path_to_snap
+        else:
+           raise Exception("ETCD snapshot is incorrect or doesn't exist")
+        ##############
+        cluster.log.debug(f'SNAPSHOT: {snapshot}')
         # Copy snapshot from first control-plane node to backup_location
         cluster.log.debug('Coping snapshot from first control-plane node to the backup folder')
-        first_control_plane.get(path_to_snap, os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'))
+        first_control_plane.get(snapshot, os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'))
 
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
     cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name,

@@ -37,6 +37,10 @@
                   "default": "etcd-backup",
                   "description": "Name of the PersistentVolumeClaim"
                 },
+                "storage_size": {
+                  "type": "string",
+                  "description": "Size of the PersistentVolume"
+                },
                 "etcdctl_image": {
                   "type": "string",
                   "description": "Docker image with bash and etcdctl on board"
@@ -47,13 +51,11 @@
                 },
                 "schedule": {
                   "type": "string",
-                  "default": "*/5 * * * *",
                   "description": "Crontab schedule"
                 },
                 "storage_depth": {
                   "type": "integer",
                   "minimal": 1,
-                  "default": 5,
                   "description": "Backups retention time(hours)"
                 }
 	      }

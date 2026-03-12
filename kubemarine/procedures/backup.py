@@ -179,6 +179,7 @@ def export_etcd(cluster: KubernetesCluster) -> None:
                                               etcdctl_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('etcdctl_image', {}),
                                               storage_class=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_class', {}),
                                               storage_name=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_name', {}),
+                                              storage_size=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('storage_size', {}),
                                               busybox_image=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('busybox_image', {}),
                                               schedule=cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}).get('schedule', {}),
                                               retention=retention)
