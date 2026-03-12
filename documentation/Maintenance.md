@@ -726,14 +726,14 @@ backup_plan:
       storage_depth: 5
 ```
 
-`enabled` is a switcher to create or delete the CronJob
-`storage_class` is StorageClasss that is used to create a PersistentVolume for backups
-`storage_name` is PersistentVolumeClaim name
-`storage_size` is PersistentVolume size
-`etcdctl_image` is Docker image with etcdctl and additional utilities on board
-`busybox_image` is Docker image with Linux shell
-`schedule` is a crontab notation schedule
-`storage_depth` is a storage time in hours
+* `enabled` is a switcher to create or delete the CronJob
+* `storage_class` is StorageClasss that is used to create a PersistentVolume for backups
+* `storage_name` is PersistentVolumeClaim name
+* `storage_size` is PersistentVolume size
+* `etcdctl_image` is Docker image with etcdctl and additional utilities on board
+* `busybox_image` is Docker image with Linux shell
+* `schedule` is a crontab notation schedule
+* `storage_depth` is a storage time in hours
 
 **Warning**: Do not use StorageClass with `reclaimPolicy: Delete` if you wat to keep snapshots after disabling periodic backups.
 
@@ -757,7 +757,7 @@ backup_plan:
       enabled: false
 ```
 
-The procedure runs only the following tasks:
+The procedure runs only the following tasks(the others rtasks are skipped be default):
 
 * verify_backup_location
 * export
@@ -858,8 +858,8 @@ restore_plan:
 ```
 
 **Notices**:
-* Images must be chosen according to the ETCD version that has been used originally to create a backup
-* Path to the snapshot must be checked preliminary
+* Images must be chosen according to the ETCD version that has been used originally to create a backup.
+* Path to the snapshot could be as folder only. The latest snapshot will be used in that case.
 
 ## Add Node Procedure
 
