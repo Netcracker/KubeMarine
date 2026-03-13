@@ -70,7 +70,6 @@ def unpack_data(resources: DynamicResources) -> None:
         raise Exception('Backup source not specified in procedure')
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
-
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
