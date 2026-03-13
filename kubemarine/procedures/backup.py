@@ -171,6 +171,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 
 def export_etcd(cluster: KubernetesCluster) -> None:
     if cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('cron_job', {}):
+        # Applying CronJob and exit
         path_to_yaml = '/tmp/etcd_backup.yaml'
         retention = int(cluster.procedure_inventory.get('backup_plan', {}).get('etcd',
                         {}).get('cron_job', {}).get('storage_depth', {}))*60

@@ -71,11 +71,6 @@ def unpack_data(resources: DynamicResources) -> None:
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
 
-    if resources.procedure_inventory().get('restore_plan', {}).get('etcd', {}).get('snapshot', {}):
-        if not os.path.isdir(backup_file_source):
-            raise FileNotFoundError('Backup location "%s" not found' % backup_file_source)
-        return
-
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
@@ -186,7 +181,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             last_snapshot = first_control_plane.sudo(f'ls -1tr {path_to_snap} | tail -n 1').get_simple_out().split('\n')[0]
             snapshot = f'{path_to_snap}/{last_snapshot}'
         elif "data" == result :
-            # Will work with particular snapshot
+            # Getting the particular snapshot
             snapshot = path_to_snap
         else:
             raise Exception("ETCD snapshot is incorrect or doesn't exist")
