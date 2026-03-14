@@ -757,7 +757,7 @@ backup_plan:
       enabled: false
 ```
 
-The procedure runs only the following tasks(the others rtasks are skipped be default):
+The procedure runs only the following tasks(the others tasks are skipped be default):
 
 * verify_backup_location
 * export
