@@ -23,7 +23,7 @@ from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
 from kubemarine.kubernetes import components
-from kubemarine.procedures import install
+from kubemarine.procedures import install, reconfigure
 
 
 def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
@@ -212,9 +212,58 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
         cluster.log.debug(f"Cleaned up report file: {random_report_name}")
 
 
+def run_preupgrade_tasks(cluster: KubernetesCluster) -> None:
+    """
+    In some case the additional operations must be performed before the upgrade
+    """
+    cluster.log.debug(f"PreUpgrade tasks checking")
+    run_tasks = False
+    cluster.procedure_inventory['services']: Dict[dict] = {}
+    cluster.procedure_inventory['services']['kubeadm_patches']: Dict[dict] = {}
+    if cluster.inventory['services'].get('kubeadm_patches', {}).get('etcd', []):
+        for item in cluster.inventory['services']['kubeadm_patches']['etcd']:
+            if item.get('patch', {}).get('unsafe-no-fsync', ""):
+                if item['patch']['unsafe-no-fsync'] == "true":
+                    # Need to switch off the option for upgrade
+                    cluster.log.debug(f"Unsafe options must be switched off")
+                    item['patch']['unsafe-no-fsync'] = "false"
+                    run_tasks = True
+    if run_tasks:
+        cluster.procedure_inventory['services']['kubeadm_patches'] = utils.deepcopy_yaml(cluster.inventory['services']['kubeadm_patches'])
+        del cluster.procedure_inventory['services']['kubeadm_patches']['apiServer']
+        del cluster.procedure_inventory['services']['kubeadm_patches']['controllerManager']
+        del cluster.procedure_inventory['services']['kubeadm_patches']['scheduler']
+        del cluster.procedure_inventory['services']['kubeadm_patches']['kubelet']
+        reconfigure.deploy_kubernetes_reconfigure(cluster)
+        # Invoke PostUpgrade runnig to revert the changes
+        post_upgrade_tasks = True
+        cluster.inventory['post_upgrade'] = "true"
+    else:
+        cluster.log.debug(f"There is no PreUpgrade tasks")
+
+
+def run_postupgrade_tasks(cluster: KubernetesCluster) -> None:
+    """
+    In some case the additional operations must be performed after the upgrade
+    """
+    cluster.log.debug(f"PostUpgrade tasks checking")
+    if cluster.inventory.get('post_upgrade', "false") == "true":
+        for item in cluster.procedure_inventory['services']['kubeadm_patches']['etcd']:
+            if item.get('patch', {}).get('unsafe-no-fsync', ""):
+                cluster.log.debug(f"Unsafe options must be switched on")
+                item['patch']['unsafe-no-fsync'] = "true"
+        for item in cluster.inventory['services']['kubeadm_patches']['etcd']:
+            if item.get('patch', {}).get('unsafe-no-fsync', ""):
+                if item['patch'].get('unsafe-no-fsync', ""):
+                    item['patch']['unsafe-no-fsync'] = "true"
+        reconfigure.deploy_kubernetes_reconfigure(cluster)
+    else:
+        cluster.log.debug(f"There is no PostUpgrade tasks")
+
 tasks = OrderedDict({
     "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
+    "run_preupgrade_tasks": run_preupgrade_tasks,
     "thirdparties": system_prepare_thirdparties,
     "prepull_images": prepull_images,
     "kubernetes": kubernetes_upgrade,
@@ -222,6 +271,7 @@ tasks = OrderedDict({
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
     "release_calico_leaked_ips": release_calico_leaked_ips,  # Added here
+    "run_postupgrade_tasks": run_postupgrade_tasks,
     "overview": install.overview
 })
 
