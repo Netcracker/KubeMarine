@@ -478,17 +478,25 @@ After applying, this configuration is merged with the plugins' configuration con
 
 **Note**: If you have changed images for any of the OOB plugins in the `cluster.yaml`, it is required to explicitly specify new images in the procedure inventory for that particular plugin. The configuration format for OOB plugins is the same.
 
+### PreUpgrade and PostUpgrade Tasks
+
+During the upgrade some configuration options must be swiched off. Preupgrade and postupgrade tasks manage that activity. Basically, they have opposite configuration target. As the result, cluster must have the same configuration (in the part that is covered by preupgrade and postupgrade tasks) as it was before the upgrade. 
+
 ### Upgrade Procedure Tasks Tree
 
 The `upgrade` procedure executes the following sequence of tasks:
 
+* cleanup_tmp_dir
 * verify_upgrade_versions
+* run_preupgrade_tasks
 * thirdparties
 * prepull_images
 * kubernetes
 * kubernetes_cleanup
 * packages
 * plugins
+* release_calico_leaked_ips
+* run_postupgrade_tasks
 * overview
 
 ## Backup Procedure
