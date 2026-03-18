@@ -194,6 +194,16 @@ packages:
     keepalived:
       package_name:
         - keepalived: keepalived
+  rhel10:
+    containerd:
+      package_name:
+        - containerd.io: containerdio
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
   common_associations:
     containerd:
       executable_name: 'containerd'
@@ -324,6 +334,9 @@ compatibility_map:
           - '9.4'
           - '9.5'
           - '9.6'
+      - os_family: 'rhel10'
+        versions:
+          - '10.1'
     ubuntu:
       - os_family: 'debian'
         versions:
