@@ -43,7 +43,6 @@ def renew_envoy_gateway_certs_task(cluster: KubernetesCluster) -> None:
         return
 
     cluster.log.debug("Starting certificate renewal for envoy gateway, CR chart will be upgraded")
-    plugin = cluster.inventory["plugins"]["envoy-gateway"]
     envoy_gateway.apply_cr_chart(cluster)
 
 
