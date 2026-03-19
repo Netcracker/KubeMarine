@@ -747,8 +747,8 @@ plugins:
       # in this case hostPorts will be equal to LB target_ports.
       # HostPorts also could be enabled and configured explicitly.
       hostPorts:
-        http: ""
-        https: ""
+        http: 0
+        https: 0
     valuesOverride: {}
     crValuesOverride: {}
     installation:

@@ -55,6 +55,17 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         if not inventory["plugins"]["nginx-ingress-controller"]['config_map'].get('proxy-set-headers'):
             inventory["plugins"]["nginx-ingress-controller"]['config_map']['proxy-set-headers'] = 'ingress-nginx/custom-headers'
 
+    # We use sentinel "0" value for nginx hostPorts by default, because our default is dynamic, it depends on LB target backend.
+    # So, if this sentinel "0" value is present for nginx hostPorts (i.e. user did not override it),
+    # then we put our default - if LB target backend is "nginx", then hostPorts are taken from LB "target_ports",
+    # otherwise, we do not use hostPorts for nginx and thus simply delete hostPort with "0" sentinel value   
+    for port in inventory["plugins"]["nginx-ingress-controller"]["ports"]:
+        if port["name"] in ("http", "https") and "hostPort" in port and port["hostPort"] == 0:
+            if haproxy.get_target_backend(cluster.inventory) == "nginx":
+                port["hostPort"] = int(cluster.inventory['services']['loadbalancer']['target_ports'][port["name"]])
+            else:
+                del port["hostPort"]
+
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_controller = cluster.raw_inventory.get("plugins", {}).get("nginx-ingress-controller", {}).get("controller", {})
     if "resources" in raw_controller:
@@ -256,16 +267,6 @@ class IngressNginxManifestProcessor(Processor):
             manifest, key, container_name='controller', is_init_container=False)
 
         container['ports'] = self.inventory['plugins']['nginx-ingress-controller']['ports']
-        # We use sentinel "0" value for hostPorts by default, because our default is dynamic, it depends on LB target backend.
-        # So, if this sentinel "0" value is present for hostPorts (i.e. user did not override it),
-        # we put our default - if LB target backend is "nginx", then hostPorts are taken from "target_ports",
-        # otherwise, we do not use hostPorts for nginx and thus simply delete hostPort with "0" sentinel value   
-        for port in container["ports"]:
-            if (port["name"] == "http" or port["name"] == "https") and "hostPort" in port and port["hostPort"] == 0:
-                if haproxy.get_target_backend(self.inventory) == "nginx":
-                    port["hostPort"] = int(self.inventory['services']['loadbalancer']['target_ports'][port["name"]])
-                else:
-                    del port["hostPort"]
         self.log.verbose(f"The {key} has been patched in 'spec.template.spec.containers.[{container_pos}].ports' "
                          f"with the data from 'plugins.nginx-ingress-controller.ports'")
 

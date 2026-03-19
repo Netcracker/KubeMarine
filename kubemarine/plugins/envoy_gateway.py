@@ -185,8 +185,8 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = targetPorts["http"]
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = targetPorts["https"]
 
-    if envoy_plugin["externalGateway"]["hostPorts"]["http"] != "" \
-        and envoy_plugin["externalGateway"]["hostPorts"]["https"] != "":
+    if envoy_plugin["externalGateway"]["hostPorts"]["http"] != 0 \
+        and envoy_plugin["externalGateway"]["hostPorts"]["https"] != 0:
         
         helm_plugin_config["values"]["defaultGateways"]["external"]["hostPorts"] = True
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = envoy_plugin["hostPorts"]["http"]
