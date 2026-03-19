@@ -734,7 +734,7 @@ plugins:
 
   envoy-gateway:
     version: '{{ globals.compatibility_map.software["envoy-gateway"][services.kubeadm.kubernetesVersion].version }}'
-    install: true
+    install: false
     kubectlRegistry: ""
     namespace: "gateway-system"
     releaseName: "envoy-gateway"

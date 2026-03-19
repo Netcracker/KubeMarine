@@ -68,5 +68,10 @@
       }
     }
   },
-  "additionalProperties": false
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "namespace", "releaseName", "crReleaseName", "kubectlRegistry", "valuesOverride", "crValuesOverride", "externalGateway"]}
+    ]
+  }
 }
