@@ -443,6 +443,8 @@ services:
       keep_configs_updated: True
       maintenance_mode: False
       mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
+    # By default, target backend is "nginx" if nginx plugin is enabled, otherwise it is "envoy"
+    target_backend: ""
     target_ports:
       http: '{% if nodes | select("has_role", "balancer") | first %}20080{% else %}80{% endif %}'
       https: '{% if nodes | select("has_role", "balancer") | first %}20443{% else %}443{% endif %}'
@@ -717,11 +719,11 @@ plugins:
     ports:
       - name: http
         containerPort: 80
-        hostPort: '{{ services.loadbalancer.target_ports.http }}'
+        hostPort: 0 # Sentinel value, which is defaulted dynamically in runtime
         protocol: TCP
       - name: https
         containerPort: 443
-        hostPort: '{{ services.loadbalancer.target_ports.https }}'
+        hostPort: 0 # Sentinel value, which is defaulted dynamically in runtime
         protocol: TCP
       - name: prometheus
         containerPort: 10254
@@ -730,11 +732,56 @@ plugins:
         containerPort: 8443
         protocol: TCP
 
+  envoy-gateway:
+    version: '{{ globals.compatibility_map.software["envoy-gateway"][services.kubeadm.kubernetesVersion].version }}'
+    install: true
+    kubectlRegistry: ""
+    namespace: "gateway-system"
+    releaseName: "envoy-gateway"
+    crReleaseName: "envoy-gateway-cr"
+    externalGateway:
+      certificate:
+        cert: ""
+        key: ""
+      # HostPorts are enabled by default only if LB target_backend is envoy,
+      # in this case hostPorts will be equal to LB target_ports.
+      # HostPorts also could be enabled and configured explicitly.
+      hostPorts:
+        http: ""
+        https: ""
+    valuesOverride: {}
+    crValuesOverride: {}
+    installation:
+      priority: 2
+      procedures:
+        - python:
+            module: plugins/envoy_gateway.py
+            method: apply_envoy_chart
+        - expect:
+            deployments:
+              - name: envoy-gateway
+                namespace: '{{ plugins["envoy-gateway"].namespace }}'
+            pods:
+              list:
+              - envoy-gateway
+              namespace: '{{ plugins["envoy-gateway"].namespace }}'
+        - python:
+            module: plugins/envoy_gateway.py
+            method: apply_cr_chart
+        - expect:
+            daemonsets:
+              - name: 'envoy-external-gateway'
+                namespace: '{{ plugins["envoy-gateway"].namespace }}'
+            pods:
+              list:
+              - 'envoy-external-gateway'
+              namespace: '{{ plugins["envoy-gateway"].namespace }}'
+
   kubernetes-dashboard:
     version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
-      priority: 2
+      priority: 3
       procedures:
         - python:
             module: plugins/builtin.py
@@ -811,7 +858,7 @@ plugins:
     version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
-      priority: 2
+      priority: 3
       procedures:
       - python:
           module: plugins/builtin.py

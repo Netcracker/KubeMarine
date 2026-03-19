@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: latest
+description: The Helm chart for Envoy Gateway Custom Resources
+name: envoy-gateway-cr
+type: application
+version: v0.0.0-kmtest

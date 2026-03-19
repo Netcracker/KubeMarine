@@ -19,7 +19,7 @@ from typing import List, Tuple, Dict, Any
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import static, utils, log
-from kubemarine.plugins import builtin
+from kubemarine.plugins import builtin, envoy_gateway
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoftware, UpgradeConfig
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
@@ -118,6 +118,14 @@ class Plugins(SoftwareType):
                         image_version = k8s_settings[image_name]
 
                     new_settings[f"{image_name}-version"] = image_version
+                
+                # For Envoy Gateway, since it is chart, we have special way to resolve images - we take them from charts values
+                if plugin_name == "envoy-gateway":
+                    images_versions = envoy_gateway.get_images_versions(plugin_version)
+                    new_settings["envoyGateway-version"] = images_versions["envoyGateway"]
+                    new_settings["envoy-version"] = images_versions["envoy"]
+                    new_settings["kubectl-version"] = images_versions["kubectl"]
+                    new_settings["ratelimit-version"] = images_versions["ratelimit"]
 
                 compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
 
@@ -279,6 +287,7 @@ def nginx_ingress_extract_images(images: List[str], manifest_identity: Identity,
     return extra_images
 
 
+# TODO: similar for envoy?
 def dashboard_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['kubernetesui/dashboard']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]

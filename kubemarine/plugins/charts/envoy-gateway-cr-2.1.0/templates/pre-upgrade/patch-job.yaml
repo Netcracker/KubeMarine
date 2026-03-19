@@ -1,0 +1,53 @@
+{{ if .Values.defaultGateways.external.hostPorts }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ns-patch 
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: ns-patch 
+      labels:
+        app.kubernetes.io/component: ns-patch 
+    spec:
+      restartPolicy: Never
+      serviceAccountName: ns-patch 
+      containers:
+        - name: upgrade-preparation
+          image: {{ include "kubectl.image" . }}
+          env:
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              if [[ -z "$NAMESPACE" ]]; then
+                echo >&2 "Error: NAMESPACE is not set"
+                exit 121
+              fi
+              
+              LABEL_VALUE=$(kubectl get ns "${NAMESPACE}" -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}')
+              echo "Current enforce label for '${NAMESPACE}': ${LABEL_VALUE}"
+              if [[ "${LABEL_VALUE}" != "privileged" ]]; then
+                kubectl label --overwrite ns "${NAMESPACE}" pod-security.kubernetes.io/enforce=privileged
+                  if [[ $? -eq 0 ]]; then
+                    echo "Namespace '${NAMESPACE}' was patched with privileged PSS"
+                  else
+                    echo >&2 "Failed to patch namespace '${NAMESPACE}'"
+                    exit 1
+                  fi
+              else
+                echo "Namespace '${NAMESPACE}' already has 'privileged' PSS"
+              fi
+          {{- if .Values.upgradeJob.resources }}
+          resources: {{ toYaml .Values.upgradeJob.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.upgradeJob.securityContext }}
+          securityContext: {{ toYaml .Values.upgradeJob.securityContext | nindent 12 }}
+          {{- end }}
+{{ end }}

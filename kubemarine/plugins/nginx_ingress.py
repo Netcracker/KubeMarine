@@ -23,6 +23,7 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
+from kubemarine import haproxy
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for nginx plugin since it is not installed"
 
@@ -255,6 +256,16 @@ class IngressNginxManifestProcessor(Processor):
             manifest, key, container_name='controller', is_init_container=False)
 
         container['ports'] = self.inventory['plugins']['nginx-ingress-controller']['ports']
+        # We use sentinel "0" value for hostPorts by default, because our default is dynamic, it depends on LB target backend.
+        # So, if this sentinel "0" value is present for hostPorts (i.e. user did not override it),
+        # we put our default - if LB target backend is "nginx", then hostPorts are taken from "target_ports",
+        # otherwise, we do not use hostPorts for nginx and thus simply delete hostPort with "0" sentinel value   
+        for port in container["ports"]:
+            if (port["name"] == "http" or port["name"] == "https") and "hostPort" in port and port["hostPort"] == 0:
+                if haproxy.get_target_backend(self.inventory) == "nginx":
+                    port["hostPort"] = int(self.inventory['services']['loadbalancer']['target_ports'][port["name"]])
+                else:
+                    del port["hostPort"]
         self.log.verbose(f"The {key} has been patched in 'spec.template.spec.containers.[{container_pos}].ports' "
                          f"with the data from 'plugins.nginx-ingress-controller.ports'")
 

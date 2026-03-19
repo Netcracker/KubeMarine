@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Change the default settings for the 'envoy-gateway' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of Envoy Gateway helm chart"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace where Envoy Gateway and CRs should be installed",
+      "default": "gateway-system"
+    },
+    "kubectlRegistry": {
+      "type": "string",
+      "description": "Registry to use instead of ghcr.io for qubership-docker-kubectl image"
+    },
+    "releaseName": {
+      "type": "string",
+      "description": "Release name for Envoy Gateway helm chart",
+      "default": "envoy-gateway"
+    },
+    "crReleaseName": {
+      "type": "string",
+      "description": "Release name for Envoy Gateway CRs helm chart",
+      "default": "envoy-gateway-cr"
+    },
+    "valuesOverride": {
+      "type": "object",
+      "description": "Override values for Envoy Gateway helm chart"
+    },
+    "crValuesOverride": {
+      "type": "object",
+      "description": "Override values for Envoy Gateway CR helm chart"
+    },
+    "externalGateway": {
+      "type": "object",
+      "description": "Configure external gateway properties",
+      "properties": {
+        "certificate": {
+          "type": "object",
+          "description": "Configure TLS certificates to use on HTTPS listener",
+          "properties": {
+            "cert": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "hostPorts": {
+          "type": "object",
+          "description": "Configure hostPorts to use for HTTP and HTTPS listeners",
+          "properties": {
+            "http": {
+              "type": "number"
+            },
+            "https": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

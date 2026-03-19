@@ -1,0 +1,10 @@
+apiVersion: v2
+appVersion: latest
+dependencies:
+- name: gateway-helm
+  repository: file://charts/gateway-helm
+  version: v1.6.0
+description: The Helm chart for Envoy Gateway
+name: envoy-gateway
+type: application
+version: v0.0.0-kmtest

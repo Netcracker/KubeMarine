@@ -121,6 +121,19 @@ def get_config_path(group: NodeGroup) -> RunnersGroupResult:
 
     return collector.result
 
+def get_target_backend(inventory: dict) -> str:
+    """
+    Returns loadbalancer target backend, with is either "nginx" or "envoy".
+    By default, "nginx" is returned if nginx plugin is installed. Otherwise, "envoy" is returned.
+    User can override this using "target_backend" field.
+    """
+    if inventory['services']['loadbalancer']['target_backend'] != "":
+        return inventory['services']['loadbalancer']['target_backend']
+    
+    if inventory['plugins']['nginx-ingress-controller']['install']:
+        return "nginx"
+
+    return "envoy"
 
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster

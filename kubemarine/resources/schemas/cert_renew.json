@@ -5,6 +5,9 @@
     "nginx-ingress-controller": {
       "$ref": "definitions/plugins/nginx-ingress-controller.json#/definitions/DefaultCertificate"
     },
+    "envoy-gateway": {
+      "$ref": "definitions/plugins/envoy-gateway.json#/properties/externalGateway/properties/certificate"
+    },
     "calico": {
       "type": "object",
       "description": "Update internal Calico certificates.",

@@ -30,3 +30,4 @@ plugins:
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
+  envoy-gateway: []

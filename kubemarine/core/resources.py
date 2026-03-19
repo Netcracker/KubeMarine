@@ -41,6 +41,7 @@ import kubemarine.plugins.calico
 import kubemarine.plugins.kubernetes_dashboard
 import kubemarine.plugins.local_path_provisioner
 import kubemarine.plugins.nginx_ingress
+import kubemarine.plugins.envoy_gateway
 import kubemarine.sysctl
 import kubemarine.system
 import kubemarine.thirdparties
@@ -406,6 +407,7 @@ class DynamicResources:
             kubemarine.thirdparties.enrich_procedure_inventory,
             kubemarine.cri.enrich_upgrade_inventory,
             kubemarine.plugins.nginx_ingress.cert_renew_enrichment,
+            kubemarine.plugins.envoy_gateway.cert_renew_enrichment,
             kubemarine.sysctl.enrich_reconfigure_inventory,
             kubemarine.core.inventory.enrich_reconfigure_inventory,
             # Enrichment of procedure inventory should be finished at this step.
@@ -438,6 +440,7 @@ class DynamicResources:
             kubemarine.admission.verify_manage_enrichment,
             kubemarine.k8s_certs.renew_verify,
             kubemarine.plugins.nginx_ingress.verify_cert_renew,
+            kubemarine.plugins.envoy_gateway.verify_cert_renew,
             # The functions below depend on kubemarine.kubernetes.verify_version
             kubemarine.kubernetes.verify_upgrade_inventory,
             # Depends on kubemarine.core.defaults.calculate_nodegroups
