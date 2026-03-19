@@ -480,6 +480,7 @@ class DynamicResources:
             kubemarine.plugins.kubernetes_dashboard.enrich_inventory,
             kubemarine.plugins.local_path_provisioner.enrich_inventory,
             kubemarine.plugins.nginx_ingress.enrich_inventory,
+            kubemarine.plugins.envoy_gateway.enrich_inventory,
             # Depends on kubemarine.packages.enrich_inventory
             kubemarine.audit.verify_inventory,
             kubemarine.system.verify_inventory,

@@ -8,6 +8,13 @@ from kubemarine.core.yaml_merger import default_merger
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for envoy gateway plugin since it is not installed"
 
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:    
+    # We override priority from 1 to 2, to make envoy install after nginx if envoy is target_backend.
+    # This is required to make sure nginx frees hostPorts
+    if haproxy.get_target_backend(cluster.inventory) == "envoy":
+        cluster.inventory["plugins"]["envoy-gateway"]["installation"]["priority"] = 2
+
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
 def cert_renew_enrichment(cluster: KubernetesCluster) -> None:
     # check that renewal is required for envoy

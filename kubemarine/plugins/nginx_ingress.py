@@ -65,6 +65,11 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                 port["hostPort"] = int(cluster.inventory['services']['loadbalancer']['target_ports'][port["name"]])
             else:
                 del port["hostPort"]
+    
+    # We override priority from 1 to 2, to make nginx install after envoy if nginx is target_backend.
+    # This is required to make sure envoy frees hostPorts
+    if haproxy.get_target_backend(cluster.inventory) == "nginx":
+        inventory["plugins"]["nginx-ingress-controller"]["installation"]["priority"] = 2
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_controller = cluster.raw_inventory.get("plugins", {}).get("nginx-ingress-controller", {}).get("controller", {})

@@ -665,7 +665,7 @@ plugins:
     install: true
     installation:
       registry: registry.k8s.io
-      priority: 1
+      priority: 1 # will be changed to 2 if LB target_backend is nginx
       procedures:
         - python:
             module: plugins/nginx_ingress.py
@@ -752,7 +752,7 @@ plugins:
     valuesOverride: {}
     crValuesOverride: {}
     installation:
-      priority: 2
+      priority: 1 # will be changed to 2 if LB target_backend is envoy
       procedures:
         - python:
             module: plugins/envoy_gateway.py
