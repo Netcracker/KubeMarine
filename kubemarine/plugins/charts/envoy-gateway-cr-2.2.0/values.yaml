@@ -3,12 +3,14 @@ MANAGED_BY: saasDeployer
 APPLICATION_NAME: envoy-api-gateway
 global:
   images:
+    envoyGateway:
+      image: "envoyproxy/gateway:v1.7.0"
     # Envoy image
     envoy:
-      image: "envoyproxy/envoy:distroless-v1.36.2"
+      image: "envoyproxy/envoy:distroless-v1.37.0"
     ratelimit:
       # This is the full image name including the hub, repo, and tag.
-      image: "envoyproxy/ratelimit:99d85510"
+      image: "envoyproxy/ratelimit:3fb70258"
     kubectl:
       image: ghcr.io/netcracker/qubership-docker-kubectl:0.0.6
 # Default GatewayClass and EnvoyProxy specification
@@ -56,8 +58,7 @@ gatewayClasses:
       # Tolerations configuration
       tolerations: []
       # NodeSelector configuration
-      nodeSelector:
-        kubernetes.io/os: linux
+      nodeSelector: {}
     envoyService:
       # The Kubernetes Service type. Applicable options are: LoadBalancer, ClusterIP, NodePort
       # Set ClusterIP to be able to create Application Load Balancer (ALB) on AWS

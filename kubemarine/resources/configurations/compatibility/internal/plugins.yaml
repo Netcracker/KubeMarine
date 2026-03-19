@@ -98,50 +98,50 @@ local-path-provisioner:
     busybox-version: 1.34.1
 envoy-gateway:
   v1.32.0:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.32.2:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.32.10:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.33.0:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.33.6:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.34.1:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.34.2:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258
   v1.35.0:
-    version: 2.1.0
-    envoyGateway-version: v1.6.0
-    envoy-version: distroless-v1.36.2
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
-    ratelimit-version: 99d85510
+    ratelimit-version: 3fb70258

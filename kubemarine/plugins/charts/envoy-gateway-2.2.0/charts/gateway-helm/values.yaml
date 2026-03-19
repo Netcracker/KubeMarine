@@ -16,15 +16,15 @@ global:
   images:
     envoyGateway:
       # This is the full image name including the hub, repo, and tag.
-      image: envoyproxy/gateway:v1.6.0       # NC modified
+      image: envoyproxy/gateway:v1.7.0       # NC modified
       # Specify image pull policy if default behavior isn't desired.
       # Default behavior: latest images will be Always else IfNotPresent.
-      pullPolicy: IfNotPresent                                                  # NC modified
+      pullPolicy: IfNotPresent               # NC modified
       # List of secrets in the same namespace of the component that can be used to pull images from private repositories.
       pullSecrets: []
     ratelimit:
       # This is the full image name including the hub, repo, and tag.
-      image: "envoyproxy/ratelimit:99d85510" # NC modified
+      image: "docker.io/envoyproxy/ratelimit:3fb70258"
       # Specify image pull policy if default behavior isn't desired.
       # Default behavior: latest images will be Always else IfNotPresent.
       pullPolicy: IfNotPresent
@@ -90,6 +90,9 @@ service:
   # If set to PreferClose, the Envoy fleet will prioritize connecting to the Envoy Gateway pods that are topologically closest to them.
   trafficDistribution: ""
   annotations: {}
+  # -- Service type. Can be set to LoadBalancer with specific IP, e.g.:
+  # type: LoadBalancer
+  # loadBalancerIP: 10.236.90.20
   type: "ClusterIP"
 
 hpa:
