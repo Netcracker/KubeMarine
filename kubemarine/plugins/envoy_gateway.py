@@ -44,15 +44,14 @@ def get_images_versions(chart_version: str) -> dict[str, str]:
 def apply_envoy_chart(cluster: KubernetesCluster) -> None:
     envoy_plugin = cluster.inventory["plugins"]["envoy-gateway"]
     chart_version = envoy_plugin["version"]
-    plugin_defaults = cluster.inventory["plugin_defaults"]
     chart_values = utils.load_yaml(
         utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-{chart_version}/values.yaml")
     )
     
     envoy_gateway_image = chart_values["global"]["images"]["envoyGateway"]["image"]
     ratelimit_image = chart_values["global"]["images"]["ratelimit"]["image"]
-    if "registry" in plugin_defaults["installation"]:
-        registry = plugin_defaults["installation"]["registry"]
+    if "registry" in envoy_plugin["installation"]:
+        registry = envoy_plugin["installation"]["registry"]
         envoy_gateway_image = f"{registry}/{envoy_gateway_image}"
         ratelimit_image = f"{registry}/{ratelimit_image}"
 
@@ -102,15 +101,14 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
 def apply_cr_chart(cluster: KubernetesCluster) -> None:
     envoy_plugin = cluster.inventory["plugins"]["envoy-gateway"]
     chart_version = envoy_plugin["version"]
-    plugin_defaults = cluster.inventory["plugin_defaults"]
     chart_values = utils.load_yaml(
         utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-cr-{chart_version}/values.yaml")
     )
     
     envoy_image = chart_values["global"]["images"]["envoy"]["image"]
     kubectl_image = chart_values["global"]["images"]["kubectl"]["image"]
-    if "registry" in plugin_defaults["installation"]:
-        registry = plugin_defaults["installation"]["registry"]
+    if "registry" in envoy_plugin["installation"]:
+        registry = envoy_plugin["installation"]["registry"]
         envoy_image = f"{registry}/{envoy_image}"
         if envoy_plugin["kubectlRegistry"] == "":
             kubectl_image = kubectl_image.replace("ghcr.io", registry)
