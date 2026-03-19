@@ -128,7 +128,7 @@ def get_target_backend(inventory: dict) -> str:
     User can override this using "target_backend" field.
     """
     if inventory['services']['loadbalancer']['target_backend'] != "":
-        return inventory['services']['loadbalancer']['target_backend']
+        return str(inventory['services']['loadbalancer']['target_backend'])
     
     if inventory['plugins']['nginx-ingress-controller']['install']:
         return "nginx"

@@ -27,7 +27,7 @@ def verify_cert_renew(cluster: KubernetesCluster) -> None:
     if procedure_envoy_cert and not cluster.inventory["plugins"]["envoy-gateway"]["install"]:
         raise Exception(ERROR_CERT_RENEW_NOT_INSTALLED)
     
-def get_images_versions(chart_version: str) -> dict[str: str]:
+def get_images_versions(chart_version: str) -> dict[str, str]:
     values = utils.load_yaml(utils.get_internal_resource_path(
         f"plugins/charts/envoy-gateway-{chart_version}/values.yaml"
     ))
