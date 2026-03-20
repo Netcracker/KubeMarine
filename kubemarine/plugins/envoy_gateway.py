@@ -86,8 +86,8 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
                 },
             },
         },
-        "namespace": cluster.inventory["plugins"]["envoy-gateway"]["namespace"],
-        "release": cluster.inventory["plugins"]["envoy-gateway"]["releaseName"],
+        "namespace": envoy_plugin["namespace"],
+        "release": envoy_plugin["releaseName"],
     }
 
     # We apply CRDs separately from chart, because Helm does not support CRD upgrade.
@@ -103,6 +103,9 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
 
     helm_plugin_config["values"] = default_merger.merge(helm_plugin_config["values"], envoy_plugin["valuesOverride"])
     utils.dump_file(cluster.context, yaml.dump(helm_plugin_config["values"]), "envoy-values.yaml", dump_location=True)
+    plugins.apply_template(cluster=cluster, config={
+        "source": utils.get_internal_resource_path(f"templates/plugins/envoy-gateway-namespace.yaml.j2")
+    })
     plugins.apply_helm(cluster=cluster, config=helm_plugin_config)
 
 def apply_cr_chart(cluster: KubernetesCluster) -> None:
