@@ -1,28 +1,31 @@
 The following functions are installed in this section.  
 
 **Table of Content**
-
-- [TLS Termination on Nginx Ingress Controller](#tls-termination-on-nginx-ingress-controller)
-  - [How to Install](#how-to-install)
+TODO
+- [TLS Termination on Envoy Gateway (or Nginx Ingress Controller)](#tls-termination-on-envoy-gateway-or-nginx-ingress-controller)
+  - [How to Install Nginx Ingress Controller (Not Recommended)](#how-to-install-nginx-ingress-controller-not-recommended)
+  - [How to Install Envoy Gateway (Recommended)](#how-to-install-envoy-gateway-recommended)
   - [Using Kubemarine-provided TCP Load Balancer](#using-kubemarine-provided-tcp-load-balancer)
   - [Using Custom TCP Load Balancer](#using-custom-tcp-load-balancer)
 - [Advanced Load Balancing Techniques](#advanced-load-balancing-techniques)
   - [Allow and Deny Lists](#allow-and-deny-lists)
-  - [Preserving Original HTTP Headers](#preserving-original-http-headers)
+  - [Preserving Original HTTP Headers on Nginx Ingress Controller](#preserving-original-http-headers-on-nginx-ingress-controller)
 - [Maintenance Mode](#maintenance-mode)
 
-## TLS Termination on Nginx Ingress Controller
+## TLS Termination on Envoy Gateway (or Nginx Ingress Controller)
 
 This is the default recommended approach to the TLS termination on kubemarine-installed environments. This approach is applicable when MTLS is not used in kubernetes and all communications between the pods are over plain HTTP.
 A high-level overview of this approach is shown in the following image.
 
-![](/documentation/images/tls-termination-nginx.png)
+![](/documentation/images/tls-termination.png)
 
-Here, the client creates a HTTPS connection to the TCP load balancer, which in turn proxies the traffic to the Nginx Ingress Controller without a TLS termination.
-Nginx Ingress Controller uses a default wildcard certificate to authenticate itself to a client and to terminate the HTTPS connection.
+Here, the client creates a HTTPS connection to the TCP load balancer, which in turn proxies the traffic to the Envoy Gateway (or Nginx Ingress Controller) without a TLS termination.
+Envoy Gateway (or Nginx Ingress Controller) uses a default wildcard certificate to authenticate itself to a client and to terminate the HTTPS connection.
 To support multiple hostnames, the certificate can use wildcard SANs.
-Nginx Ingress Controller contacts applications using plain HTTP connection.
+Envoy Gateway (or Nginx Ingress Controller) contacts applications using plain HTTP connection.
 Thus using this approach, it is very easy to manage only one certificate in one place - TLS traffic is terminated on the Nginx Ingress Controller using the default certificate for all application ingresses.
+
+For more information about Envoy Gateway default certificate, visit [https://gateway-api.sigs.k8s.io/guides/tls/](https://gateway-api.sigs.k8s.io/guides/tls/).
 
 For more information about Nginx Ingress Controller default certificate, visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
 
@@ -31,16 +34,26 @@ For more information about Nginx Ingress Controller default certificate, visit [
 This approach has the following limitations:
 
 * Adding a new hostname might require to re-issue the certificate, if the new hostname does not match any previous wildcard SANs.
-* Connections from the Nginx Ingress Controller to applications are through HTTP; thus, without an encryption.
+* Connections from the Envoy Gateway (or Nginx Ingress Controller) to applications are through HTTP; thus, without an encryption.
 * L7 load balancing options can be customized through "ingress" resources only.
 
-### How to Install
+### How to Install Nginx Ingress Controller (Not Recommended)
+
+Nginx Ingress controller is installed by default, so you do not need to enable this plugin explicitly.
 
 To enable TLS termination on Nginx Ingress Controller using the default certificate, it is required to customize the "nginx" plugin with a custom default certificate.
 This can be done during:
 
 * Installation; for details, refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
 * On an already installed Nginx Ingress Controller, using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
+
+**Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
+
+### How to Install Envoy Gateway (Recommended)
+
+Envoy Gateway currently is not installed by default, you need to provide additional configuration in `cluster.yaml` to install it. To install Envoy Gateway with TLS termination using the default certificate, refer to [envoy-gateway plugin installation section](/documentation/Installation.md#envoy-gateway).
+
+On an already installed Envoy Gateway, certificates could be installed or renewed using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-envoy-gateway).
 
 **Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
 
@@ -62,7 +75,7 @@ In this case, your custom TCP load balancer should meet the following requiremen
 * The load balancer should be an L4 pass-through TCP load balancer, without TLS termination.
 * The load balancer should be Highly Available.
 * The load balancer should have HTTPS (port 443) and Kubernetes API (port 6443) frontends.
-* The HTTPS frontend should point to backend port 443 of worker nodes where Nginx Ingress Controller is installed.
+* The HTTPS frontend should point to backend port 443 of worker nodes where Envoy Gateway (or Nginx Ingress Controller) is installed.
 * The Kubernetes API frontend should point to backend port 6443 of all control-plane nodes.
 * The load balancer backend configuration should be updated accordingly when new nodes are added or removed from a cluster.
 
@@ -122,7 +135,7 @@ spec:
 
 In this example, the `whitelist.myservicea.foo.org` hostname is available only from IP address `172.10.0.1` and subnet `10.0.0.0/24`.
 
-### Preserving Original HTTP Headers
+### Preserving Original HTTP Headers on Nginx Ingress Controller
 
 The TCP load balancer does not modify the HTTP response/request headers. 
 The Nginx Ingress Controller also does not modify **custom** HTTP headers. 

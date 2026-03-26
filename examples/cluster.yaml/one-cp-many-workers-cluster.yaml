@@ -20,8 +20,31 @@ nodes:
     roles: ["worker"]
 
 # NodeSelector and Tolerations are required to make sure
-# nginx-ingress runs on control-plane node
+# envoy-gateway/nginx-ingress runs on control-plane node
 plugins:
+  envoy-gateway:
+    install: true
+    externalGateway:
+      certificate:
+        cert: |
+          -----BEGIN CERTIFICATE-----
+          ----------------------------------------------------------------
+          -----END CERTIFICATE-----
+        key: |
+          -----BEGIN RSA PRIVATE KEY-----
+          ----------------------------------------------------------------
+          -----END RSA PRIVATE KEY-----
+    crValuesOverride:
+      gatewayClasses:
+        external:
+          envoyDeployment:
+            nodeSelector:
+              node-role.kubernetes.io/control-plane: ""
+            tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+
   nginx-ingress-controller:
     controller:
       nodeSelector:
