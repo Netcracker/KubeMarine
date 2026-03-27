@@ -783,7 +783,6 @@ plugins:
         name: kubernetes-dashboard
         namespace: kubernetes-dashboard
         annotations:
-          gateway-api-converter.netcracker.com/ignore: "true"
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
           nginx.ingress.kubernetes.io/configuration-snippet: |
             add_header X-Frame-Options "sameorigin";
