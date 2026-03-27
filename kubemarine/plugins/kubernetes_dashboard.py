@@ -129,6 +129,9 @@ class DashboardManifestProcessor(Processor):
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 
     def enrich_gateway_api_resources(self, manifest: Manifest) -> None:
+        if not self.inventory["plugins"]["envoy-gateway"]["install"]:
+            return
+
         hostname = self.inventory["plugins"]["kubernetes-dashboard"]["hostname"]
         http_route_yaml = yaml.safe_load(dedent(f"""
             apiVersion: gateway.networking.k8s.io/v1
