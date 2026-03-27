@@ -132,7 +132,34 @@ spec:
                       name: https
                       protocol: TCP
                     {{- end }}
+                    {{- if .Values.defaultGateways.external.tcp }}
+                    {{- range $key, $value := .Values.defaultGateways.external.tcp }}
+                    {{- if le (int $value.port) 1000 }}
+                    - containerPort: {{ add 10000 (int $value.port) }}
+                      hostPort: {{ add 10000 (int $value.port) }}
+                    {{- else }}
+                    - containerPort: {{ $value.port }}
+                      hostPort: {{ $value.port }}
+                    {{- end }}
+                      name: {{ $value.name }}
+                      protocol: TCP
+                    {{- end }}
+                    {{- end }}
+                    {{- if .Values.defaultGateways.external.udp }}
+                    {{- range $key, $value := .Values.defaultGateways.external.udp }}
+                    {{- if le (int $value.port) 1000 }}
+                    - containerPort: {{ add 10000 (int $value.port) }}
+                      hostPort: {{ add 10000 (int $value.port) }}
+                    {{- else }}
+                    - containerPort: {{ $value.port }}
+                      hostPort: {{ $value.port }}
+                    {{- end }}
+                      name: {{ $value.name }}
+                      protocol: UDP
+                    {{- end }}
+                    {{- end }}
             {{- end }}
+        {{- if or (.Values.gatewayClasses.external.envoyDeployment.tolerations) (.Values.gatewayClasses.external.envoyDeployment.nodeSelector) }}
         pod:
           {{- with .Values.gatewayClasses.external.envoyDeployment.tolerations }}
           tolerations:
@@ -142,6 +169,7 @@ spec:
           nodeSelector:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- end }}
         container:
           image: {{ include "envoy.image" . }}
           resources:

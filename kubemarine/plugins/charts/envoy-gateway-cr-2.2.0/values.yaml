@@ -147,9 +147,9 @@ defaultGateways:
     #    namespaceLabel:
     #      kubernetes.io/metadata.name: namespace-3
     tls: []
-    # Use `hostPort` on Envoy pods. It works only for HTTP and HTTPS listeners.
-    # By default, host ports are the same as listener ports,
+    # Use `hostPort` on Envoy pods. By default, host ports are the same as listener ports,
     # except when listener port is lower than 1000, in this case default hostPort will be listener port plus 10000.
+    # HostPorts doesn't work for `tls` listeners
     hostPorts: false
     # Allows to override hostPort used for HTTP listener.
     httpHostPort: ""
