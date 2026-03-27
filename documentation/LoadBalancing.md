@@ -1,7 +1,7 @@
 The following functions are installed in this section.  
 
 **Table of Content**
-TODO
+
 - [TLS Termination on Envoy Gateway (or Nginx Ingress Controller)](#tls-termination-on-envoy-gateway-or-nginx-ingress-controller)
   - [How to Install Nginx Ingress Controller (Not Recommended)](#how-to-install-nginx-ingress-controller-not-recommended)
   - [How to Install Envoy Gateway (Recommended)](#how-to-install-envoy-gateway-recommended)

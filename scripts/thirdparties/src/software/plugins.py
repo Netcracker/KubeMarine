@@ -287,7 +287,6 @@ def nginx_ingress_extract_images(images: List[str], manifest_identity: Identity,
     return extra_images
 
 
-# TODO: similar for envoy?
 def dashboard_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['kubernetesui/dashboard']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
