@@ -443,7 +443,8 @@ services:
       keep_configs_updated: True
       maintenance_mode: False
       mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
-    # By default, target backend is "nginx" if nginx plugin is enabled, otherwise it is "envoy"
+    # By default, target backend is "nginx" if nginx plugin is enabled, otherwise it is "envoy".
+    # If nginx and envoy are not installed, this option has no effect.
     target_backend: ""
     target_ports:
       http: '{% if nodes | select("has_role", "balancer") | first %}20080{% else %}80{% endif %}'
