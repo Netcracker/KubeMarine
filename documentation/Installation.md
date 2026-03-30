@@ -3254,6 +3254,8 @@ services:
 
 This section describes who should listen `target_ports` on worker nodes, either `nginx` or `envoy`. Default is `nginx` for backward compatibility, but it is recommended to use `envoy`. If you do not install nginx and envoy plugins, this option has no effect.
 
+**Note**: Envoy Gateway uses Gateway API resources (HTTPRoutes, etc) instead of Ingresses. Thus, when you migrate cluster from Ingress-NGINX to Envoy Gateway, your applications should also migrate from Ingresses to Gateway API resources, otherwise routing will not work.
+
 This options also influences plugins installation priority. Selected target backend (e.g. `nginx`) will be installed with priority `2`, while the other plugin (e.g. `envoy`) will be installed with priority `1`. This is to allow other plugin to configure first and free host ports for target backend.
 
 ##### haproxy
