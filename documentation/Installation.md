@@ -3258,6 +3258,13 @@ This section describes who should listen `target_ports` on worker nodes, either 
 
 This options also influences plugins installation priority. Selected target backend (e.g. `nginx`) will be installed with priority `2`, while the other plugin (e.g. `envoy`) will be installed with priority `1`. This is to allow other plugin to configure first and free host ports for target backend.
 
+You can specify this option in `cluster.yaml` as following:
+```yaml
+services:
+  loadbalancer:
+    target_backend: "envoy"
+```
+
 ##### haproxy
 
 This section describes the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
