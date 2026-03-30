@@ -260,15 +260,11 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup) -> None:
         manage_mandatory_packages,
         manage_custom_packages
     ])
-    affected_hosts = system.detect_kernel_upgrade(group)
-    #early reboot to apply new kernel before performing other system configurations.
+    affected_hosts = system.detect_kernel_upgrade(group) #detecting if kernel is upgraded on any node.
+    #scheduling reboot if kernel upgrade detected, as it is required to apply new kernel version.
     if affected_hosts:
-        affected_group = cluster.make_group(affected_hosts)
-        hosts_str = ", ".join(affected_group.get_hosts())
-        cluster.log.warning(f"Rebooting node(s) {hosts_str} to apply updated kernel before proceeding "
-                            f"with further system configuration.")
-        system.reboot_group(affected_group)
-        cluster.context["early_reboot_done"] = True       
+        cluster.log.debug(f"Scheduling reboot to apply updated kernel version.")
+        cluster.schedule_cumulative_point(system.reboot_nodes)      
 
 def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
@@ -327,7 +323,7 @@ def manage_custom_packages(group: NodeGroup) -> None:
                 cluster.log.verbose('Packages changed at %s' % host)
                 any_changes_found = True
 
-    if any_changes_found and not cluster.context.get("early_reboot_done"):
+    if any_changes_found:
         cluster.log.verbose('Packages changed, scheduling nodes restart...')
         cluster.schedule_cumulative_point(system.reboot_nodes)
     else:
@@ -575,7 +571,7 @@ cumulative_points = {
     # Reboot and verify that the most crucial system settings are applied on boot.
     # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
-        "prepare.system.audit"
+        "prepare.system.modprobe"
     ],
     system.verify_system: [
         "prepare.system.audit"
