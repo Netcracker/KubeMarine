@@ -61,6 +61,8 @@ def _import_tasks_procedure(name: str) -> TasksProcedure:
         from kubemarine.procedures import remove_node as procedure
     elif name == "restore":
         from kubemarine.procedures import restore as procedure
+    elif name == "reunion":
+        from kubemarine.procedures import reunion as procedure
     elif name == "upgrade":
         from kubemarine.procedures import upgrade as procedure
     else:
