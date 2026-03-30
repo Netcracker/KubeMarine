@@ -571,7 +571,8 @@ cumulative_points = {
     # Reboot and verify that the most crucial system settings are applied on boot.
     # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
-        "prepare.system.modprobe"
+        "prepare.system.modprobe",
+        "prepare.system.audit"
     ],
     system.verify_system: [
         "prepare.system.audit"
