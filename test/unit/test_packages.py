@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from platform import node
 import unittest
 from copy import deepcopy
 from typing import Optional
