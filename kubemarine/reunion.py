@@ -50,7 +50,7 @@ def reunion_member(cluster: KubernetesCluster) -> None:
 
     # Checking if corrupted node is already deleted
     if member_id != '':
-        cluster.log.debug(f'Corrupted member has {member_id} id, {member_ep} endpoint, and {member_peer} peer')
+        cluster.log.debug(f'Corrupted member has ID: "{member_id}"; Endpoint: "{member_ep}"; Peer: "{member_peer}"')
         result = healthy_node.sudo('etcdctl endpoint status --cluster')
         # Checking if the node is not a leader
         for member in result[healthy_node.get_host()].stdout.split("\n"):
