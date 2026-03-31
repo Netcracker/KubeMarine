@@ -57,10 +57,10 @@ containerdio:
 haproxy:
   version_rhel8: 1.8*
   version_rhel9: 2.4*
-  version_rhel10: 3.2*
+  version_rhel10: 3.0*
   version_debian: 2.*
 keepalived:
   version_rhel8: 2.1*
   version_rhel9: 2.2*
-  version_rhel10: 2.3*
+  version_rhel10: 2.2*
   version_debian: 1:2.*

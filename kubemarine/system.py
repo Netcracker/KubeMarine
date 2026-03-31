@@ -235,7 +235,9 @@ def enable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None,
                    now: bool = True, callback: Callback = None) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
-
+    os_family = group.get_nodes_os()
+    if name == 'keepalived' and os_family == 'rhel10':
+        now = False
     cmd = 'systemctl enable %s' % name
     if now:
         cmd = cmd + " --now"
@@ -344,24 +346,17 @@ def reboot_nodes(cluster: KubernetesCluster) -> None:
 def detect_kernel_upgrade(group: NodeGroup) -> List[str]:
     cluster = group.cluster
     affected_hosts = []
-
     os_family = group.get_nodes_os()
 
-    if os_family in ["rhel8", "rhel9", "rhel10"]:
-        try:
-            result = group.sudo("needs-restarting -r", hide=True, warn=True)
-            for host, res in result.items():
-                if res.exited == 1:
-                    affected_hosts.append(host)
-                    cluster.log.debug(
-                        f"{host}: Reboot required (detected via needs-restarting -r)"
-                    )
-        except GroupResultException:
-            cluster.log.debug(
-                "Skipping reboot detection (needs-restarting not available in test environment)"
-            )
-            return []
-    return affected_hosts #list of nodes with detected kernel upgrade
+    if os_family in ["rhel10"]:
+        result = group.sudo("needs-restarting -r", hide=True, warn=True)
+        for host, res in result.items():
+            if res.exited == 1:
+                affected_hosts.append(host)
+                cluster.log.debug(
+                    f"{host}: Reboot required (detected via needs-restarting -r)"
+                )
+    return affected_hosts  # list of nodes with detected kernel upgrade
 
 def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupResult:
     from kubemarine import kubernetes  # pylint: disable=cyclic-import
