@@ -15,6 +15,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
+    - [Etcd Member Reunion](#etcd-member-reunion)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution From CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
@@ -1469,6 +1470,19 @@ The `cert_renew` procedure executes the following sequence of tasks:
 3. envoy_gateway
 4. calico
 5. certs_overview
+
+## Etcd Member Reunion
+
+The `reunion` procedure allows to remove and add once again the particular etcd member. It might be useful when one etcd member failed and the other `control-plane` services are up and running on the node. The **procedure.yaml** looks the following:
+
+```yaml
+corrupted_node: "control-plane-1"
+healthy_node: "control-plane-2"
+```
+
+The `reunion` procedure executes only one task:
+
+1. reunion_member
 
 # Procedure Execution
 
