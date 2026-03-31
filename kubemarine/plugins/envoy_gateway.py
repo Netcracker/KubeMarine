@@ -197,8 +197,10 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         and envoy_plugin["externalGateway"]["hostPorts"]["https"] != 0:
         
         helm_plugin_config["values"]["defaultGateways"]["external"]["hostPorts"] = True
-        helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = envoy_plugin["hostPorts"]["http"]
-        helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = envoy_plugin["hostPorts"]["https"]
+        helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = \
+            envoy_plugin["externalGateway"]["hostPorts"]["http"]
+        helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = \
+            envoy_plugin["externalGateway"]["hostPorts"]["https"]
 
     helm_plugin_config["values"] = default_merger.merge(helm_plugin_config["values"], envoy_plugin["crValuesOverride"])
     utils.dump_file(cluster.context, yaml.dump(helm_plugin_config["values"]), "envoy-cr-values.yaml", dump_location=True)
