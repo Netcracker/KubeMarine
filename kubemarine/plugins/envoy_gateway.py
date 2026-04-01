@@ -192,6 +192,9 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         helm_plugin_config["values"]["defaultGateways"]["external"]["hostPorts"] = True
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = targetPorts["http"]
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = targetPorts["https"]
+    else:
+        # If HAProxy is not used in front of Envoy, then we should not enable proxyProtocol
+        helm_plugin_config["values"]["defaultGateways"]["external"]["proxyProtocol"] = False
 
     if envoy_plugin["externalGateway"]["hostPorts"]["http"] != 0 \
         and envoy_plugin["externalGateway"]["hostPorts"]["https"] != 0:
