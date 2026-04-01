@@ -27,7 +27,7 @@ tmp_dir = '/etc/kubernetes/tmp/'
 
 def reunion_member(cluster: KubernetesCluster) -> None:
     if cluster.procedure_inventory.get('corrupted_node', '') == cluster.procedure_inventory.get('healthy_node', ''):
-        raise Exception('Corrupted and healthy nodes cannot be the same one')
+        raise Exception('Corrupted and healthy nodes must be different')
     # Checking corrupted node
     corrupted_node = cluster.nodes['control-plane'].get_member_by_name(cluster.procedure_inventory.get('corrupted_node', ''))
     # Getting healthy etcd node
@@ -47,7 +47,6 @@ def reunion_member(cluster: KubernetesCluster) -> None:
                 member_ep = member.split(", ")[4]
                 member_peer = member.split(", ")[3]
 
-
     # Checking if corrupted node is already deleted
     if member_id != '':
         cluster.log.debug(f'Corrupted member has ID: "{member_id}"; Endpoint: "{member_ep}"; Peer: "{member_peer}"')
@@ -64,6 +63,7 @@ def reunion_member(cluster: KubernetesCluster) -> None:
         healthy_node.sudo(f'etcdctl member remove {member_id}')
     else:
         cluster.log.debug(f'The {corrupted_node.get_node_name()} member must be already removed from the etcd cluster')
+        member_peer = f'https://{corrupted_node.get_config()["internal_address"]}:2380'
     # Removing erasing etcd storage
     cluster.log.debug(f'Erasing data directory')
     corrupted_node.sudo(f'rm -Rf /var/lib/etcd'
@@ -102,7 +102,6 @@ def reunion_member(cluster: KubernetesCluster) -> None:
     corrupted_node.put(buf, etcd_manifest, sudo=True)
     corrupted_node.sudo(f'rm {tmp_dir}/etcd.yaml', callback=collector)
     cluster.log.debug(f'Checking members list and cluster status')
-    result = corrupted_node.sudo('etcdctl endpoint status --cluster')
     # Waiting for etcd pod
-    _ = etcd.wait_for_health(cluster, corrupted_node)
+    etcd.wait_for_health(cluster, corrupted_node)
     kubernetes.wait_for_nodes(cluster.nodes['control-plane'])
