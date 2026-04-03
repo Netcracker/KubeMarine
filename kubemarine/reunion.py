@@ -32,7 +32,8 @@ def reunion_member(cluster: KubernetesCluster) -> None:
     corrupted_node = cluster.nodes['control-plane'].get_member_by_name(cluster.procedure_inventory.get('corrupted_node', ''))
     # Getting healthy etcd node
     healthy_node = cluster.nodes['control-plane'].get_member_by_name(cluster.procedure_inventory.get('healthy_node', ''))
-    cluster.log.debug(f'The corrupted etcd node is: {corrupted_node.get_node_name()}. The healthy etcd node is: {healthy_node.get_node_name()}')
+    cluster.log.debug(f'The corrupted etcd node is: "{corrupted_node.get_node_name()}". '
+                      f'The healthy etcd node is: "{healthy_node.get_node_name()}"')
 
     cluster.log.debug(f'Checking members list')
     member_id = ''
