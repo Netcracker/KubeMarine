@@ -6143,9 +6143,12 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
+
+**Note**: Ubuntu 20.04 is not supported on Kubernetes v1.35+
+
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 3b332029396ff8f3e056c29a005d62fe6b09d05f          |
 |          | kubelet                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 0ad7d08b9de3a526869088e0d0a2de4d6f5ffabc          |
 |          | kubectl                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 8873116ce8aa124b6a3fed5f76e6b0b0989f87a3          |
