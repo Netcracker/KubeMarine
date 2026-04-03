@@ -1480,6 +1480,8 @@ corrupted_node: "control-plane-1"
 healthy_node: "control-plane-2"
 ```
 
+The `corrupted_node` is a k8s node where etcd member must be removed and added. The `healthy_node` is one of the k8s nodes where etcd is up and running properly.
+
 The `reunion` procedure executes only one task:
 
 1. reunion_member
