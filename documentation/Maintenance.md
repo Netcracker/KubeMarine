@@ -577,6 +577,8 @@ You can specify two types of path in it:
   /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
+Also, the latest backup is stored on control plane nodes in `/etc/kubemarine/backup.tar.gz` file.
+
 #### etcd Parameters
 
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
@@ -746,6 +748,8 @@ Example:
 ```
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
+
+If `backup_location` is empty, the latest backup that is stored on control plane nodes in `/etc/kubemarine/backup.tar.gz` file will be used.
 
 #### etcd Parameters
 
