@@ -31,6 +31,9 @@ from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
 
 
+local_backup = "/etc/kubemarine/backup.tar.gz"
+
+
 def missing_or_empty(file: str) -> bool:
     if not os.path.exists(file):
         return True
@@ -60,26 +63,29 @@ def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, conf
             tar.close()
 
 
-def unpack_data(resources: DynamicResources) -> None:
-    logger = resources.logger()
-    context = resources.context
-    backup_tmp_directory = backup.prepare_backup_tmpdir(logger, context)
-    backup_file_source = resources.procedure_inventory().get('backup_location')
+def unpack_data(cluster: KubernetesCluster) -> None:
+    backup_tmp_directory = backup.prepare_backup_tmpdir(cluster.log, cluster.context)
+    backup_file_source = cluster.procedure_inventory.get('backup_location')
 
+    # Local backup archive usage if 'backup_location' is not defined
     if not backup_file_source:
-        raise Exception('Backup source not specified in procedure')
+        cluster.log.debug('Backup source not specified in procedure. The archive from node will be used')
+        backup_file_source = utils.get_dump_filepath(cluster.context, 'backup.tar.gz')
+        control_plane_node = cluster.nodes['control-plane'].get_any_member()
+        control_plane_node.get(local_backup, backup_file_source)
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
-    if not os.path.isfile(backup_file_source):
+    if not os.path.isfile(backup_file_source) and not use_archive_from_node:
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
-    logger.debug('Unpacking all data...')
+
+    cluster.log.debug('Unpacking all data...')
     with tarfile.open(backup_file_source, 'r:gz') as tar:
         for member in tar:
             if member.isdir():
                 continue
             fname = os.path.join(backup_tmp_directory, member.name)
-            logger.debug(fname)
+            cluster.log.debug(fname)
             fname_parts = fname.split('/')
             if len(fname_parts) > 1:
                 fname_dir = "/".join(fname_parts[:-1])
@@ -93,7 +99,7 @@ def unpack_data(resources: DynamicResources) -> None:
         raise FileNotFoundError('Descriptor not found in backup file')
 
     with utils.open_external(descriptor_filepath, 'r') as stream:
-        context['backup_descriptor'] = yaml.safe_load(stream)
+        cluster.context['backup_descriptor'] = yaml.safe_load(stream)
 
 
 def stop_cluster(cluster: KubernetesCluster) -> None:
@@ -258,6 +264,7 @@ def reboot(cluster: KubernetesCluster) -> None:
 
 tasks = OrderedDict({
     "prepare": {
+        "unpack_archive": unpack_data,
         "stop_cluster": stop_cluster,
     },
     "restore": {
@@ -276,7 +283,6 @@ tasks = OrderedDict({
 
 class RestoreFlow(flow.Flow):
     def _run(self, resources: DynamicResources) -> None:
-        unpack_data(resources)
         flow.run_actions(resources, [RestoreAction()])
 
 

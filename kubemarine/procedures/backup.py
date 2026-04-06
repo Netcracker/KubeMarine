@@ -38,6 +38,7 @@ from kubemarine.cri import containerd
 
 local_backup = "/etc/kubemarine/backup.tar.gz"
 
+
 def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     haproxy_service = cluster.get_package_association('haproxy', 'service_name')
     keepalived_service = cluster.get_package_association('keepalived', 'service_name')
