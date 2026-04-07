@@ -16,6 +16,8 @@ import io
 
 import ruamel.yaml
 
+from typing import List
+
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import CollectorCallback
 from kubemarine import kubernetes, etcd
