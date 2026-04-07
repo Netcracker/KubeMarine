@@ -1473,7 +1473,7 @@ The `cert_renew` procedure executes the following sequence of tasks:
 
 ## Etcd Member Reunion
 
-The `reunion` procedure allows to remove and add once again the particular etcd member. It might be useful when one etcd member failed and the other `control-plane` services are up and running on the node. The **procedure.yaml** looks the following:
+The `reunion` procedure allows to remove and add once again the particular etcd member. It might be useful when one etcd member failed and the other `control-plane` services are up and running on the node. Also, it's quite important the `etcdctl member list` command returns correct result with all members of the cluster, otherwise reunion procedure won't work. The **procedure.yaml** looks the following:
 
 ```yaml
 corrupted_node: "control-plane-1"
