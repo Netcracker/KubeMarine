@@ -23,29 +23,29 @@ calico:
     version: v3.31.2
 nginx-ingress-controller:
   v1.32.0:
-    version: v1.12.4
-    webhook-version: v1.6.0
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.32.2:
-    version: v1.12.4
-    webhook-version: v1.6.0
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.32.10:
-    version: v1.14.1
-    webhook-version: v1.6.5
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.33.0:
-    version: v1.13.0
-    webhook-version: v1.6.0
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.33.6:
-    version: v1.14.1
-    webhook-version: v1.6.5
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.34.1:
-    version: v1.13.1
-    webhook-version: v1.6.1
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.34.2:
-    version: v1.14.1
-    webhook-version: v1.6.5
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.35.0:
-    version: v1.14.1
-    webhook-version: v1.6.5
+    version: v1.16.0
+    webhook-version: v1.6.9
 kubernetes-dashboard:
   v1.32.0:
     version: v2.7.0

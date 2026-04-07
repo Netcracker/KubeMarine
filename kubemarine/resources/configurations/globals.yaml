@@ -96,13 +96,13 @@ plugins:
     manifests:
       - source:
           v1.2: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/do/deploy.yaml'
-          default: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/cloud/deploy.yaml'
+          default: 'https://raw.githubusercontent.com/netcracker/ingress-nginx/helm-chart-{version}/deploy/static/provider/cloud/deploy.yaml'
     requirements:
       v1.2:
         'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#support-versions-table'
       v1.4:
         'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#support-versions-table'
-      default: 'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#supported-versions-table'
+      default: 'https://github.com/netcracker/ingress-nginx/tree/helm-chart-{version}#supported-versions-table'
   kubernetes-dashboard:
     manifests:
       - source:
