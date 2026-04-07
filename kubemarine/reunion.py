@@ -1,4 +1,4 @@
-# Copyright 2021-2022 NetCracker Technology Corporation
+# Copyright 2021-2026 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,24 +48,18 @@ def reunion_member(cluster: KubernetesCluster) -> None:
                 member_ep = member.split(", ")[4]
                 member_peer = member.split(", ")[3]
 
-    # Checking if corrupted node is already deleted
-    if member_id != '':
-        cluster.log.debug(f'Corrupted member has ID: "{member_id}"; Endpoint: "{member_ep}"; Peer: "{member_peer}"')
-        result = healthy_node.sudo('etcdctl endpoint status --cluster')
-        # Checking if the node is not a leader
-        for member in result[healthy_node.get_host()].stdout.split("\n"):
-            if len(member) > 0:
-                if member_ep == member.split(", ")[0] and member.split(", ")[8] == "true":
-                    raise Exception('Leader cannot be removed')
-        cluster.log.debug(f'Removing corrupted member {member_id}')
-        # Moving etcd.yaml to temporary folder or checking the etcd.yaml in temporary folder
-        corrupted_node.sudo(f'mv --backup {etcd_manifest} {tmp_dir} || ls -1 {tmp_dir}/etcd.yaml')
-        # Removing corrupted member
-        healthy_node.sudo(f'etcdctl member remove {member_id}')
+    if not member_id:
+        raise Exception('The corrupted member cannot be identified')
     else:
-        cluster.log.debug(f'The {corrupted_node.get_node_name()} member must be already removed from the etcd cluster')
-        member_peer = f'https://{corrupted_node.get_config()["internal_address"]}:2380'
-    # Removing erasing etcd storage
+        cluster.log.debug(f'Corrupted member has ID: "{member_id}"; Endpoint: "{member_ep}"; Peer: "{member_peer}"')
+    cluster.log.debug(f'Removing corrupted member {member_id}')
+    # Moving etcd.yaml to temporary folder
+    corrupted_node.sudo(f'mv {etcd_manifest} {tmp_dir}')
+    # Checking if etcd container has been deleted
+    corrupted_node.sudo('crictl rm -f $(sudo crictl ps --name etcd -q) || true > /dev/null')
+    # Removing corrupted member
+    healthy_node.sudo(f'etcdctl member remove {member_id}')
+    # Erasing etcd storage
     cluster.log.debug(f'Erasing data directory')
     corrupted_node.sudo(f'rm -Rf /var/lib/etcd'
                         '&& sudo mkdir /var/lib/etcd')
@@ -75,20 +69,21 @@ def reunion_member(cluster: KubernetesCluster) -> None:
     result = healthy_node.sudo(f'etcdctl member add {corrupted_node.get_node_name()} --peer-urls={member_peer}')
     for line in result[healthy_node.get_host()].stdout.split("\n"):
         if line.startswith('ETCD_INITIAL_CLUSTER='):
-            init_cluster = line.split('ETCD_INITIAL_CLUSTER=')[1]
+            init_cluster = line.split('ETCD_INITIAL_CLUSTER=')[1].replace('"','')
 
     # Preraring etcd manifest
     collector = CollectorCallback(cluster)
     corrupted_node.sudo(f'cat {tmp_dir}/etcd.yaml', callback=collector)
     results = collector.results[corrupted_node.get_host()]
     yaml = ruamel.yaml.YAML().load(results[0].stdout)
-    for command in yaml['spec']['containers'][0]['command']:
+    commands: List[str] = yaml['spec']['containers'][0]['command']
+    for i, command in enumerate(commands):
         if command.startswith('--initial-advertise-peer-urls='):
-            command = f'--initial-advertise-peer-urls={member_peer}'
+            commands[i] = f'--initial-advertise-peer-urls={member_peer}'
         if command.startswith('--initial-cluster='):
-            command = f'--initial-cluster={init_cluster}'
+            commands[i] = f'--initial-cluster={init_cluster}'
         if command.startswith('--initial-cluster-state='):
-            command = '--initial-cluster-state=existing'
+            commands[i] = '--initial-cluster-state=existing'
 
     if not f'--initial-advertise-peer-urls={member_peer}' in yaml['spec']['containers'][0]['command']:
         yaml['spec']['containers'][0]['command'].append(f'--initial-advertise-peer-urls={member_peer}')
