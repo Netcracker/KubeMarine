@@ -75,7 +75,7 @@ def unpack_data(cluster: KubernetesCluster) -> None:
         control_plane_node.get(local_backup, backup_file_source)
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
-    if not os.path.isfile(backup_file_source) and not use_archive_from_node:
+    if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
 
