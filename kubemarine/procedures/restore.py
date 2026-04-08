@@ -25,7 +25,7 @@ from typing import List
 import yaml
 
 from kubemarine.core import utils, flow
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
@@ -78,7 +78,7 @@ def unpack_data(resources: DynamicResources) -> None:
         control_plane_node = cluster.nodes['control-plane'].get_any_member()
         control_plane_node.get(local_backup, backup_file_source)
         # Reset cluster
-        resources.reset_cluster()
+        resources.reset_cluster(EnrichmentStage.DEFAULT)
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
     if not os.path.isfile(backup_file_source):
@@ -105,7 +105,7 @@ def unpack_data(resources: DynamicResources) -> None:
         raise FileNotFoundError('Descriptor not found in backup file')
 
     with utils.open_external(descriptor_filepath, 'r') as stream:
-         context['backup_descriptor'] = yaml.safe_load(stream)
+        context['backup_descriptor'] = yaml.safe_load(stream)
 
 
 def stop_cluster(cluster: KubernetesCluster) -> None:
