@@ -89,12 +89,12 @@ def reunion_member(cluster: KubernetesCluster) -> None:
 
     if not f'--initial-advertise-peer-urls={member_peer}' in yaml['spec']['containers'][0]['command']:
         yaml['spec']['containers'][0]['command'].append(f'--initial-advertise-peer-urls={member_peer}')
-    if not f'--initial-advertise-peer-urls={member_peer}' in yaml['spec']['containers'][0]['command']:
+    if not f'--initial-cluster={init_cluster}' in yaml['spec']['containers'][0]['command']:
         yaml['spec']['containers'][0]['command'].append(f'--initial-cluster={init_cluster}')
     if not '--initial-cluster-state=existing' in yaml['spec']['containers'][0]['command']:
         yaml['spec']['containers'][0]['command'].append('--initial-cluster-state=existing')
 
-    cluster.log.debug(f'Puting etcd manifest on the corrupted node')
+    cluster.log.debug(f'Putting etcd manifest on the corrupted node')
     buf = io.StringIO()
     ruamel.yaml.YAML().dump(yaml, buf)
     corrupted_node.put(buf, etcd_manifest, sudo=True)
