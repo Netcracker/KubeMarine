@@ -159,6 +159,7 @@ services:
       - modulename: nf_defrag_ipv6
         install: '{{ nodes[0]["internal_address"] | isipv6 }}'
     rhel9: *modprobe-default-modules
+    rhel10: *modprobe-default-modules
     debian: *modprobe-default-modules
 
   sysctl:
@@ -489,6 +490,20 @@ services:
         semanage:
           package_name: 'policycoreutils-python-utils'
       rhel9:
+        containerd: {}
+        haproxy:
+          executable_name: '/usr/sbin/haproxy'
+          service_name: 'haproxy'
+        keepalived: {}
+        audit:
+          package_name: 'audit'
+        conntrack:
+          package_name: 'conntrack-tools'
+        semanage:
+          package_name: 'policycoreutils-python-utils'
+        iptables:
+          package_name: 'iptables-nft'
+      rhel10:
         containerd: {}
         haproxy:
           executable_name: '/usr/sbin/haproxy'

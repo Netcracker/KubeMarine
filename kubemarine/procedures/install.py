@@ -255,11 +255,16 @@ def system_prepare_package_manager_disable_unattended_upgrades(group: NodeGroup)
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_package_manager_manage_packages(group: NodeGroup) -> None:
+    cluster = group.cluster
     group.call_batch([
         manage_mandatory_packages,
         manage_custom_packages
     ])
-
+    affected_hosts = system.detect_kernel_upgrade(group) #detecting if kernel is upgraded on any node.
+    #scheduling reboot if kernel upgrade detected, as it is required to apply new kernel version.
+    if affected_hosts:
+        cluster.log.debug(f"Scheduling reboot to apply updated kernel version.")
+        cluster.schedule_cumulative_point(system.reboot_nodes)      
 
 def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
@@ -566,6 +571,7 @@ cumulative_points = {
     # Reboot and verify that the most crucial system settings are applied on boot.
     # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
+        "prepare.system.modprobe",
         "prepare.system.audit"
     ],
     system.verify_system: [

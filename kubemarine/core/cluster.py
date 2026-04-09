@@ -589,7 +589,7 @@ class KubernetesCluster(Environment):
         The method skips inaccessible nodes unless all nodes are inaccessible.
 
         :return: Detected OS family, possible values: "debian", "rhel8", "rhel9",
-                 "multiple", "unknown", "unsupported", "<undefined>".
+                 "rhel10","multiple", "unknown", "unsupported", "<undefined>".
         """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
         if os_families == {'<undefined>'}:
@@ -609,7 +609,7 @@ class KubernetesCluster(Environment):
         The method skips inaccessible nodes unless all nodes are inaccessible.
 
         :return: Detected OS family, possible values: "debian", "rhel8", "rhel9",
-                 "multiple", "unknown", "unsupported", "<undefined>".
+                 "rhel10","multiple", "unknown", "unsupported", "<undefined>".
         """
         return self.nodes['all'].get_nodes_os()
 

@@ -215,7 +215,8 @@ class ModulesEnrichment(unittest.TestCase):
         return {
             'debian': ('ubuntu', '22.04'),
             'rhel8': ('rhel', '8.7'),
-            'rhel9': ('rhel', '9.2')
+            'rhel9': ('rhel', '9.2'),
+            'rhel10': ('rocky', '10.1')
         }[os_family]
 
     def _nodes_having_modules(self, cluster: demo.FakeKubernetesCluster, module_name: str) -> Set[str]:

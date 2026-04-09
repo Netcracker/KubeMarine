@@ -17,7 +17,7 @@ from copy import deepcopy
 from typing import Optional
 from test.unit import utils
 
-from kubemarine import demo, packages
+from kubemarine import demo, packages, system
 from kubemarine.core import static, errors
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.demo import FakeKubernetesCluster
@@ -672,6 +672,79 @@ class CacheVersions(unittest.TestCase):
             self.assertEqual(kubernetes_config, unattended_upgrades_config,
                              'Wrong unattended-upgrade config on control-plane/worker')
 
+class SystemUtilities(unittest.TestCase):
+
+    def test_detect_kernel_upgrade_reboot_required(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context()
+        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='10')
+        for node in nodes_context.values():
+            node['os']['family'] = 'rhel10'
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        group = cluster.nodes['all']
+
+        # Mock needs-restarting -r → exit code 1 (reboot required)
+        results = demo.create_nodegroup_result(group, stdout="", code=1)
+        cluster.fake_shell.add(results, 'sudo', ["needs-restarting -r"])
+
+        affected = system.detect_kernel_upgrade(group)
+
+        self.assertEqual(set(group.get_hosts()), set(affected),
+                         "All nodes should require reboot when exit code is 1")
+
+    def test_detect_kernel_upgrade_no_reboot(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context()
+        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='10')
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        group = cluster.nodes['all']
+
+        # Mock needs-restarting -r → exit code 0 (no reboot required)
+        results = demo.create_nodegroup_result(group, stdout="", code=0)
+        cluster.fake_shell.add(results, 'sudo', ["needs-restarting -r"])
+
+        affected = system.detect_kernel_upgrade(group)
+
+        self.assertEqual([], affected,
+                         "No nodes should require reboot when exit code is 0")
+
+    def test_detect_kernel_upgrade_handles_exception(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context()
+        nodes_context = demo.generate_nodes_context(inventory, os_name='centos', os_version='10')
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        group = cluster.nodes['all']
+
+        # Simulate failure of sudo command
+        def raise_exception(*args, **kwargs):
+            raise Exception("Mocked failure")
+
+        original_sudo = group.sudo
+        group.sudo = raise_exception
+
+        try:
+            affected = system.detect_kernel_upgrade(group)
+        finally:
+            group.sudo = original_sudo
+
+        self.assertEqual([], affected,
+                        "Should return empty list if detection command fails")
+
+    def test_detect_kernel_upgrade_non_rhel(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context()
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        group = cluster.nodes['all']
+
+        affected = system.detect_kernel_upgrade(group)
+
+        self.assertEqual([], affected,
+                         "Detection should be skipped for non-RHEL OS")
 
 if __name__ == '__main__':
     unittest.main()
