@@ -244,7 +244,7 @@ def run_backup(cluster: KubernetesCluster) -> None:
     # Preparing the backup
     backup.prepare_backup_tmpdir(cluster.log, cluster.context)
 
-    def invoke_methods(data):
+    def invoke_methods(data) -> None:
         for val in data.values():
             if isinstance(val, dict):
                 invoke_methods(val)
