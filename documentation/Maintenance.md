@@ -483,6 +483,7 @@ After applying, this configuration is merged with the plugins' configuration con
 
 The `upgrade` procedure executes the following sequence of tasks:
 
+* run_backup
 * verify_upgrade_versions
 * thirdparties
 * prepull_images
@@ -491,6 +492,8 @@ The `upgrade` procedure executes the following sequence of tasks:
 * packages
 * plugins
 * overview
+
+**Note**: The backup procedure runs defore the upgrade as a part of   upgrade tasks. It stores the archive on control plane nodes. Pay attention, in case of seqential upgrade, the backup procedure runs only once to reduce time consumption.
 
 ## Backup Procedure
 
