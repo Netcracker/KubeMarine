@@ -4287,6 +4287,8 @@ plugins:
           -----END RSA PRIVATE KEY-----
 ```
 
+**Note**: If you enable Envoy Gateway installation on existing environment, but you do not want Ingress-NGINX to stop working, do not set `install: false` on nginx-ingress-controller plugin, otherwise KubeMarine will reconfigure your cluster to use Envoy only.
+
 Following configuration options are supported for Envoy Gateway plugin:
 ```yaml
 plugins:
