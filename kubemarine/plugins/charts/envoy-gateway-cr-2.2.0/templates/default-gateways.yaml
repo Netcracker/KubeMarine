@@ -1,0 +1,192 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.defaultGateways.external.name }}
+  namespace: '{{ .Release.Namespace }}'
+  {{- if .Values.defaultGateways.external.annotations }}
+  annotations:
+  {{- with .Values.defaultGateways.external.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  labels:
+  {{- with .Values.defaultGateways.external.labels }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "eg.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gatewayClasses.external.name }}
+  listeners:
+    - allowedRoutes:
+        namespaces:
+          from: All
+      name: http
+      port: {{ .Values.defaultGateways.external.httpPort }}
+      protocol: HTTP
+    {{- if .Values.defaultGateways.external.httpsPort }}
+    - allowedRoutes:
+        namespaces:
+          from: All
+      name: https
+      port: {{ .Values.defaultGateways.external.httpsPort }}
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - group: ''
+            kind: Secret
+            name: {{ .Values.defaultGateways.external.secret.name }} 
+        mode: Terminate
+    {{- end }}
+    {{- if .Values.defaultGateways.external.tcp }}
+    {{- range $key, $value := .Values.defaultGateways.external.tcp }}
+    - allowedRoutes:
+        kinds:
+        - group: gateway.networking.k8s.io
+          kind: TCPRoute
+        namespaces:
+          {{- if and (kindIs "string" $value.namespaceLabel) (eq $value.namespaceLabel "All") }}
+          from: All
+          {{- else }}
+          from: Selector
+          selector:
+            matchLabels:
+              {{- toYaml $value.namespaceLabel | nindent 14 }}
+          {{- end }}
+      name: {{ $value.name }}
+      port: {{ $value.port }}
+      protocol: TCP
+    {{- end }}
+    {{- end }}
+    {{- if .Values.defaultGateways.external.udp }}
+    {{- range $key, $value := .Values.defaultGateways.external.udp }}
+    - allowedRoutes:
+        kinds:
+        - group: gateway.networking.k8s.io
+          kind: UDPRoute
+        namespaces:
+          {{- if and (kindIs "string" $value.namespaceLabel) (eq $value.namespaceLabel "All") }}
+          from: All
+          {{- else }}
+          from: Selector
+          selector:
+            matchLabels:
+              {{- toYaml $value.namespaceLabel | nindent 14 }}
+          {{- end }}
+      name: {{ $value.name }}
+      port: {{ $value.port }}
+      protocol: UDP
+    {{- end }}
+    {{- end }}
+    {{- if .Values.defaultGateways.external.tls }}
+    {{- range $key, $value := .Values.defaultGateways.external.tls }}
+    - allowedRoutes:
+        namespaces:
+          {{- if and (kindIs "string" $value.namespaceLabel) (eq $value.namespaceLabel "All") }}
+          from: All
+          {{- else }}
+          from: Selector
+          selector:
+            matchLabels:
+              {{- toYaml $value.namespaceLabel | nindent 14 }}
+          {{- end }}
+      name: {{ $value.name }}
+      port: {{ $value.port }}
+      protocol: TLS
+      tls:
+        mode: Passthrough
+      hostname: {{ $value.hostname }}
+    {{- end }}
+    {{- end }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: {{ .Values.defaultGateways.external.ctpName }}
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "eg.labels" . | nindent 4 }}
+spec:
+  enableProxyProtocol: {{ .Values.defaultGateways.external.proxyProtocol }}
+  headers:
+    withUnderscoresAction: {{ .Values.defaultGateways.external.underscoresAction }}
+  {{- if .Values.defaultGateways.external.ctpSpec }}
+  {{- with .Values.defaultGateways.external.ctpSpec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- end }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ .Values.defaultGateways.external.name }}
+---
+{{- if and .Values.defaultGateways.external.httpsPort .Values.defaultGateways.external.secret.create }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.defaultGateways.external.secret.name }}
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "eg.labels" . | nindent 4 }}
+data:
+  tls.crt: {{ .Values.defaultGateways.external.secret.crt }}
+  tls.key: {{ .Values.defaultGateways.external.secret.key }}
+type: kubernetes.io/tls
+---
+{{- end }}
+
+{{ if .Values.defaultGateways.internal.enabled }}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.defaultGateways.internal.name }}
+  namespace: '{{ .Release.Namespace }}'
+  {{- if .Values.defaultGateways.internal.annotations }}
+  annotations:
+  {{- with .Values.defaultGateways.internal.annotations }}
+  {{- toYaml .  | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  labels:
+  {{- with .Values.defaultGateways.internal.labels }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "eg.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gatewayClasses.internal.name }}
+  listeners:
+    - allowedRoutes:
+        namespaces:
+          from: All
+      name: http
+      port: {{ .Values.defaultGateways.internal.httpPort }}
+      protocol: HTTP
+    {{- if .Values.defaultGateways.internal.httpsPort }}
+    - allowedRoutes:
+        namespaces:
+          from: All
+      name: https
+      port: {{ .Values.defaultGateways.internal.httpsPort }}
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - group: ''
+            kind: Secret
+            name: {{ .Values.defaultGateways.internal.secret.name }} 
+        mode: Terminate
+    {{- end }}
+---
+{{- if and .Values.defaultGateways.internal.httpsPort .Values.defaultGateways.internal.secret.create }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.defaultGateways.internal.secret.name }}
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "eg.labels" . | nindent 4 }}
+data:
+  tls.crt: {{ .Values.defaultGateways.internal.secret.crt }}
+  tls.key: {{ .Values.defaultGateways.internal.secret.key }}
+type: kubernetes.io/tls
+---
+{{- end }}
+{{- end }}

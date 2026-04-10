@@ -1,0 +1,177 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.gatewayClasses.internal.envoyProxy.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "eg.labels" . | nindent 4 }}
+spec:
+  logging:
+    level:
+      default: {{ .Values.gatewayClasses.internal.envoyProxy.logging }}
+  provider:
+    kubernetes:
+      envoyService:
+        {{- if .Values.gatewayClasses.internal.envoyService.annotations }}
+        annotations:
+        {{- with .Values.gatewayClasses.internal.envoyService.annotations }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        labels:
+          {{- include "eg.labels" . | nindent 10 }}
+        {{- if .Values.gatewayClasses.internal.envoyService.name }}
+        name: {{ .Values.gatewayClasses.internal.envoyService.name }}
+        {{- end }}
+        type: {{ .Values.gatewayClasses.internal.envoyService.type }}
+        externalTrafficPolicy: {{ .Values.gatewayClasses.internal.envoyService.externalTrafficPolicy }}
+      {{- if .Values.gatewayClasses.internal.envoyDeployment.daemonset }}
+      envoyDaemonSet:
+      {{- else }}
+      envoyDeployment:
+        replicas: {{ .Values.gatewayClasses.internal.envoyDeployment.replicas }}
+      {{- end }}
+        patch:
+          type: StrategicMerge
+          value:
+            metadata:
+              labels:
+                name: {{ .Values.SERVICE_NAME }}
+                app.kubernetes.io/instance: {{ cat (coalesce "envoy-gateway" .Values.SERVICE_NAME) "-" .Release.NAMESPACE | nospace | trunc 63 | trimSuffix "-" }}
+                app.kubernetes.io/technology: go
+                app.kubernetes.io/part-of: {{ .Values.APPLICATION_NAME }}
+                {{- if .Chart.AppVersion }}
+                app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+                {{- end }}
+        container:
+          image: {{ include "envoy.image" . }}
+          resources:
+            {{- toYaml .Values.gatewayClasses.internal.envoyDeployment.resources | nindent 12 }}
+    type: {{ index .Values "config" "envoyGateway" "provider" "type" }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.gatewayClasses.external.envoyProxy.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "eg.labels" . | nindent 4 }}
+spec:
+  logging:
+    level:
+      default: {{ .Values.gatewayClasses.external.envoyProxy.logging }}
+  provider:
+    kubernetes:
+      envoyService:
+        {{- if .Values.gatewayClasses.external.envoyService.annotations }}
+        annotations:
+        {{- with .Values.gatewayClasses.external.envoyService.annotations }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        labels:
+          {{- include "eg.labels" . | nindent 10 }}
+        {{- if .Values.gatewayClasses.external.envoyService.name }}
+        name: {{ .Values.gatewayClasses.external.envoyService.name }}
+        {{- end }}
+        {{- if eq .Values.gatewayClasses.external.envoyService.type "LoadBalancer" }}
+        {{- if and (hasKey .Values "INFRA_RESTRICTED_ENVIRONMENT") .Values.INFRA_RESTRICTED_ENVIRONMENT }}
+        type: NodePort
+        {{- else }}
+        type: {{ .Values.gatewayClasses.external.envoyService.type }}
+        {{- end }}
+        {{- else }}
+        type: {{ .Values.gatewayClasses.external.envoyService.type }}
+        {{- end }}
+        externalTrafficPolicy: {{ .Values.gatewayClasses.external.envoyService.externalTrafficPolicy }}
+      {{- if .Values.gatewayClasses.external.envoyDeployment.daemonset }}
+      envoyDaemonSet:
+      {{- else }}
+      envoyDeployment:
+        replicas: {{ .Values.gatewayClasses.external.envoyDeployment.replicas }}
+      {{- end }}
+        {{- if .Values.gatewayClasses.external.envoyDeployment.name }}
+        name: {{ .Values.gatewayClasses.external.envoyDeployment.name }}
+        {{- end }}
+        patch:
+          type: StrategicMerge
+          value:
+            metadata:
+              labels:
+                name: {{ .Values.SERVICE_NAME }}
+                app.kubernetes.io/instance: {{ cat (coalesce "envoy-gateway" .Values.SERVICE_NAME) "-" .Release.NAMESPACE | nospace | trunc 63 | trimSuffix "-" }}
+                app.kubernetes.io/technology: go
+                app.kubernetes.io/part-of: {{ .Values.APPLICATION_NAME }}
+                {{- if .Chart.AppVersion }}
+                app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+                {{- end }}
+            {{- if .Values.defaultGateways.external.hostPorts }}
+            spec:
+              template:
+                spec:
+                  containers:
+                  - name: envoy
+                    ports:
+                    {{- if le (int .Values.defaultGateways.external.httpPort) 1000 }}
+                    - containerPort: {{ add 10000 (int .Values.defaultGateways.external.httpPort) }}
+                      hostPort: {{ .Values.defaultGateways.external.httpHostPort | default (add 10000 (int .Values.defaultGateways.external.httpPort)) }}
+                    {{- else }}
+                    - containerPort: {{ .Values.defaultGateways.external.httpPort }}
+                      hostPort: {{ .Values.defaultGateways.external.httpHostPort | default .Values.defaultGateways.external.httpPort }}
+                    {{- end }}
+                      name: http
+                      protocol: TCP
+                    {{- if .Values.defaultGateways.external.httpsPort }}
+                    {{- if le (int .Values.defaultGateways.external.httpsPort) 1000 }}
+                    - containerPort: {{ add 10000 (int .Values.defaultGateways.external.httpsPort) }}
+                      hostPort: {{ .Values.defaultGateways.external.httpsHostPort | default (add 10000 (int .Values.defaultGateways.external.httpsPort)) }}
+                    {{- else }}
+                    - containerPort: {{ .Values.defaultGateways.external.httpsPort }}
+                      hostPort: {{ .Values.defaultGateways.external.httpsHostPort | default .Values.defaultGateways.external.httpsPort }}
+                    {{- end }}
+                      name: https
+                      protocol: TCP
+                    {{- end }}
+                    {{- if .Values.defaultGateways.external.tcp }}
+                    {{- range $key, $value := .Values.defaultGateways.external.tcp }}
+                    {{- if le (int $value.port) 1000 }}
+                    - containerPort: {{ add 10000 (int $value.port) }}
+                      hostPort: {{ add 10000 (int $value.port) }}
+                    {{- else }}
+                    - containerPort: {{ $value.port }}
+                      hostPort: {{ $value.port }}
+                    {{- end }}
+                      name: {{ $value.name }}
+                      protocol: TCP
+                    {{- end }}
+                    {{- end }}
+                    {{- if .Values.defaultGateways.external.udp }}
+                    {{- range $key, $value := .Values.defaultGateways.external.udp }}
+                    {{- if le (int $value.port) 1000 }}
+                    - containerPort: {{ add 10000 (int $value.port) }}
+                      hostPort: {{ add 10000 (int $value.port) }}
+                    {{- else }}
+                    - containerPort: {{ $value.port }}
+                      hostPort: {{ $value.port }}
+                    {{- end }}
+                      name: {{ $value.name }}
+                      protocol: UDP
+                    {{- end }}
+                    {{- end }}
+            {{- end }}
+        {{- if or (.Values.gatewayClasses.external.envoyDeployment.tolerations) (.Values.gatewayClasses.external.envoyDeployment.nodeSelector) }}
+        pod:
+          {{- with .Values.gatewayClasses.external.envoyDeployment.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.gatewayClasses.external.envoyDeployment.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        container:
+          image: {{ include "envoy.image" . }}
+          resources:
+            {{- toYaml .Values.gatewayClasses.external.envoyDeployment.resources | nindent 12 }}
+    type: {{ index .Values "config" "envoyGateway" "provider" "type" }}

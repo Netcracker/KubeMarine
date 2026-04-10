@@ -21,6 +21,7 @@ from kubemarine import plugins, k8s_certs
 from kubemarine.core import flow
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins import calico
+from kubemarine.plugins import envoy_gateway
 
 
 def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
@@ -34,6 +35,15 @@ def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
     # If by chance default certificate is not previously configured,
     # the procedure reconfigures the DeamonSet as well.
     plugins.install_plugin(cluster, "nginx-ingress-controller", plugin["installation"]['procedures'])
+
+def renew_envoy_gateway_certs_task(cluster: KubernetesCluster) -> None:
+    # check that renewal is required for envoy gateway
+    if not cluster.procedure_inventory.get("envoy-gateway"):
+        cluster.log.debug("Skipped: envoy gateway certs renewal is not required")
+        return
+
+    cluster.log.debug("Starting certificate renewal for envoy gateway, CR chart will be upgraded")
+    envoy_gateway.apply_cr_chart(cluster)
 
 
 def renew_calico_apiserver_certs_task(cluster: KubernetesCluster) -> None:
@@ -64,6 +74,7 @@ def k8s_certs_overview_task(cluster: KubernetesCluster) -> None:
 tasks = OrderedDict({
     "kubernetes": k8s_certs_renew_task,
     "nginx_ingress_controller": renew_nginx_ingress_certs_task,
+    "envoy_gateway": renew_envoy_gateway_certs_task,
     "calico": renew_calico_apiserver_certs_task,
     "certs_overview": k8s_certs_overview_task
 })

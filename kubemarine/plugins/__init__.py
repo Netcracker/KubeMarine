@@ -834,7 +834,7 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
         cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace'
     execute_subprocess_with_logging(cluster, command)
 
 

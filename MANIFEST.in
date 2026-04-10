@@ -4,3 +4,4 @@ include kubemarine/version
 recursive-include kubemarine/patches *
 recursive-include kubemarine/resources *
 recursive-include kubemarine/templates *
+recursive-include kubemarine/plugins/charts *

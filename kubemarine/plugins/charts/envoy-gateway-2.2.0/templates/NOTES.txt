@@ -1,0 +1,10 @@
+Thank you for installing Envoy Gateway Custom Resources!
+
+Your release is named: {{ .Release.Name }}.
+
+Your release is in namespace: {{ .Release.Namespace }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}

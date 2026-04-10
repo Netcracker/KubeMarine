@@ -204,6 +204,7 @@ It is because in this case, you take full control over the system packages and t
 Patches that upgrade the OOB plugins have the following identifiers:
 * `upgrade_calico` - It upgrades the Calico plugin.
 * `upgrade_nginx_ingress_controller` - It upgrades the NGINX Ingress Controller plugin.
+* `upgrade_envoy_gateway` - It upgrades the Envoy Gateway plugin.
 * `upgrade_kubernetes_dashboard` - It upgrades the Kubernetes dashboard plugin.
 * `upgrade_local_path_provisioner` - It upgrades the Local Path Provisioner plugin.
 
@@ -1292,7 +1293,7 @@ from particular namespaces will be applied.
 **Warnings**:
 * Be careful with the `exemptions` section it may cause cluster instability.
 * Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
-* The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
+* The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'gateway-system', 'local-path-provisioner', 
 'kubernetes-dashboard', and 'calico' (calico-apiserver)) are managed automatically.
 They are deleted during the procedure in case of using `pod-security: disabled`, and changed accordingly in case `pss.defaults.enforce` is changed.
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
@@ -1364,6 +1365,8 @@ link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
+For Envoy Gateway, the Secret with the default certificate is updated with a new certificate and key. The Secret update is performed by Envoy Gateway chart re-installation.
+
 For Calico, the certificate is updated for the Calico API server.
 
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
@@ -1375,6 +1378,22 @@ You can find description and examples of the accepted parameters in the next sec
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+#### Configuring Certificate Renew Procedure for Envoy Gateway
+
+To update the certificate and key for `envoy-gateway`, use the following configuration:
+
+```yaml
+envoy-gateway:
+  cert: |
+    -----BEGIN CERTIFICATE-----
+    ...(skipped)...
+    -----END CERTIFICATE-----
+  key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    ...(skipped)...
+    -----END RSA PRIVATE KEY-----
+```
 
 #### Configuring Certificate Renew Procedure for nginx-ingress-controller
 
@@ -1440,11 +1459,11 @@ kubernetes:
 ### Certificate Renew Tasks Tree
 
 The `cert_renew` procedure executes the following sequence of tasks: 
-
 1. kubernetes
 2. nginx_ingress_controller
-3. calico
-4. certs_overview
+3. envoy_gateway
+4. calico
+5. certs_overview
 
 # Procedure Execution
 
