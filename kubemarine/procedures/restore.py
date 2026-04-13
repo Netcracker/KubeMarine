@@ -71,13 +71,13 @@ def unpack_data(resources: DynamicResources) -> None:
 
     # Local backup archive usage if 'backup_location' is not defined
     if not backup_file_source:
-        # Create cluster
+        # Since `unpack_data` method is out of tasks scope we need to create cluster
         cluster = resources.cluster()
-        logger.debug('Backup source not specified in procedure. The archive from node will be used')
+        logger.warning('Backup source not specified in procedure. The archive from node will be used')
         backup_file_source = utils.get_dump_filepath(context, 'backup.tar.gz')
         control_plane_node = cluster.nodes['control-plane'].get_any_member()
         control_plane_node.get(local_backup, backup_file_source)
-        # Reset cluster
+        # Previously created cluster must be reset to run enrichment from the beginning
         resources.reset_cluster(EnrichmentStage.DEFAULT)
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
