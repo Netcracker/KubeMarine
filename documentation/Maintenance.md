@@ -493,7 +493,7 @@ The `upgrade` procedure executes the following sequence of tasks:
 * plugins
 * overview
 
-**Note**: The backup procedure runs defore the upgrade as a part of   upgrade tasks. It stores the archive on control plane nodes. Pay attention, in case of seqential upgrade, the backup procedure runs only once to reduce time consumption.
+**Note**: The backup procedure runs defore the upgrade as a part of the upgrade tasks. It stores the backup archive on control plane nodes in `/etc/kubemarine/backup.tar.gz` file. Pay attention, in case of seqential upgrade, the backup procedure runs only once to reduce time consumption.
 
 ## Backup Procedure
 
