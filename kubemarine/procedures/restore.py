@@ -84,7 +84,6 @@ def unpack_data(resources: DynamicResources) -> None:
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
-
     logger.debug('Unpacking all data...')
     with tarfile.open(backup_file_source, 'r:gz') as tar:
         for member in tar:
