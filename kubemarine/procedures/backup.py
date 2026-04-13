@@ -88,8 +88,7 @@ def prepare_backup_tmpdir(logger: log.EnhancedLogger, context: dict) -> str:
 def verify_backup_location(cluster: KubernetesCluster) -> None:
     target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
-        cluster.log.warning('Backup location directory not exists. The backup will be stored only on control plane nodes')
-        cluster.context['use_archive_tmpdir'] = True
+        raise FileNotFoundError('Backup location directory not exists')
 
 
 def export_ansible_inventory(cluster: KubernetesCluster) -> None:
@@ -728,10 +727,7 @@ def pack_data(cluster: KubernetesCluster) -> None:
 
     backup_filename = 'backup-%s-%s.tar.gz' % (cluster_name, utils.get_current_timestamp_formatted())
 
-    if cluster.context.get('use_archive_tmpdir', False):
-        target = utils.get_dump_filepath(cluster.context, backup_filename)
-    else:
-        target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', backup_filename))
+    target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', backup_filename))
     if os.path.isdir(target):
         target = os.path.join(target, backup_filename)
 
