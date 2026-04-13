@@ -6,6 +6,10 @@
       "type": "string",
       "description": "Path to the file with the backup from which the recovery is performed"
     },
+    "source_node": {
+      "$ref": "definitions/common/node_ref.json#/definitions/Name",
+      "description": "The name of the node to get backup archive from. The node must be a control-plane."
+    },
     "restore_plan": {
       "type": "object",
       "description": "Restore procedure configuration",

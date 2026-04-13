@@ -31,9 +31,6 @@ from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
 
 
-local_backup = "/etc/kubemarine/backup.tar.gz"
-
-
 def missing_or_empty(file: str) -> bool:
     if not os.path.exists(file):
         return True
@@ -69,14 +66,15 @@ def unpack_data(resources: DynamicResources) -> None:
     backup_tmp_directory = backup.prepare_backup_tmpdir(logger, context)
     backup_file_source = resources.procedure_inventory().get('backup_location')
 
-    # Local backup archive usage if 'backup_location' is not defined
-    if not backup_file_source:
+    # The backup archive from node
+    node_name = resources.procedure_inventory().get('source_node', '')
+    if node_name:
         # Since `unpack_data` method is out of tasks scope we need to create cluster
         cluster = resources.cluster()
-        logger.warning('Backup source not specified in procedure. The archive from node will be used')
+        logger.warning('The archive from node will be used')
         backup_file_source = utils.get_dump_filepath(context, 'backup.tar.gz')
-        control_plane_node = cluster.nodes['control-plane'].get_any_member()
-        control_plane_node.get(local_backup, backup_file_source)
+        control_plane_node = cluster.nodes['control-plane'].get_member_by_name(node_name)
+        control_plane_node.get(resources.procedure_inventory().get('backup_location'), backup_file_source)
         # Previously created cluster must be reset to run enrichment from the beginning
         resources.reset_cluster(EnrichmentStage.DEFAULT)
 

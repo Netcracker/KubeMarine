@@ -749,7 +749,7 @@ Example:
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-If `backup_location` parameter value is empty, the latest backup that is stored on the control plane nodes in the `/etc/kubemarine/backup.tar.gz` file will be used.
+If `source_node` parameter is set, the backup archive will be used from that control plane node. The `backup_location` must be set accordingly because it needs the location (`/etc/kubemarine/backup.tar.gz`) on control plane node.
 
 #### etcd Parameters
 
