@@ -64,7 +64,7 @@ def unpack_data(resources: DynamicResources) -> None:
     logger = resources.logger()
     context = resources.context
     backup_tmp_directory = backup.prepare_backup_tmpdir(logger, context)
-    backup_file_source = resources.procedure_inventory().get('backup_location')
+    backup_file_source = resources.procedure_inventory().get('backup_location', '')
 
     # The backup archive from node
     node_name = resources.procedure_inventory().get('source_node', '')
@@ -73,7 +73,7 @@ def unpack_data(resources: DynamicResources) -> None:
         cluster = resources.cluster()
         logger.warning('The archive from control plane node will be used')
         backup_file_source = utils.get_dump_filepath(context, 'backup.tar.gz')
-        on_node_backup_file_source: str = resources.procedure_inventory().get('backup_location', '')
+        on_node_backup_file_source = resources.procedure_inventory().get('backup_location', '')
         control_plane_node = cluster.nodes['control-plane'].get_member_by_name(node_name)
         control_plane_node.get(on_node_backup_file_source, backup_file_source)
         # Previously created cluster must be reset to run enrichment from the beginning
