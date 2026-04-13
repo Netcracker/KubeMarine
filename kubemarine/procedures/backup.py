@@ -86,7 +86,6 @@ def prepare_backup_tmpdir(logger: log.EnhancedLogger, context: dict) -> str:
 
 
 def verify_backup_location(cluster: KubernetesCluster) -> None:
-    # TODO: S3
     target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         cluster.log.warning('Backup location directory not exists. The backup will be stored only on control plane nodes')
