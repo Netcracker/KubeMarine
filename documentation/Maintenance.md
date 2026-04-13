@@ -747,9 +747,10 @@ Example:
 
 ```
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
+source_node: ''
 ```
 
-If `source_node` parameter is set, the backup archive will be used from that control plane node. The `backup_location` must be set accordingly because it needs the location (`/etc/kubemarine/backup.tar.gz`) on control plane node.
+If `source_node` parameter is set, the backup archive will be used from that control plane node. The `backup_location` must be set accordingly because it needs the location on control plane node, e.g.: [full-restore_with_source_node.yaml](../examples/procedure.yaml/full-restore_with_source_node.yaml)
 
 #### etcd Parameters
 
