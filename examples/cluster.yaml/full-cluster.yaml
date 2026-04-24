@@ -221,6 +221,7 @@ services:
     net.ipv6.ip_nonlocal_bind: 1
 
   loadbalancer:
+    target_backend: "envoy"
     haproxy:
       defaults:
         timeout_connect: '10s'
@@ -344,6 +345,32 @@ plugins:
       expect:
         apiservice:
           retries: 60
+
+  envoy-gateway:
+    install: true
+    installation:
+      priority: 2
+    kubectlRegistry: "ghcr.io"
+    externalGateway:
+      certificate:
+        cert: |
+          -----BEGIN CERTIFICATE-----
+          ----------------------------------------------------------------
+          -----END CERTIFICATE-----
+        key: |
+          -----BEGIN RSA PRIVATE KEY-----
+          ----------------------------------------------------------------
+          -----END RSA PRIVATE KEY-----
+    crValuesOverride:
+      gatewayClasses:
+        external:
+          envoyDeployment:
+            nodeSelector:
+              kubernetes.io/hostname: some-nodes
+            tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
 
   nginx-ingress-controller:
     install: true

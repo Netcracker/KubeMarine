@@ -82,6 +82,11 @@
       },
       "additionalProperties": false
     },
+    "target_backend": {
+      "type": "string",
+      "description": "Allows to select loadbalancer backend explicitly. Allowed values are 'nginx', 'envoy' or empty (dynamic default, which is 'nginx' if nginx is installed, otherwise 'envoy').",
+      "enum": ["nginx", "envoy", ""]
+    },
     "target_ports": {
       "type": "object",
       "description": "The section contains the information about http/https ports, which are used in connection from balancers to worker nodes",

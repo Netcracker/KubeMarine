@@ -25,7 +25,7 @@ from typing import List
 import yaml
 
 from kubemarine.core import utils, flow
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
@@ -64,10 +64,20 @@ def unpack_data(resources: DynamicResources) -> None:
     logger = resources.logger()
     context = resources.context
     backup_tmp_directory = backup.prepare_backup_tmpdir(logger, context)
-    backup_file_source = resources.procedure_inventory().get('backup_location')
+    backup_file_source = resources.procedure_inventory().get('backup_location', '')
 
-    if not backup_file_source:
-        raise Exception('Backup source not specified in procedure')
+    # The backup archive from node
+    node_name = resources.procedure_inventory().get('source_node', '')
+    if node_name:
+        # Since `unpack_data` method is out of tasks scope we need to create cluster
+        cluster = resources.cluster()
+        logger.warning('The archive from control plane node will be used')
+        backup_file_source = utils.get_dump_filepath(context, 'backup.tar.gz')
+        on_node_backup_file_source = resources.procedure_inventory().get('backup_location', '')
+        control_plane_node = cluster.nodes['control-plane'].get_member_by_name(node_name)
+        control_plane_node.get(on_node_backup_file_source, backup_file_source)
+        # Previously created cluster must be reset to run enrichment from the beginning
+        resources.reset_cluster(EnrichmentStage.DEFAULT)
 
     backup_file_source = utils.get_external_resource_path(backup_file_source)
     if not os.path.isfile(backup_file_source):

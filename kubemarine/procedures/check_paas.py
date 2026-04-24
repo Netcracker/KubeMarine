@@ -35,7 +35,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, CollectorCallback, GroupResultException
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
-from kubemarine.plugins import calico, builtin, manifest
+from kubemarine.plugins import calico, builtin, manifest, envoy_gateway
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static, utils
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -644,7 +644,7 @@ def get_not_running_pods(cluster: KubernetesCluster) -> str:
 
 
 def kubernetes_pods_condition(cluster: KubernetesCluster) -> None:
-    system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default",
+    system_namespaces = ["kube-system", "ingress-nginx", "gateway-system", "kube-public", "kubernetes-dashboard", "default",
                          "local-path-storage", "calico-apiserver"]
     critical_states = cluster.globals['pods']['critical_states']
     with TestCase(cluster, '207', "Kubernetes", "Pods Condition") as tc:
@@ -873,7 +873,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '213', "Security", "Selinux security policy") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os(['rhel8', 'rhel9'])
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel8', 'rhel9', 'rhel10'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
         _, selinux_result, selinux_parsed_result = \
@@ -931,7 +931,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '214', "Security", "Selinux configuration") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os(['rhel8', 'rhel9'])
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel8', 'rhel9', 'rhel10'])
         if group.is_empty():
             return tc.success("No RHEL nodes found")
         selinux_configured, selinux_result, _ = \
@@ -1274,6 +1274,12 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
 
             if plugin == 'nginx-ingress-controller':
                 entities_to_check['ingress-nginx'] = {"DaemonSet": {"ingress-nginx-controller": {"version": expected_version}}}
+            if plugin == 'envoy-gateway':
+                images_versions = envoy_gateway.get_images_versions(expected_version)
+                entities_to_check['gateway-system'] = {
+                    "Deployment": {"envoy-gateway": {"version": images_versions["envoyGateway"]}},
+                    "DaemonSet": {"envoy-external-gateway": {"version": images_versions["envoy"]}}
+                }
             if plugin == 'local-path-provisioner':
                 entities_to_check['local-path-storage'] = {"Deployment": {
                     "local-path-provisioner": {"version": expected_version}}}
@@ -1336,6 +1342,11 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
 
             if plugin == 'ingress-nginx-controller':
                 entities_to_check['ingress-nginx'] = {"DaemonSet": ["ingress-nginx-controller"]}
+            if plugin == 'envoy-gateway':
+                entities_to_check['gateway-system'] = {
+                    "Deployment": ["envoy-gateway"],
+                    "DaemonSet": ["envoy-external-gateway"]
+                }
             if plugin == 'local-path-provisioner':
                 entities_to_check['local-path-storage'] = {"Deployment": ["local-path-provisioner"]}
             if plugin == 'kubernetes-dashboard':

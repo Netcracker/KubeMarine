@@ -72,6 +72,7 @@ class DashboardManifestProcessor(Processor):
             self.enrich_service_account_kubernetes_dashboard,
             self.enrich_deployment_kubernetes_dashboard,
             self.enrich_deployment_dashboard_metrics_scraper,
+            self.enrich_gateway_api_resources,
         ]
 
     def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
@@ -127,6 +128,64 @@ class DashboardManifestProcessor(Processor):
         self.enrich_node_selector(manifest, key, plugin_service='metrics-scraper')
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 
+    def enrich_gateway_api_resources(self, manifest: Manifest) -> None:
+        if not self.inventory["plugins"]["envoy-gateway"]["install"]:
+            return
+
+        hostname = self.inventory["plugins"]["kubernetes-dashboard"]["hostname"]
+        http_route_yaml = yaml.safe_load(dedent(f"""
+            apiVersion: gateway.networking.k8s.io/v1
+            kind: HTTPRoute
+            metadata:
+              name: kubernetes-dashboard
+              namespace: kubernetes-dashboard
+            spec:
+              hostnames:
+              - {hostname}
+              parentRefs:
+              - group: gateway.networking.k8s.io
+                kind: Gateway
+                name: default-external-gateway
+                namespace: gateway-system
+              rules:
+              - backendRefs:
+                - group: gateway.envoyproxy.io
+                  kind: Backend
+                  name: kubernetes-dashboard
+                  weight: 1
+                filters:
+                - responseHeaderModifier:
+                    add:
+                    - name: X-Frame-Options
+                      value: sameorigin
+                    - name: X-Content-Type-Options
+                      value: nosniff
+                    - name: Content-Security-Policy
+                      value: default-src 'self'; style-src 'self' 'unsafe-inline'; 
+                        script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; form-action 'self'
+                  type: ResponseHeaderModifier
+                matches:
+                - path:
+                    type: PathPrefix
+                    value: /
+        """))
+        self.include(manifest, -1, http_route_yaml)
+        backend_yaml = yaml.safe_load(dedent(f"""
+            apiVersion: gateway.envoyproxy.io/v1alpha1
+            kind: Backend
+            metadata:
+              name: kubernetes-dashboard
+              namespace: kubernetes-dashboard
+            spec:
+              endpoints:
+              - fqdn:
+                  hostname: kubernetes-dashboard.kubernetes-dashboard.svc.cluster.local
+                  port: 443
+              tls:
+                insecureSkipVerify: true
+              type: Endpoints                                     
+        """))
+        self.include(manifest, -1, backend_yaml)
 
 service_account_secret_kubernetes_dashboard = dedent("""\
     apiVersion: v1

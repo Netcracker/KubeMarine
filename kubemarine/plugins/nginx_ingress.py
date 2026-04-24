@@ -23,6 +23,7 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
+from kubemarine import haproxy
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for nginx plugin since it is not installed"
 
@@ -53,6 +54,22 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
             inventory["plugins"]["nginx-ingress-controller"]['config_map'] = {}
         if not inventory["plugins"]["nginx-ingress-controller"]['config_map'].get('proxy-set-headers'):
             inventory["plugins"]["nginx-ingress-controller"]['config_map']['proxy-set-headers'] = 'ingress-nginx/custom-headers'
+
+    # We use sentinel "0" value for nginx hostPorts by default, because our default is dynamic, it depends on LB target backend.
+    # So, if this sentinel "0" value is present for nginx hostPorts (i.e. user did not override it),
+    # then we put our default - if LB target backend is "nginx", then hostPorts are taken from LB "target_ports",
+    # otherwise, we do not use hostPorts for nginx and thus simply delete hostPort with "0" sentinel value   
+    for port in inventory["plugins"]["nginx-ingress-controller"]["ports"]:
+        if port["name"] in ("http", "https") and "hostPort" in port and port["hostPort"] == 0:
+            if haproxy.get_target_backend(cluster.inventory) == "nginx":
+                port["hostPort"] = int(cluster.inventory['services']['loadbalancer']['target_ports'][port["name"]])
+            else:
+                del port["hostPort"]
+    
+    # We override priority from 1 to 2, to make nginx install after envoy if nginx is target_backend.
+    # This is required to make sure envoy frees hostPorts
+    if haproxy.get_target_backend(cluster.inventory) == "nginx":
+        inventory["plugins"]["nginx-ingress-controller"]["installation"]["priority"] = 2
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_controller = cluster.raw_inventory.get("plugins", {}).get("nginx-ingress-controller", {}).get("controller", {})

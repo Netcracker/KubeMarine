@@ -84,11 +84,13 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
     keys = [
         'version_rhel8',
         'version_rhel9',
+        'version_rhel10',
         'version_debian',
     ]
     if package_name == 'containerd':
         keys.remove('version_rhel8')
         keys.remove('version_rhel9')
+        keys.remove('version_rhel10')
     elif package_name == 'containerdio':
         keys.remove('version_debian')
 

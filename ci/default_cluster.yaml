@@ -24,6 +24,9 @@ plugins:
   nginx-ingress-controller:
     install: true
 
+  envoy-gateway:
+    install: true
+
   kubernetes-dashboard:
     install: true
 

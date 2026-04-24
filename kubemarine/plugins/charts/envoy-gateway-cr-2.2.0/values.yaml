@@ -1,0 +1,187 @@
+SERVICE_NAME: envoy-gateway
+MANAGED_BY: saasDeployer
+APPLICATION_NAME: envoy-api-gateway
+global:
+  images:
+    envoyGateway:
+      image: "envoyproxy/gateway:v1.7.0"
+    # Envoy image
+    envoy:
+      image: "envoyproxy/envoy:distroless-v1.37.0"
+    ratelimit:
+      # This is the full image name including the hub, repo, and tag.
+      image: "envoyproxy/ratelimit:3fb70258"
+    kubectl:
+      image: ghcr.io/netcracker/qubership-docker-kubectl:0.0.6
+# Default GatewayClass and EnvoyProxy specification
+gatewayClasses:
+  internal:
+    name: internal
+    envoyProxy:
+      name: internal
+      logging: warn
+    envoyDeployment:
+      # Transform Deployment into DaemonSet
+      daemonset: false
+      replicas: 1
+      resources:
+        requests:
+          cpu: 150m
+          memory: 640Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    envoyService:
+      type: ClusterIP
+      # The name of the Service in common case if not needed and makes configuration limited. Empty Service name allows to create custom Gateways without additional steps
+      name: ""
+      externalTrafficPolicy: Local
+      annotations: {}
+  external:
+    name: external
+    envoyProxy:
+      name: external
+      logging: warn
+    envoyDeployment:
+      # Allows to specify custom name for the envoy deployment
+      name: ""
+      # Transform Deployment into DaemonSet
+      daemonset: false
+      replicas: 1
+      resources:
+        requests:
+          cpu: 150m
+          memory: 640Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      # Tolerations configuration
+      tolerations: []
+      # NodeSelector configuration
+      nodeSelector: {}
+    envoyService:
+      # The Kubernetes Service type. Applicable options are: LoadBalancer, ClusterIP, NodePort
+      # Set ClusterIP to be able to create Application Load Balancer (ALB) on AWS
+      # If INFRA_RESTRICTED_ENVIRONMENT variable is set to 'true' the type will be NodePort
+      type: LoadBalancer
+      # The name of the Service in common case if not needed and makes configuration limited. Empty Service name allows to create custom Gateways without additional steps
+      # The name of the Service must not be empty in case of ALB usage, because it's used in the Ingress configuration
+      name: ""
+      externalTrafficPolicy: Local
+      annotations: {}
+    # The following section is applicable only for AWS ALB
+    ingress:
+      create: false
+      name: alb
+      annotations:
+        kubernetes.io/ingress.class: alb
+        alb.ingress.kubernetes.io/load-balancer-name: alb
+        alb.ingress.kubernetes.io/scheme: internal
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/healthcheck-port: '19002'
+        alb.ingress.kubernetes.io/healthcheck-path: /healthz
+        # Put the correct certificate ARN to enable HTTPS and uncomment the following line
+        #alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:xxxxx:certificate/xxxxxxx
+
+defaultGateways:
+  internal:
+    # Allows to disable internal Gateway creation
+    enabled: true
+    name: default-internal-gateway
+    httpPort: 80
+    httpsPort: ""
+    secret:
+      create: false
+      name: internal-certificate
+      # Certificate in Base64 enconing
+      #crt: ""
+      # Private key in Base64 enconing
+      #key: ""
+    # Additional annotations
+    annotations: {}
+    # Additional labels
+    labels: {}
+  external:
+    name: default-external-gateway
+    # In case of AWS ALB `proxyProtocol` must be set to false
+    proxyProtocol: true
+    # The action to take when an HTTP header with underscores is encountered e.g.: `my_custom_header: 1`
+    # It could be RejectRequest, Allow, DropHeader
+    underscoresAction: RejectRequest
+    # Name of ClientTrafficPolicy resource
+    ctpName: enable-proxy-protocol
+    # ClientTrafficPolicy `spec` section, it could override the `proxyProtocol` and `underscoresAction` options
+    ctpSpec: {}
+    httpPort: 80
+    httpsPort: ""
+    secret:
+      create: false
+      name: external-certificate
+      # Certificate in Base64 enconing
+      #crt: ""
+      # Private key in Base64 enconing
+      #key: ""
+    # TCP listeners list e.g.:
+    #tcp:
+    #  - name: sftp
+    #    # It could be `key: value` notation or `All` string to allow routes from all of the namespaces
+    #    namespaceLabel:
+    #      kubernetes.io/metadata.name: namespace-1
+    #    port: 2222
+    tcp: []
+    # UDP listeners list e.g.:
+    #udp:
+    #  - name: tftp
+    #    # It could be `key: value` notation or `All` string to allow routes from all of the namespaces
+    #    namespaceLabel:
+    #      kubernetes.io/metadata.name: namespace-2
+    #    port: 6969
+    udp: []
+    # TLS Passthrough listeners list e.g.:
+    #tls:
+    #  - name: tls-1
+    #    # Port must differ from `httpsPort` above
+    #    port: 4443
+    #    hostname: namespace-3.cluster.example
+    #    # It could be `key: value` notation or `All` string to allow routes from all of the namespaces
+    #    namespaceLabel:
+    #      kubernetes.io/metadata.name: namespace-3
+    tls: []
+    # Use `hostPort` on Envoy pods. By default, host ports are the same as listener ports,
+    # except when listener port is lower than 1000, in this case default hostPort will be listener port plus 10000.
+    # HostPorts doesn't work for `tls` listeners
+    hostPorts: false
+    # Allows to override hostPort used for HTTP listener.
+    httpHostPort: ""
+    # Allows to override hostPort used for HTTPS listener.
+    httpsHostPort: ""
+    # Additional annotations
+    annotations: {}
+    # Additional labels
+    labels: {}
+
+upgradeJob:
+  pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations: []
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - "ALL"
+    seccompProfile:
+      type: RuntimeDefault
+
+# That section must be the same as it's described in `envoy-gateway` chart
+config:
+  envoyGateway:
+    gateway:
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    provider:
+      type: Kubernetes

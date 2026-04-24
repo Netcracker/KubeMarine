@@ -115,6 +115,11 @@ plugins:
           default: 'https://raw.githubusercontent.com/rancher/local-path-provisioner/{version}/deploy/local-path-storage.yaml'
     requirements:
       default: 'https://github.com/rancher/local-path-provisioner/tree/{version}#requirement'
+  # TODO: support Envoy Gateway in thirdparties upgrade script, so that it downloads the chart
+  envoy-gateway:
+    manifests: [] # manifests are empty because it is helm chart
+    requirements:
+      default: https://gateway.envoyproxy.io/news/releases/matrix/
 
 software:
   containerd:
@@ -185,6 +190,16 @@ packages:
       package_name:
         - keepalived: keepalived
   rhel9:
+    containerd:
+      package_name:
+        - containerd.io: containerdio
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
+  rhel10:
     containerd:
       package_name:
         - containerd.io: containerdio
@@ -324,6 +339,9 @@ compatibility_map:
           - '9.4'
           - '9.5'
           - '9.6'
+      - os_family: 'rhel10'
+        versions:
+          - '10.1'
     ubuntu:
       - os_family: 'debian'
         versions:

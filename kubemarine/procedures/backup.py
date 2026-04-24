@@ -36,6 +36,9 @@ from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.cri import containerd
 
 
+local_backup = "/etc/kubemarine/backup.tar.gz"
+
+
 def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     haproxy_service = cluster.get_package_association('haproxy', 'service_name')
     keepalived_service = cluster.get_package_association('keepalived', 'service_name')
@@ -97,7 +100,7 @@ def export_ansible_inventory(cluster: KubernetesCluster) -> None:
 
 def export_packages_list(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if cluster.get_os_family() in ['rhel8', 'rhel9']:
+    if cluster.get_os_family() in ['rhel8', 'rhel9', 'rhel10']:
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"
@@ -730,6 +733,8 @@ def pack_data(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug('Packing all data...')
     pack_to_tgz(target, backup_directory)
+    # Put archive into control-plane nodes. It will replace previous backup
+    cluster.nodes['control-plane'].put(target, local_backup, sudo=True, mkdir=True)
 
     cluster.log.verbose('Cleaning up...')
     shutil.rmtree(backup_directory, ignore_errors=True)

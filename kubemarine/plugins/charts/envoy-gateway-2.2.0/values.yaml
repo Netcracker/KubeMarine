@@ -1,0 +1,133 @@
+SERVICE_NAME: envoy-gateway
+MANAGED_BY: saasDeployer
+APPLICATION_NAME: envoy-api-gateway
+global:
+  images:
+    envoy:
+      image: "envoyproxy/envoy:distroless-v1.37.0"
+    envoyGateway:
+      image: "envoyproxy/gateway:v1.7.0"
+    ratelimit:
+      image: "envoyproxy/ratelimit:3fb70258"
+gateway-helm:
+  # The global settings for the Envoy Gateway Helm chart.
+  # These values will be used if the values are not overridden in the other sections.
+  global:
+    images:
+      envoyGateway:
+        # This is the full image name including the hub, repo, and tag.
+        image: "envoyproxy/gateway:v1.7.0"
+        # Specify image pull policy if default behavior isn't desired.
+        # Default behavior: latest images will be Always else IfNotPresent.
+        pullPolicy: IfNotPresent
+        # List of secrets in the same namespace of the component that can be used to pull images from private repositories.
+        pullSecrets: []
+      ratelimit:
+        # This is the full image name including the hub, repo, and tag.
+        image: "envoyproxy/ratelimit:3fb70258"
+        # Specify image pull policy if default behavior isn't desired.
+        # Default behavior: latest images will be Always else IfNotPresent.
+        pullPolicy: IfNotPresent
+        # List of secrets in the same namespace of the component that can be used to pull images from private repositories.
+        pullSecrets: []
+    # The ClusterRole and ClusterRoleBinding must be created or not
+    rbac:
+      create: true
+  podDisruptionBudget:
+    minAvailable: 0
+    # maxUnavailable: 1
+
+  deployment:
+    envoyGateway:
+      image:
+        repository: ""
+        tag: ""
+      imagePullPolicy: ""
+      imagePullSecrets: []
+      resources:
+        limits:
+          memory: 1024Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        privileged: false
+        runAsNonRoot: true
+        runAsGroup: 65532
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+    ports:
+      - name: grpc
+        port: 18000
+        targetPort: 18000
+      - name: ratelimit
+        port: 18001
+        targetPort: 18001
+      - name: wasm
+        port: 18002
+        targetPort: 18002
+      - name: metrics
+        port: 19001
+        targetPort: 19001
+    priorityClassName: null
+    replicas: 1
+    pod:
+      affinity: {}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '19001'
+      labels: {}
+      topologySpreadConstraints: []
+      tolerations: []
+      nodeSelector: {}
+
+  service:
+    annotations: {}
+
+  config:
+    envoyGateway:
+      gateway:
+        controllerName: gateway.envoyproxy.io/gatewayclass-controller
+      provider:
+        type: Kubernetes
+      logging:
+        level:
+          default: info
+
+  createNamespace: false
+
+  kubernetesClusterDomain: cluster.local
+
+  # -- Certgen is used to generate the certificates required by EnvoyGateway. If you want to construct a custom certificate, you can generate a custom certificate through Cert-Manager before installing EnvoyGateway. Certgen will not overwrite the custom certificate. Please do not manually modify `values.yaml` to disable certgen, it may cause EnvoyGateway OIDC,OAuth2,etc. to not work as expected.
+  certgen:
+    job:
+      annotations: {}
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      affinity: {}
+      tolerations: []
+      nodeSelector: {}
+      ttlSecondsAfterFinished: 30
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        # `runAsUser` and `runAsGroup` Must be the same values as `envoyGateway` specified in case of OCP4 installation
+        runAsGroup: 65532
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+    rbac:
+      annotations: {}
+      labels: {}

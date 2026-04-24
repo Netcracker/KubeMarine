@@ -28,6 +28,10 @@ services:
 plugins:
   kubernetes-dashboard:
     install: true
+
+  envoy-gateway:
+    install: true
+
   nginx-ingress-controller:
     install: true
     controller:

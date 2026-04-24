@@ -68,6 +68,7 @@ This section provides information about the inventory, features, and steps for i
       - [Predefined Plugins](#predefined-plugins)
         - [calico](#calico)
         - [nginx-ingress-controller](#nginx-ingress-controller)
+        - [envoy-gateway](#envoy-gateway)
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
       - [Plugins Features](#plugins-features)
@@ -168,10 +169,10 @@ For cluster machines, ensure the following requirements are met:
   * CentOS Stream 9
   * RHEL 8.4, 8.6, 8.7, 8.8, 8.9, 8.10, 9.2, 9.3, 9.4
   * Oracle Linux 8.4, 9.2
-  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3, 9.4, 9.5, 9.6
+  * RockyLinux 8.6, 8.7, 8.8, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1
   * Ubuntu 20.04, 22.04.1, 24.04.1
  
-**Note**: Ubuntu 24.04 is supported only with kubernetes versions starting from v1.29.7 and above.
+**Note**: Ubuntu 20.04 is not supported for Kubernetes 1.35 and higher 
 
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L299).
@@ -403,9 +404,9 @@ This schema might be useful if:
 * You want a development environment, where you do not care about HA;
 * AND you want to use multiple workers (otherwise, All-in-one schema could be used);
 * AND you have slow disks, so you want to avoid etcd replication overhead (otherwise, Mini-HA schema could be used);
-* AND you do not want to bother with vIP configuration (otherwise, you could combine control-plane and balancer role on one node, without explicit ingress-nginx placement).
+* AND you do not want to bother with vIP configuration (otherwise, you could combine control-plane and balancer role on one node, without explicit envoy-gateway/ingress-nginx placement).
 
-In this case, you can use schema with single control plane node (which runs ingress-nginx) and many (1 or more) workers.
+In this case, you can use schema with single control plane node (which runs envoy-gateway/ingress-nginx) and many (1 or more) workers.
 An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](../examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
 
 **Note**: Optionally, if you want control-plane node to be able to run workloads, 
@@ -3211,7 +3212,7 @@ However, it is possible to add or modify any deployment parameters of the invent
 ###### target_ports
 
 This section describes the ports, which are used for http/https connections from balancer nodes to workers. 
-Those parameters are specified as backend ports in haproxy configuration and as host ports in ingress-nginx-controller plugin.
+Those parameters are specified as backend ports in haproxy configuration and as host ports in envoy-gateay or ingress-nginx-controller plugin (depending on `target_backend` value).
 
 Default values depend on balancer availability:  
 
@@ -3247,6 +3248,21 @@ services:
     target_ports:
       http: 80
       https: 443
+```
+
+###### target_backend
+
+This section describes who should listen `target_ports` on worker nodes, either `nginx` or `envoy`. Default is `nginx` for backward compatibility, but it is recommended to use `envoy`. If you do not install nginx and envoy plugins, this option has no effect.
+
+**Note**: Envoy Gateway uses Gateway API resources (HTTPRoutes, etc) instead of Ingresses. Thus, when you migrate cluster from Ingress-NGINX to Envoy Gateway, your applications should also migrate from Ingresses to Gateway API resources, otherwise routing will not work.
+
+This options also influences plugins installation priority. Selected target backend (e.g. `nginx`) will be installed with priority `2`, while the other plugin (e.g. `envoy`) will be installed with priority `1`. This is to allow other plugin to configure first and free host ports for target backend.
+
+You can specify this option in `cluster.yaml` as following:
+```yaml
+services:
+  loadbalancer:
+    target_backend: "envoy"
 ```
 
 ##### haproxy
@@ -3674,7 +3690,7 @@ There are three parts of PSS configuration:
 * The default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods.
 * `exemptions` describes the exemptions from default rules.
 
-PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, `local-path-provisioner`, and `calico` (relevant only for `calico-apiserver` namespace). For instance:
+PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `envoy-gateway`, `kubernetes-dashboard`, `local-path-provisioner`, and `calico` (relevant only for `calico-apiserver` namespace). For instance:
 
 ```yaml
 apiVersion: v1
@@ -3812,6 +3828,7 @@ When you want to install a plugin, the installer includes pre-configured plug-in
   * [calico](#calico)
 * Ingress Controllers
   * [nginx-ingress-controller](#nginx-ingress-controller)
+  * [envoy-gateway](#nginx-ingress-controller)
 * [kubernetes-dashboard](#kubernetes-dashboard)
 * [local-path-provisioner](#local-path-provisioner)
 
@@ -4088,6 +4105,9 @@ The following parameters are supported:
 
 ##### nginx-ingress-controller
 
+**Note:** Ingress-NGINX is retired. We keep it enabled by default for backward compatibility, but it is recommended to move to [Envoy Gateway](#envoy-gateway) and disable Ingress-NGINX. For more information about Ingress-NGINX retirement, see:
+* https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
+
 Before proceeding, refer to the [Official Documentation of the Kubernetes Ingress Controllers](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/) and visit [official Nginx Ingress Controller repository](https://github.com/nginxinc/kubernetes-ingress).
 
 **Note**: 
@@ -4239,6 +4259,87 @@ For example:
 ###### monitoring
 
 By default, 10254 port is opened and provides Prometheus metrics.
+
+
+##### envoy-gateway
+
+Before proceeding, see following:
+* [Official Documentation of the Gateway API](https://gateway-api.sigs.k8s.io/) 
+* [Envoy Gateway Documentation](https://gateway.envoyproxy.io/docs/).
+
+Envoy Gateway plugin is NOT installed by default, but it is recommended to enable it and use it instead of Ingress-NGINX. The following is an example to enable the plugin:
+```yaml
+# Allow Envoy Gateway to take hostPorts targeted by HAProxy
+services:
+  loadbalancer:
+    target_backend: "envoy"
+
+plugins:
+  envoy-gateway:
+    # Should be set to "true" manually
+    install: true
+    externalGateway:
+      # Specify default certificates used by external gateway
+      certificate:
+        cert: |
+          -----BEGIN CERTIFICATE-----
+          .... skipped ....
+          -----END CERTIFICATE-----
+        key: |-
+          -----BEGIN RSA PRIVATE KEY-----
+          .... skipped ....
+          -----END RSA PRIVATE KEY-----
+```
+
+**Note**: If you enable Envoy Gateway installation on existing environment, but you do not want Ingress-NGINX to stop working, do not set `install: false` on nginx-ingress-controller plugin, otherwise KubeMarine will reconfigure your cluster to use Envoy only.
+
+Following configuration options are supported for Envoy Gateway plugin:
+```yaml
+plugins:
+  envoy-gateway:
+    # Allows to specify qubership Envoy Gateway chart version.
+    # If not specified, KubeMarine will choose recommended version depending on k8s version.
+    version: ''
+    # Allows to enable/disable Envoy Gateway plugin.
+    install: false
+    # Allows to specify registry to use for qubership kubectl image, used by Evnoy Gateway chart job.
+    # By default it is "ghcr.io".
+    kubectlRegistry: ""
+    # Allows to specify namespace and release names for Envoy Gateway chart and CRs chart.
+    namespace: "gateway-system"
+    releaseName: "envoy-gateway"
+    crReleaseName: "envoy-gateway-cr"
+    externalGateway:
+      # Allows to configure certificates to use on external Gateway, enabling HTTPS listener.
+      # If not specified, HTTPS listener will not be configured.
+      certificate:
+        cert: ""
+        key: ""
+      # HostPorts are enabled by default only if services.loadbalancer.target_backend is envoy,
+      # in this case hostPorts will be equal to LB target_ports.
+      # HostPorts also could be enabled and configured explicitly.
+      hostPorts:
+        http: 0
+        https: 0
+    # Allows to override values for Envoy Gateway and CRs charts.
+    # For example, following configuration could be used to provide nodeSelector/tolerations for external gateway
+    # crValuesOverride:
+    #   gatewayClasses:
+    #     external:
+    #       envoyDeployment:
+    #         nodeSelector:
+    #           kubernetes.io/hostname: some-nodes
+    #         tolerations:
+    #         - key: node-role.kubernetes.io/control-plane
+    #           operator: Exists
+    #           effect: NoSchedule
+    #
+    # For more information on Envoy Gateway and CR charts values, see following:
+    #   * https://github.com/Netcracker/qubership-envoy-api-gateway/blob/main/charts/envoy-gateway/values.yaml
+    #   * https://github.com/Netcracker/qubership-envoy-api-gateway/blob/main/charts/envoy-gateway-cr/values.yaml
+    valuesOverride: {}
+    crValuesOverride: {}
+```
 
 ##### kubernetes-dashboard
 
@@ -4471,9 +4572,10 @@ Plugins are installed in a strict sequential order. The installation sequence is
 |Plugin|Priority|
 |---|---|
 |calico|`0`|
-|nginx-ingress-controller|`1`|
-|kubernetes-dashboard|`2`|
-|local-path-provisioner|`2`|
+|envoy-gateway|`1` if `services.lb.target_backend` is `nginx`, otherwise `2` |
+|nginx-ingress-controller|`2` if `services.lb.target_backend` is `nginx`, otherwise `1` |
+|kubernetes-dashboard|`3`|
+|local-path-provisioner|`3`|
 
 You can change the priorities of preinstalled plugins, as well as set your own priority for the custom plugins.
 The following is an example of how to prioritize a plugin:
@@ -6082,6 +6184,10 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.27          | v0.0.27                      | v0.0.27      | v0.0.27      | v0.0.27           | v0.0.27   | v0.0.27   | Required only if local-path provisioner plugin is set to be installed. |   
+|          | envoyproxy/envoy | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
+|          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
 
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.33.6
@@ -6114,6 +6220,10 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
+|          | envoyproxy/envoy | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
+|          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.34.2
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
@@ -6145,11 +6255,18 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
+|          | envoyproxy/envoy | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
+|          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
+
+**Note**: Ubuntu 20.04 is not supported on Kubernetes v1.35+
+
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 20.04,22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
+|          |                                                                | CentOS Stream 9 | RHEL/Oracle Linux 8.4 | Ubuntu 22.04 | Ubuntu 24.04 | Oracle Linux 8.4+ | RHEL 8.6+ | RockyLinux 8.6+ |                                                                                                      |
 | binaries | kubeadm                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 3b332029396ff8f3e056c29a005d62fe6b09d05f          |
 |          | kubelet                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 0ad7d08b9de3a526869088e0d0a2de4d6f5ffabc          |
 |          | kubectl                                                        | v1.35.0          | v1.35.0                      | v1.35.0      | v1.35.0      | v1.35.0           | v1.35.0   | v1.35.0   | SHA1: 8873116ce8aa124b6a3fed5f76e6b0b0989f87a3          |
@@ -6176,3 +6293,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
+|          | envoyproxy/envoy | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
+|          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
+|          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |

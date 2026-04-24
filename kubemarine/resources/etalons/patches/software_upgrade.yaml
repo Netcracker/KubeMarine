@@ -17,16 +17,20 @@ packages:
   containerdio:
     version_rhel8: []
     version_rhel9: []
+    version_rhel10: []
   haproxy:
     version_rhel8: false
     version_rhel9: false
+    version_rhel10: false
     version_debian: false
   keepalived:
     version_rhel8: false
     version_rhel9: false
+    version_rhel10: false
     version_debian: false
 plugins:
   calico: []
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
+  envoy-gateway: []
