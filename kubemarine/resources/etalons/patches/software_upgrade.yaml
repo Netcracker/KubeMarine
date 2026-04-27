@@ -34,3 +34,4 @@ plugins:
   kubernetes-dashboard: []
   local-path-provisioner: []
   envoy-gateway: []
+  openstack-cinder-csi: []

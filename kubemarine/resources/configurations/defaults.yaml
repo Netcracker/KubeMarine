@@ -900,6 +900,31 @@ plugins:
         cpu: 200m
         memory: 256Mi
 
+  openstack-cinder-csi:
+    version: '{{ globals.compatibility_map.software["openstack-cinder-csi"][services.kubeadm.kubernetesVersion].version }}'
+    install: false
+    namespace: "kube-system"
+    releaseName: "openstack-cinder-csi"
+    values: {}
+    installation:
+      priority: 3
+      procedures:
+        - python:
+            module: plugins/openstack_cinder_csi.py
+            method: apply_cinder_chart
+        - expect:
+            deployments:
+              - name: '{{ plugins["openstack-cinder-csi"].releaseName }}-controllerplugin'
+                namespace: '{{ plugins["openstack-cinder-csi"].namespace }}'
+            daemonsets:
+              - name: '{{ plugins["openstack-cinder-csi"].releaseName }}-nodeplugin'
+                namespace: '{{ plugins["openstack-cinder-csi"].namespace }}'
+            pods:
+              list:
+              - '{{ plugins["openstack-cinder-csi"].releaseName }}-controllerplugin'
+              - '{{ plugins["openstack-cinder-csi"].releaseName }}-nodeplugin'
+              namespace: '{{ plugins["openstack-cinder-csi"].namespace }}'
+
 rbac:
   account_defaults:
     namespace: kube-system

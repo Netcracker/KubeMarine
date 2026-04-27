@@ -1,0 +1,235 @@
+extraLabels: {}
+
+nameOverride: ""
+fullnameOverride: ""
+timeout: 3m
+
+csi:
+  attacher:
+    image:
+      repository: registry.k8s.io/sig-storage/csi-attacher
+      tag: v4.10.0
+      pullPolicy: IfNotPresent
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+  provisioner:
+    topology: "true"
+    image:
+      repository: registry.k8s.io/sig-storage/csi-provisioner
+      tag: v5.3.0
+      pullPolicy: IfNotPresent
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+  snapshotter:
+    image:
+      repository: registry.k8s.io/sig-storage/csi-snapshotter
+      tag: v8.4.0
+      pullPolicy: IfNotPresent
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+    # Secret permission is optional.
+    # Enable it if your driver needs secret.
+    # For example, `csi.storage.k8s.io/snapshotter-secret-name` is set in VolumeSnapshotClass.
+    # See https://kubernetes-csi.github.io/docs/secrets-and-credentials.html for more details.
+    extraRbac: {}
+    #  - apiGroups: [""]
+    #    resources: ["secrets"]
+    #    verbs: ["get", "list"]
+  resizer:
+    image:
+      repository: registry.k8s.io/sig-storage/csi-resizer
+      tag: v1.14.0
+      pullPolicy: IfNotPresent
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+    # The following rule should be uncommented for plugins that require secrets
+    # for provisioning.
+    extraRbac: {}
+    # - apiGroups: [""]
+    #   resources: ["secrets"]
+    #   verbs: ["get", "list", "watch"]
+  livenessprobe:
+    image:
+      repository: registry.k8s.io/sig-storage/livenessprobe
+      tag: v2.17.0
+      pullPolicy: IfNotPresent
+    failureThreshold: 5
+    initialDelaySeconds: 10
+    timeoutSeconds: 10
+    periodSeconds: 60
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+  nodeDriverRegistrar:
+    image:
+      repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+      tag: v2.15.0
+      pullPolicy: IfNotPresent
+    resources: {}
+    extraArgs: {}
+    extraEnv: []
+  plugin:
+    image:
+      repository: registry.k8s.io/provider-os/cinder-csi-plugin
+      pullPolicy: IfNotPresent
+      tag:  # defaults to .Chart.AppVersion
+    volumes:
+      - name: cacert
+        hostPath:
+          path: /etc/cacert
+    volumeMounts:
+      - name: cacert
+        mountPath: /etc/cacert
+        readOnly: true
+      - name: cloud-config
+        mountPath: /etc/config
+        readOnly: true
+    nodePlugin:
+      dnsPolicy: ClusterFirstWithHostNet
+      # Optional additional annotations to add to the nodePlugin Pods.
+      podAnnotations: {}
+      # Optional additional labels to add to the nodePlugin Pods.
+      podLabels: {}
+      podSecurityContext: {}
+      securityContext: {}
+        # capabilities:
+        #   drop:
+        #   - ALL
+        # seccompProfile:
+        #   type: RuntimeDefault
+      affinity: {}
+      nodeSelector: {}
+      tolerations:
+        - operator: Exists
+      kubeletDir: /var/lib/kubelet
+      extraArgs: {}
+      # Allow for specifying internal IP addresses for multiple hostnames
+      # hostAliases:
+      #   - ip: "10.0.0.1"
+      #     hostnames:
+      #     - "keystone.hostname.com"
+    controllerPlugin:
+      replicas: 1
+      strategy:
+        # RollingUpdate strategy replaces old pods with new ones gradually,
+        # without incurring downtime.
+        type: RollingUpdate
+        rollingUpdate:
+          # maxUnavailable is the maximum number of pods that can be
+          # unavailable during the update process.
+          maxUnavailable: 0
+          # maxSurge is the maximum number of pods that can be
+          # created over the desired number of pods.
+          maxSurge: 1
+      # Optional additional annotations to add to the controllerPlugin Pods.
+      podAnnotations: {}
+      # Optional additional labels to add to the controllerPlugin Pods.
+      podLabels: {}
+      podSecurityContext: {}
+        # runAsNonRoot: true
+        # runAsUser: 65532
+        # runAsGroup: 65532
+        # fsGroup: 65532
+        # fsGroupChangePolicy: OnRootMismatch
+      securityContext: {}
+        # capabilities:
+        #   drop:
+        #   - ALL
+        # seccompProfile:
+        #   type: RuntimeDefault
+        # readOnlyRootFilesystem: true
+      affinity: {}
+      nodeSelector: {}
+      tolerations: []
+      extraArgs: {}
+      # Allow for specifying internal IP addresses for multiple hostnames
+      # hostAliases:
+      #   - ip: "10.0.0.1"
+      #     hostnames:
+      #     - "keystone.hostname.com"
+    resources: {}
+    # Enable built-in http server through the http-endpoint flag
+    httpEndpoint:
+      enabled: false
+      port: 8080
+    # Create Prometheus Operator PodMonitor. Requires http server above.
+    # See https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#monitoring.coreos.com/v1.PodMonitor
+    podMonitor:
+      enabled: false
+      additionalLabels: {}
+    extraArgs: {}
+    extraEnv: []
+
+# Log verbosity level.
+# See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md
+# for description of individual verbosity levels.
+logVerbosityLevel: 2
+
+# the secret should contain the openstack credentials
+# there are several options to inject the credentials:
+# 1) from kubernetes secret that doesn't exist: set "enabled" and "create" to true, this will create a secret from the values written to "data" down below
+# 2) from kubernetes secret that already exists: set "enabled" to true and "create" to false
+# 3) from host system path /etc/cloud/cloud.conf: set "enabled" to false and "hostMount" to true
+# 4) via agent-injector (e.g. hashicorp vault): set "enabled" and "hostMount" to false, you have to provide credentials on your own by injecting credentials into the pod
+secret:
+  enabled: false
+  hostMount: true
+  create: false
+  filename: cloud.conf
+#  name: cinder-csi-cloud-config
+#  data:
+#    cloud.conf: |-
+#      [Global]
+#      auth-url=http://openstack-control-plane
+#      user-id=user-id
+#      password=password
+#      trust-id=trust-id
+#      region=RegionOne
+#      ca-file=/etc/cacert/ca-bundle.crt
+
+storageClass:
+  enabled: true
+  delete:
+    isDefault: false
+    allowVolumeExpansion: true
+  retain:
+    isDefault: false
+    allowVolumeExpansion: true
+# any kind of custom StorageClasses
+#   custom: |-
+#     ---
+#     apiVersion: storage.k8s.io/v1
+#     kind: StorageClass
+#     metadata:
+#       name: sas
+#     provisioner: cinder.csi.openstack.org
+#     volumeBindingMode: WaitForFirstConsumer
+#     allowVolumeExpansion: true
+#     parameters:
+#       type: SAS
+#     ---
+#     apiVersion: snapshot.storage.k8s.io/v1
+#     kind: VolumeSnapshotClass
+#     metadata:
+#       name: csi-cinder-snapclass
+#     driver: cinder.csi.openstack.org
+#     deletionPolicy: Delete
+
+# You may set ID of the cluster where openstack-cinder-csi is deployed. This value will be appended
+# to volume metadata in newly provisioned volumes as `cinder.csi.openstack.org/cluster=<cluster ID>`.
+clusterID: "kubernetes"
+
+# Enable PVC annotations support to create PVCs with extra parameters
+pvcAnnotations: false
+
+priorityClassName: ""
+
+imagePullSecrets: []
+# - name: my-imagepull-secret
+
+# add annotations to all pods, deployment, daemonset and podmonitor
+commonAnnotations: {}
