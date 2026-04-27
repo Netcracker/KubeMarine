@@ -1,5 +1,3 @@
-
-import os
 import yaml
 from kubemarine import plugins
 from kubemarine.core import utils
