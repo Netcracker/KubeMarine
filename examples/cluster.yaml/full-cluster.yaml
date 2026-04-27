@@ -377,7 +377,7 @@ plugins:
     installation:
       priority: 1
     controller:
-      image: registry.k8s.io/ingress-nginx/controller:v1.10.1
+      image: ghcr.io/netcracker/ingress-nginx/controller:v1.16.0
       ssl:
         enableSslPassthrough: false
         default-certificate:

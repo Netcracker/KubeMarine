@@ -100,8 +100,8 @@ class FakeManifest(Manifest):
             ]
         elif manifest_identity == Identity('nginx-ingress-controller'):
             return [
-                f'registry.k8s.io/ingress-nginx/controller:{plugin_version}@sha256:123',
-                'registry.k8s.io/ingress-nginx/kube-webhook-certgen:fake-webhook-version@sha256:123'
+                f'ghcr.io/netcracker/ingress-nginx/controller:{plugin_version}@sha256:123',
+                'ghcr.io/netcracker/ingress-nginx/kube-webhook-certgen:fake-webhook-version@sha256:123'
             ]
         elif manifest_identity == Identity('kubernetes-dashboard'):
             return [
