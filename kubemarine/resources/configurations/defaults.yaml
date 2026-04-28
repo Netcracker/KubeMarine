@@ -680,7 +680,7 @@ plugins:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'
     install: true
     installation:
-      registry: registry.k8s.io
+      registry: ghcr.io
       priority: 1 # will be changed to 2 if LB target_backend is nginx
       procedures:
         - python:
@@ -709,7 +709,7 @@ plugins:
       strict-validate-path-type: "false"
       allow-cross-namespace-resources: "true"
     webhook:
-      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
+      image: 'netcracker/ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
       # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598
       resources:
         requests:
@@ -719,7 +719,7 @@ plugins:
           cpu: 20m
           memory: 40Mi
     controller:
-      image: 'ingress-nginx/controller:{{ plugins["nginx-ingress-controller"].version }}'
+      image: 'netcracker/ingress-nginx/controller:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
         enableSslPassthrough: false
       nodeSelector:

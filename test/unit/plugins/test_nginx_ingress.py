@@ -140,7 +140,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def _test_controller(self, manifest: Manifest, k8s_version: str):
         template_spec = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")['spec']['template']['spec']
         container = template_spec['containers'][0]
-        expected_image = f"example.registry/ingress-nginx/controller:{self.expected_image_tag(k8s_version, 'version')}"
+        expected_image = f"example.registry/netcracker/ingress-nginx/controller:{self.expected_image_tag(k8s_version, 'version')}"
         self.assertEqual(expected_image, container['image'], "Unexpected controller image")
         self.assertEqual({"kubernetes.io/os": "something"}, template_spec['nodeSelector'], "Unexpected controller nodeSelector")
         self.assertEqual([{"effect": "NoSchedule"}], template_spec.get('tolerations'), "Unexpected controller tolerations")
@@ -219,7 +219,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
         manifest = self.enrich_yaml(cluster)
         expected_webhook_image_tag = self.expected_image_tag(self.k8s_latest, 'webhook-version')
-        expected_image = f"example.registry/ingress-nginx/kube-webhook-certgen:{expected_webhook_image_tag}"
+        expected_image = f"example.registry/netcracker/ingress-nginx/kube-webhook-certgen:{expected_webhook_image_tag}"
 
         container_create = self.get_obj(manifest, "Job_ingress-nginx-admission-create")\
             ['spec']['template']['spec']['containers'][0]

@@ -283,14 +283,14 @@ def calico_apiserver_extract_images(images: List[str], manifest_identity: Identi
 
 
 def nginx_ingress_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
-    expected_images = ['ingress-nginx/controller']
+    expected_images = ['netcracker/ingress-nginx/controller']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     extra_images = {}
     for image in images:
         if image in expected_images:
             continue
         image_name, version = image.split(':')
-        if image_name == 'ingress-nginx/kube-webhook-certgen':
+        if image_name == 'netcracker/ingress-nginx/kube-webhook-certgen':
             extra_images['webhook'] = version
         else:
             raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
@@ -342,8 +342,7 @@ def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[s
         # If some new image in this registry appear, we should emphasize this explicitly,
         # adopt the synchronization tool, and installation.registry of the plugin in defaults.yaml
         if manifest.identity == Identity('nginx-ingress-controller'):
-            image = image.replace('k8s.gcr.io/', '')
-            image = image.replace('registry.k8s.io/', '')
+            image = image.replace('ghcr.io/', '')
 
         images.append(image)
 

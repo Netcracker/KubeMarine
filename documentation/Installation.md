@@ -4111,6 +4111,10 @@ The following parameters are supported:
 
 Before proceeding, refer to the [Official Documentation of the Kubernetes Ingress Controllers](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/) and visit [official Nginx Ingress Controller repository](https://github.com/nginxinc/kubernetes-ingress).
 
+**Note**: 
+* Due to Ingress-NGINX retirement, it is not recommended to use Ingress-NGINX. Please use Envoy Gateway instead.
+* KubeMarine recently started using its own Ingress-NGINX fork which could be found at https://github.com/Netcracker/ingress-nginx
+
 NGINX Ingress Controller plugin is installed by default and does not require any special enablement or configuration. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
 The following is an example to enable the plugin:
@@ -4141,7 +4145,7 @@ plugins:
   nginx-ingress-controller:
     install: true
     controller:
-      image: k8s-artifacts-prod/ingress-nginx/controller:v0.34.1
+      image: k8s-artifacts-prod/netcracker/ingress-nginx/controller:v1.16.0
 ```
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
@@ -6244,8 +6248,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | calico/node                                                    | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/kube-controllers                                        | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/apiserver                                               | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   | Required only if API server is enabled in Calico config.|
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.14.1          | v1.14.1                      | v1.14.1      | v1.14.1      | v1.14.1           | v1.14.1   | v1.14.1   |                                                         |
-|          | registry.k8s.io/kube-webhook-certgen                           | v1.6.5           | v1.6.5                       | v1.6.5       | v1.6.5       | v1.6.5            | v1.6.5    | v1.6.5    |                                                         |
+|          | ghcr.io/netcracker/ingress-nginx/controller                       | v1.16.0          | v1.16.0                      | v1.16.0      | v1.16.0      | v1.16.0           | v1.16.0   | v1.16.0   |                                                         |
+|          | ghcr.io/netcracker/kube-webhook-certgen                           | v1.6.9           | v1.6.9                       | v1.6.9       | v1.6.9       | v1.6.9            | v1.6.9    | v1.6.9    |                                                         |
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.27          | v0.0.27                      | v0.0.27      | v0.0.27      | v0.0.27           | v0.0.27   | v0.0.27   | Required only if local-path provisioner plugin is set to be installed. |   
@@ -6287,8 +6291,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | calico/node                                                    | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/kube-controllers                                        | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/apiserver                                               | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   | Required only if API server is enabled in Calico config.|
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.14.1          | v1.14.1                      | v1.14.1      | v1.14.1      | v1.14.1           | v1.14.1   | v1.14.1   |                                                         |
-|          | registry.k8s.io/kube-webhook-certgen                           | v1.6.5           | v1.6.5                       | v1.6.5       | v1.6.5       | v1.6.5            | v1.6.5    | v1.6.5    |                                                         |
+|          | ghcr.io/netcracker/ingress-nginx/controller                       | v1.16.0          | v1.16.0                      | v1.16.0      | v1.16.0      | v1.16.0           | v1.16.0   | v1.16.0   |                                                         |
+|          | ghcr.io/netcracker/kube-webhook-certgen                           | v1.6.9           | v1.6.9                       | v1.6.9       | v1.6.9       | v1.6.9            | v1.6.9    | v1.6.9    |                                                         |
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
@@ -6329,8 +6333,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | calico/node                                                    | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/kube-controllers                                        | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/apiserver                                               | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   | Required only if API server is enabled in Calico config.|
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.14.1          | v1.14.1                      | v1.14.1      | v1.14.1      | v1.14.1           | v1.14.1   | v1.14.1   |                                                         |
-|          | registry.k8s.io/kube-webhook-certgen                           | v1.6.5           | v1.6.5                       | v1.6.5       | v1.6.5       | v1.6.5            | v1.6.5    | v1.6.5    |                                                         |
+|          | ghcr.io/netcracker/ingress-nginx/controller                       | v1.16.0          | v1.16.0                      | v1.16.0      | v1.16.0      | v1.16.0           | v1.16.0   | v1.16.0   |                                                         |
+|          | ghcr.io/netcracker/kube-webhook-certgen                           | v1.6.9           | v1.6.9                       | v1.6.9       | v1.6.9       | v1.6.9            | v1.6.9    | v1.6.9    |                                                         |
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   
@@ -6374,8 +6378,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | calico/node                                                    | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/kube-controllers                                        | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   |                                                         |
 |          | calico/apiserver                                               | v3.31.2          | v3.31.2                      | v3.31.2      | v3.31.2      | v3.31.2           | v3.31.2   | v3.31.2   | Required only if API server is enabled in Calico config.|
-|          | registry.k8s.io/ingress-nginx/controller                       | v1.14.1          | v1.14.1                      | v1.14.1      | v1.14.1      | v1.14.1           | v1.14.1   | v1.14.1   |                                                         |
-|          | registry.k8s.io/kube-webhook-certgen                           | v1.6.5           | v1.6.5                       | v1.6.5       | v1.6.5       | v1.6.5            | v1.6.5    | v1.6.5    |                                                         |
+|          | ghcr.io/netcracker/ingress-nginx/controller                       | v1.16.0          | v1.16.0                      | v1.16.0      | v1.16.0      | v1.16.0           | v1.16.0   | v1.16.0   |                                                         |
+|          | ghcr.io/netcracker/kube-webhook-certgen                           | v1.6.9           | v1.6.9                       | v1.6.9       | v1.6.9       | v1.6.9            | v1.6.9    | v1.6.9    |                                                         |
 |          | kubernetesui/dashboard                                         | v2.7.0           | v2.7.0                       | v2.7.0       | v2.7.0       | v2.7.0            | v2.7.0    | v2.7.0    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | kubernetesui/metrics-scraper                                   | v1.0.8           | v1.0.8                       | v1.0.8       | v1.0.8       | v1.0.8            | v1.0.8    | v1.0.8    | Required only if Kubernetes Dashboard plugin is set to be installed. |
 |          | rancher/local-path-provisioner                                 | v0.0.32          | v0.0.32                      | v0.0.32      | v0.0.32      | v0.0.32           | v0.0.32   | v0.0.32   | Required only if local-path provisioner plugin is set to be installed. |   

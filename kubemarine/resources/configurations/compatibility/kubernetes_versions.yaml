@@ -12,7 +12,7 @@ compatibility_map:
 # This section should be changed manually.
   v1.32.0:
     calico: v3.29.1
-    nginx-ingress-controller: v1.12.4
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
@@ -20,7 +20,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.32.2:
     calico: v3.29.5
-    nginx-ingress-controller: v1.12.4
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.27
@@ -28,7 +28,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.32.10:
     calico: v3.31.2
-    nginx-ingress-controller: v1.14.1
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
@@ -36,7 +36,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.33.0:
     calico: v3.30.3
-    nginx-ingress-controller: v1.13.0
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.31
@@ -44,7 +44,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.33.6:
     calico: v3.31.2
-    nginx-ingress-controller: v1.14.1
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
@@ -52,7 +52,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.34.1:
     calico: v3.30.3
-    nginx-ingress-controller: v1.13.1
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
@@ -60,7 +60,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.34.2:
     calico: v3.31.2
-    nginx-ingress-controller: v1.14.1
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
@@ -68,7 +68,7 @@ compatibility_map:
     openstack-cinder-csi: 2.35.0
   v1.35.0:
     calico: v3.31.2
-    nginx-ingress-controller: v1.14.1
+    nginx-ingress-controller: v1.16.0
     envoy-gateway: 2.2.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32

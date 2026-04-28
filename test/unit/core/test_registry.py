@@ -28,7 +28,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         self.assertEqual('registry.k8s.io/coredns', inventory['services']['kubeadm']['dns']['imageRepository'])
         for plugin_name, plugin_params in inventory['plugins'].items():
             if plugin_name == 'nginx-ingress-controller':
-                self.assertEqual('registry.k8s.io', plugin_params['installation']['registry'])
+                self.assertEqual('ghcr.io', plugin_params['installation']['registry'])
             else:
                 self.assertIsNone(plugin_params['installation'].get('registry'))
 
