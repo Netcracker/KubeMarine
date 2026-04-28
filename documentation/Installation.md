@@ -71,6 +71,7 @@ This section provides information about the inventory, features, and steps for i
         - [envoy-gateway](#envoy-gateway)
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
+        - [openstack-cinder-csi](#openstack-cinder-csi)
       - [Plugins Features](#plugins-features)
         - [plugin_defaults](#plugin_defaults)
         - [Plugins Reinstallation](#plugins-reinstallation)
