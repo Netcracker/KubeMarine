@@ -56,7 +56,8 @@ def reunion_member(cluster: KubernetesCluster) -> None:
         cluster.log.debug(f'Corrupted member has ID: "{member_id}"; Endpoint: "{member_ep}"; Peer: "{member_peer}"')
     cluster.log.debug(f'Removing corrupted member {member_id}')
     # Moving etcd.yaml to temporary folder
-    corrupted_node.sudo(f'mv {etcd_manifest} {tmp_dir}')
+    corrupted_node.sudo(f'mkdir -p {tmp_dir}'
+                        f'&& sudo mv {etcd_manifest} {tmp_dir}')
     # Checking if etcd container has been deleted
     corrupted_node.sudo('crictl rm -f $(sudo crictl ps --name etcd -q) || true > /dev/null')
     # Removing corrupted member
