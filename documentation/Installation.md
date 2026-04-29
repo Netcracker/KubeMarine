@@ -4550,7 +4550,9 @@ plugins:
             type: $YOUR_OPENSTACK_VOLUME_TYPE_HERE
 ```
 
-**Note:** Above configuration assumes that nodes have OpenStack credentials stored on all nodes under `/etc/config/cloud.conf` file. You need to put this file on nodes during nodes provisioning.
+**Note:** 
+* Above configuration assumes that nodes have OpenStack credentials stored on all nodes under `/etc/config/cloud.conf` file. You need to put this file on nodes during nodes provisioning.
+* By default, this plugin uses `openstack-cinder-csi` namespace and helm release name.
 
 If you are using an old OpenStack, above configuration will not work, because it installs new version of Cinder CSI plugin, which is not compatible with old OpenStack APIs. You may see issues like following:
 ```
