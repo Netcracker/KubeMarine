@@ -903,7 +903,7 @@ plugins:
   openstack-cinder-csi:
     version: '{{ globals.compatibility_map.software["openstack-cinder-csi"][services.kubeadm.kubernetesVersion].version }}'
     install: false
-    namespace: "kube-system"
+    namespace: "openstack-cinder-csi"
     releaseName: "openstack-cinder-csi"
     values: {}
     installation:

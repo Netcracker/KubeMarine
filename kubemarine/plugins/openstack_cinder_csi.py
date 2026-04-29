@@ -84,4 +84,7 @@ def apply_cinder_chart(cluster: KubernetesCluster) -> None:
         yaml.dump(helm_plugin_config["values"]), "openstack-cinder-csi-values.yaml", 
         dump_location=True
     )
+    plugins.apply_template(cluster=cluster, config={
+        "source": utils.get_internal_resource_path(f"templates/plugins/openstack-cinder-csi-namespace.yaml.j2")
+    })
     plugins.apply_helm(cluster=cluster, config=helm_plugin_config)
