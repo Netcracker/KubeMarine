@@ -125,6 +125,10 @@ procedures = OrderedDict({
         'description': "Test internal imports and resources presence",
         'group': 'other'
     },
+    'reunion': {
+        'description': "Remove corrupted ETCD member from the cluster and add once again",
+        'group': 'maintenance'
+    },
 })
 
 
