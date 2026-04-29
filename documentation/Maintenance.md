@@ -484,6 +484,7 @@ After applying, this configuration is merged with the plugins' configuration con
 
 The `upgrade` procedure executes the following sequence of tasks:
 
+* run_backup
 * verify_upgrade_versions
 * thirdparties
 * prepull_images
@@ -492,6 +493,8 @@ The `upgrade` procedure executes the following sequence of tasks:
 * packages
 * plugins
 * overview
+
+**Note**: The backup procedure runs defore the upgrade as a part of the upgrade tasks. It stores the backup archive on control plane nodes in `/etc/kubemarine/backup.tar.gz` file. Pay attention, in case of seqential upgrade, the backup procedure runs only once to reduce time consumption.
 
 ## Backup Procedure
 

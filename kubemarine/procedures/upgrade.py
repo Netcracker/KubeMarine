@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import itertools
 from collections import OrderedDict
 from typing import List, Callable, Dict
@@ -23,7 +24,7 @@ from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
 from kubemarine.kubernetes import components
-from kubemarine.procedures import install
+from kubemarine.procedures import install, backup
 
 
 def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
@@ -212,7 +213,51 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
         cluster.log.debug(f"Cleaned up report file: {random_report_name}")
 
 
+def run_backup(cluster: KubernetesCluster) -> None:
+    # Creating the procedure inventory for backup
+    cluster.procedure_inventory['backup_location'] = ''
+    backup_plan: Dict[str, dict] = {
+        'etcd': {
+            'source_node': cluster.nodes['control-plane'].get_any_member().get_node_name()
+            },
+        'nodes': {
+            "/etc/resolv.conf": True,
+            "/root": True,
+            "/etc/hosts": False
+            },
+        'kubernetes': {
+            "namespaced_resources": {
+                "namespaces": "all",
+                "resources": "all"
+            },
+            "nonnamespaced_resources": "all"
+        }
+    }
+    cluster.context.setdefault('backup_descriptor', {
+        'meta': {'time': {'started': datetime.datetime.now()}},
+        'etcd': {},
+        'nodes': {},
+        'kubernetes': {'resources': {}},
+    })
+
+    cluster.procedure_inventory['backup_plan'] = backup_plan
+    # Preparing the backup
+    backup.prepare_backup_tmpdir(cluster.log, cluster.context)
+
+    def invoke_methods(data: dict) -> None:
+        for val in data.values():
+            if isinstance(val, dict):
+                invoke_methods(val)
+            else:
+                cluster.log.debug(f'Backup task: {val.__name__}')
+                method = getattr(backup, val.__name__)
+                method(cluster)
+
+    # Running the backup tasks
+    invoke_methods(backup.tasks)
+
 tasks = OrderedDict({
+    "run_backup": run_backup,
     "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
@@ -258,6 +303,8 @@ class UpgradeAction(flow.TasksAction):
 
         if upgrade_step > 0:
             del self.tasks['cleanup_tmp_dir']
+            # Only one backup for sequential upgrades
+            del self.tasks['run_backup']
 
     def cluster(self, res: DynamicResources) -> KubernetesCluster:
         # Make sure to enrich at DEFAULT stage without impact from changed context
