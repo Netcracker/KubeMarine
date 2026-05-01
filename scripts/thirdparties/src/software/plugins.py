@@ -19,7 +19,7 @@ from typing import List, Tuple, Dict, Any
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import static, utils, log
-from kubemarine.plugins import builtin, envoy_gateway
+from kubemarine.plugins import builtin, envoy_gateway, openstack_cinder_csi
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoftware, UpgradeConfig
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
@@ -126,6 +126,17 @@ class Plugins(SoftwareType):
                     new_settings["envoy-version"] = images_versions["envoy"]
                     new_settings["kubectl-version"] = images_versions["kubectl"]
                     new_settings["ratelimit-version"] = images_versions["ratelimit"]
+
+                # Same for Openstack Cinder CSI
+                if plugin_name == "openstack-cinder-csi":
+                    images_versions = openstack_cinder_csi.get_images_versions(plugin_version)
+                    new_settings["attacher-version"] = images_versions["attacher"]
+                    new_settings["provisioner-version"] = images_versions["provisioner"]
+                    new_settings["snapshotter-version"] = images_versions["snapshotter"]
+                    new_settings["resizer-version"] = images_versions["resizer"]
+                    new_settings["livenessprobe-version"] = images_versions["livenessprobe"]
+                    new_settings["nodeDriverRegistrar-version"] = images_versions["nodeDriverRegistrar"]
+                    new_settings["plugin-version"] = images_versions["plugin"]
 
                 compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
 

@@ -821,20 +821,10 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
         namespace = "default"
 
     prepare_for_helm_command = f'helm --kubeconfig {local_config_path} -n {namespace} '
+    command = prepare_for_helm_command + f'upgrade -i {release} {chart_path} --create-namespace'
+    if config.get("take_ownership"):
+        command += " --take-ownership"
 
-    cluster.log.verbose("Check if chart already has been installed")
-    # todo probably use single command helm upgrade --install
-    command = prepare_for_helm_command + 'list -q'
-    helm_existed_releases = execute_subprocess_with_logging(cluster, command, capture_stdout=True)
-
-    if release in helm_existed_releases.splitlines():
-        cluster.log.debug("Deployed release %s is found. Upgrading it..." % release)
-        deployment_mode = "upgrade"
-    else:
-        cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
-        deployment_mode = "install"
-
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace'
     execute_subprocess_with_logging(cluster, command)
 
 

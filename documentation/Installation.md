@@ -71,6 +71,7 @@ This section provides information about the inventory, features, and steps for i
         - [envoy-gateway](#envoy-gateway)
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
+        - [openstack-cinder-csi](#openstack-cinder-csi)
       - [Plugins Features](#plugins-features)
         - [plugin_defaults](#plugin_defaults)
         - [Plugins Reinstallation](#plugins-reinstallation)
@@ -4523,6 +4524,76 @@ plugins:
     helper-pod-image: busybox:latest
 ```
 
+##### openstack-cinder-csi
+
+By default, the `openstack-cinder-csi` plugin is not installed, however, you can install it by enabling the plugin and providing required configuration, for example:
+```yaml
+plugins:
+  openstack-cinder-csi:
+    install: true
+    values:
+      storageClass:
+        enabled: false
+        custom: |-
+          ---
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+            name: csi-sc-cinderplugin
+          provisioner: cinder.csi.openstack.org
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          allowVolumeExpansion: true
+          parameters:
+            type: $YOUR_OPENSTACK_VOLUME_TYPE_HERE
+```
+
+**Note:** 
+* Above configuration assumes that nodes have OpenStack credentials stored on all nodes under `/etc/config/cloud.conf` file. You need to put this file on nodes during nodes provisioning.
+* By default, this plugin uses `openstack-cinder-csi` namespace and helm release name.
+
+If you are using an old OpenStack, above configuration will not work, because it installs new version of Cinder CSI plugin, which is not compatible with old OpenStack APIs. You may see issues like following:
+```
+E0428 10:09:13.203111      12 utils.go:99] [ID:36] GRPC error: rpc error: code = Internal desc = Failed to get volumes: Expected HTTP response code [200 204 300] when accessing [GET ...], but got 400 instead: {"badRequest": {"message": "Invalid filters name are found in query options.", "code": 400}}
+```
+
+For old OpenStack, you should use older version of openstack-cinder-csi chart and older plugin image, like following:
+```yaml
+plugins:
+  openstack-cinder-csi:
+    install: true
+    version: 2.2.0 # changed for old OpenStack
+    values:
+      storageClass:
+        enabled: false
+        custom: |-
+          ---
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+            name: csi-sc-cinderplugin
+          provisioner: cinder.csi.openstack.org
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          allowVolumeExpansion: true
+          parameters:
+            type: $YOUR_OPENSTACK_VOLUME_TYPE_HERE
+      # changed for old OpenStack
+      csi:
+        plugin:
+          image:
+            repository: docker.io/k8scloudprovider/cinder-csi-plugin
+            tag: v1.22.0
+```
+
+**Note**:
+* If you use registry other than `docker.io`, you need to edit `csi.plugin.image.repository` in above configuration accordingly.
+* For old OpenStack version, OpenStack credentials should be stored on nodes under `/etc/kubernetes/cloud.conf`
+
 #### Plugins Features
 
 This section provides information about the plugin features in detail.
@@ -6188,6 +6259,13 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
 |          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
 |          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-attacher | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-provisioner | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-snapshotter | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-resizer | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/livenessprobe | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/provider-os/cinder-csi-plugin | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
 
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.33.6
@@ -6224,6 +6302,13 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
 |          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
 |          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-attacher | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-provisioner | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-snapshotter | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-resizer | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/livenessprobe | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/provider-os/cinder-csi-plugin | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.34.2
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |           | Note                                                                                                       |
@@ -6259,6 +6344,13 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
 |          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
 |          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-attacher | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-provisioner | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-snapshotter | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-resizer | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/livenessprobe | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/provider-os/cinder-csi-plugin | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
 
@@ -6297,3 +6389,10 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/gateway | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | v1.7.0 | Required only if envoy-gateway plugin is set to be installed. |
 |          | envoyproxy/ratelimit | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | 3fb70258 | Required only if envoy-gateway plugin is set to be installed. |
 |          | ghcr.io/netcracker/qubership-docker-kubectl | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | 0.0.6 | Required only if envoy-gateway plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-attacher | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | v4.10.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-provisioner | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | v5.3.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-snapshotter | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | v8.4.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-resizer | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | v1.14.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/livenessprobe | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | v2.17.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | v2.15.0 | Required only if openstack-cinder-csi plugin is set to be installed. |
+|          | registry.k8s.io/provider-os/cinder-csi-plugin | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | v1.35.0 | Required only if openstack-cinder-csi plugin is set to be installed. |

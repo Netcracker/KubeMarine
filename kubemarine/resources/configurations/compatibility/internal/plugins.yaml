@@ -145,3 +145,76 @@ envoy-gateway:
     envoy-version: distroless-v1.37.0
     kubectl-version: 0.0.6
     ratelimit-version: 3fb70258
+openstack-cinder-csi:
+  v1.32.0:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.32.2:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.32.10:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.33.0:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.33.6:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.34.1:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.34.2:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.35.0:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
