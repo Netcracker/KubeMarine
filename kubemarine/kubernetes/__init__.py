@@ -197,6 +197,7 @@ def enrich_control_plane_kubelet_local_mode(cluster: KubernetesCluster) -> None:
     kubeadm = inventory["services"]["kubeadm"]
     if components.control_plane_kubelet_local_mode(cluster):
         feature_gates = kubeadm.get("featureGates", {})
+        # TODO
         if 'ControlPlaneKubeletLocalMode' not in feature_gates:
             feature_gates['ControlPlaneKubeletLocalMode'] = True
         kubeadm["featureGates"] = feature_gates

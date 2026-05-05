@@ -1135,7 +1135,7 @@ By default, the installer uses the following parameters:
 | scheduler.extraArgs.profiling                           | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.profiling                   | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.terminated-pod-gc-threshold | `1000`                                                   |                                                                                        |
-| featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes version >= 1.33                                                |
+| featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes versions 1.33, 1.34 and 1.35                                               |
 
 The following is an example of kubeadm defaults override:
 
