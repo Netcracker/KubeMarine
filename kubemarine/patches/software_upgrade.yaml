@@ -8,7 +8,9 @@
 # The order of upgrade of defined by the implementation.
 
 thirdparties:
-  calicoctl: []
+  calicoctl:
+  - v1.34.2
+  - v1.35.0
   crictl: []
   etcdutl: []
 packages:
@@ -29,7 +31,9 @@ packages:
     version_rhel10: false
     version_debian: false
 plugins:
-  calico: []
+  calico:
+  - v1.34.2
+  - v1.35.0
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []

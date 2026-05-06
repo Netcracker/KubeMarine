@@ -1,12 +1,6 @@
 # !!!Do not change the content of the file!!!
 # This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 kube-apiserver:
-  v1.32.0:
-    version: v1.32.0
-  v1.32.2:
-    version: v1.32.2
-  v1.32.10:
-    version: v1.32.10
   v1.33.0:
     version: v1.33.0
   v1.33.6:
@@ -17,13 +11,9 @@ kube-apiserver:
     version: v1.34.2
   v1.35.0:
     version: v1.35.0
+  v1.36.0:
+    version: v1.36.0
 kube-controller-manager:
-  v1.32.0:
-    version: v1.32.0
-  v1.32.2:
-    version: v1.32.2
-  v1.32.10:
-    version: v1.32.10
   v1.33.0:
     version: v1.33.0
   v1.33.6:
@@ -34,13 +24,9 @@ kube-controller-manager:
     version: v1.34.2
   v1.35.0:
     version: v1.35.0
+  v1.36.0:
+    version: v1.36.0
 kube-scheduler:
-  v1.32.0:
-    version: v1.32.0
-  v1.32.2:
-    version: v1.32.2
-  v1.32.10:
-    version: v1.32.10
   v1.33.0:
     version: v1.33.0
   v1.33.6:
@@ -51,13 +37,9 @@ kube-scheduler:
     version: v1.34.2
   v1.35.0:
     version: v1.35.0
+  v1.36.0:
+    version: v1.36.0
 kube-proxy:
-  v1.32.0:
-    version: v1.32.0
-  v1.32.2:
-    version: v1.32.2
-  v1.32.10:
-    version: v1.32.10
   v1.33.0:
     version: v1.33.0
   v1.33.6:
@@ -68,13 +50,9 @@ kube-proxy:
     version: v1.34.2
   v1.35.0:
     version: v1.35.0
+  v1.36.0:
+    version: v1.36.0
 pause:
-  v1.32.0:
-    version: '3.10'
-  v1.32.2:
-    version: '3.10'
-  v1.32.10:
-    version: '3.10'
   v1.33.0:
     version: '3.10'
   v1.33.6:
@@ -85,13 +63,9 @@ pause:
     version: 3.10.1
   v1.35.0:
     version: 3.10.1
+  v1.36.0:
+    version: 3.10.2
 etcd:
-  v1.32.0:
-    version: 3.5.16-0
-  v1.32.2:
-    version: 3.5.16-0
-  v1.32.10:
-    version: 3.5.24-0
   v1.33.0:
     version: 3.5.21-0
   v1.33.6:
@@ -102,13 +76,9 @@ etcd:
     version: 3.6.5-0
   v1.35.0:
     version: 3.6.6-0
+  v1.36.0:
+    version: 3.6.8-0
 coredns/coredns:
-  v1.32.0:
-    version: v1.11.3
-  v1.32.2:
-    version: v1.11.3
-  v1.32.10:
-    version: v1.11.3
   v1.33.0:
     version: v1.12.0
   v1.33.6:
@@ -119,3 +89,5 @@ coredns/coredns:
     version: v1.12.1
   v1.35.0:
     version: v1.13.1
+  v1.36.0:
+    version: v1.14.2

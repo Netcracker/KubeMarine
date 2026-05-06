@@ -54,10 +54,10 @@ class EnrichmentValidation(unittest.TestCase):
 
     def test_pss_defaults_verify_version(self):
         self._inventory()['defaults'] = {'enforce-version': 'not a version'}
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.32.0'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
         with self.assertRaisesRegex(Exception, re.escape(
                 f"Incorrect enforce-version 'not a version', "
-                f"valid version (for example): v1.32")):
+                f"valid version (for example): v1.33")):
             self._new_cluster()
 
 if __name__ == '__main__':
