@@ -1,0 +1,150 @@
+extraLabels: {}
+
+nameOverride: ""
+fullnameOverride: ""
+timeout: 3m
+
+csi:
+  attacher:
+    image:
+      repository: k8s.gcr.io/sig-storage/csi-attacher
+      tag: v3.4.0
+      pullPolicy: IfNotPresent
+    resources: {}
+  provisioner:
+    topology: "true"
+    image:
+      repository: k8s.gcr.io/sig-storage/csi-provisioner
+      tag: v3.1.0
+      pullPolicy: IfNotPresent
+    resources: {}
+  snapshotter:
+    image:
+      repository: k8s.gcr.io/sig-storage/csi-snapshotter
+      tag: v5.0.1
+      pullPolicy: IfNotPresent
+    resources: {}
+  resizer:
+    image:
+      repository: k8s.gcr.io/sig-storage/csi-resizer
+      tag: v1.4.0
+      pullPolicy: IfNotPresent
+    resources: {}
+  livenessprobe:
+    image:
+      repository: k8s.gcr.io/sig-storage/livenessprobe
+      tag: v2.6.0
+      pullPolicy: IfNotPresent
+    failureThreshold: 5
+    initialDelaySeconds: 10
+    timeoutSeconds: 10
+    periodSeconds: 60
+    resources: {}
+  nodeDriverRegistrar:
+    image:
+      repository: k8s.gcr.io/sig-storage/csi-node-driver-registrar
+      tag: v2.5.0
+      pullPolicy: IfNotPresent
+    resources: {}
+  plugin:
+    image:
+      repository: docker.io/k8scloudprovider/cinder-csi-plugin
+      pullPolicy: IfNotPresent
+      tag:  # defaults to .Chart.AppVersion
+    volumes:
+      - name: cacert
+        hostPath:
+          path: /etc/cacert
+    volumeMounts:
+      - name: cacert
+        mountPath: /etc/cacert
+        readOnly: true
+      - name: cloud-config
+        mountPath: /etc/kubernetes
+        readOnly: true
+    nodePlugin:
+      affinity: {}
+      nodeSelector: {}
+      tolerations:
+        - operator: Exists
+      kubeletDir: /var/lib/kubelet
+    controllerPlugin:
+      replicas: 1
+      strategy:
+        # RollingUpdate strategy replaces old pods with new ones gradually,
+        # without incurring downtime.
+        type: RollingUpdate
+        rollingUpdate:
+          # maxUnavailable is the maximum number of pods that can be
+          # unavailable during the update process.
+          maxUnavailable: 0
+          # maxSurge is the maximum number of pods that can be
+          # created over the desired number of pods.
+          maxSurge: 1
+      affinity: {}
+      nodeSelector: {}
+      tolerations: []
+    resources: {}
+  snapshotController:
+    enabled: false
+    image:
+      repository: k8s.gcr.io/sig-storage/snapshot-controller
+      tag: v5.0.1
+    resources: {}
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+
+# Log verbosity level.
+# See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md
+# for description of individual verbosity levels.
+logVerbosityLevel: 2
+
+secret:
+  enabled: false
+  create: false
+  filename: cloud.conf
+#  name: cinder-csi-cloud-config
+#  data:
+#    cloud.conf: |-
+#      [Global]
+#      auth-url=http://openstack-control-plane
+#      user-id=user-id
+#      password=password
+#      trust-id=trust-id
+#      region=RegionOne
+#      ca-file=/etc/cacert/ca-bundle.crt
+
+storageClass:
+  enabled: true
+  delete:
+    isDefault: false
+    allowVolumeExpansion: true
+  retain:
+    isDefault: false
+    allowVolumeExpansion: true
+# any kind of custom StorageClasses
+#   custom: |-
+#     ---
+#     apiVersion: storage.k8s.io/v1
+#     kind: StorageClass
+#     metadata:
+#       name: sas
+#     provisioner: cinder.csi.openstack.org
+#     volumeBindingMode: WaitForFirstConsumer
+#     allowVolumeExpansion: true
+#     parameters:
+#       type: SAS
+#     ---
+#     apiVersion: snapshot.storage.k8s.io/v1beta1
+#     kind: VolumeSnapshotClass
+#     metadata:
+#       name: csi-cinder-snapclass
+#     driver: cinder.csi.openstack.org
+#     deletionPolicy: Delete
+
+# You may set ID of the cluster where openstack-cinder-csi is deployed. This value will be appended
+# to volume metadata in newly provisioned volumes as `cinder.csi.openstack.org/cluster=<cluster ID>`.
+clusterID: "kubernetes"
+
+priorityClassName: ""

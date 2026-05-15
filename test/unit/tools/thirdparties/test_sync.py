@@ -103,7 +103,7 @@ class SynchronizationTest(unittest.TestCase):
         requirements = tracker.get_changed_software_requirements()
         self.assertEqual(new_versions, list(requirements), "Unexpected Kubernetes versions were changed")
         expected_software = {'calico', 'nginx-ingress-controller', 'envoy-gateway', 'kubernetes-dashboard', 
-                             'local-path-provisioner', 'containerd', 'crictl'}
+                             'local-path-provisioner', 'containerd', 'crictl', 'openstack-cinder-csi'}
         for ver in new_versions:
             self.assertEqual(expected_software,
                              {name for name, _ in requirements[ver]},

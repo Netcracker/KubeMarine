@@ -120,6 +120,11 @@ plugins:
     manifests: [] # manifests are empty because it is helm chart
     requirements:
       default: https://gateway.envoyproxy.io/news/releases/matrix/
+  # TODO: support Openstack Cinder CSI in thirdparties upgrade script, so that it downloads the chart
+  openstack-cinder-csi:
+    manifests: [] # manifests are empty because it is helm chart
+    requirements:
+      default: https://github.com/kubernetes/cloud-provider-openstack/blob/openstack-cinder-csi-{version}/docs/cinder-csi-plugin/using-cinder-csi-plugin.md#csi-compatibility
 
 software:
   containerd:
