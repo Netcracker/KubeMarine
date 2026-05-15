@@ -414,6 +414,24 @@ class FlowTest(unittest.TestCase):
         # no exception should occur
         flow.run_tasks(res, tasks)
 
+    def test_remove_control_plane_if_offline(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        online_hosts = [node["address"] for node in inventory["nodes"]]
+        control_planes = [i for i, node in enumerate(inventory["nodes"]) if 'control-plane' in node['roles']]
+
+        i = control_planes[0]
+        online_hosts.remove(inventory["nodes"][i]["address"])
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory["nodes"] = [{"name": inventory["nodes"][i]["name"]}]
+
+        self._stub_detect_nodes_context(inventory, online_hosts, [])
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        # no exception should occur — offline control-plane being removed must not block the procedure
+        flow.run_tasks(res, tasks)
+
     def test_remove_node_if_worker_offline(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         online_hosts = [node["address"] for node in inventory["nodes"]]

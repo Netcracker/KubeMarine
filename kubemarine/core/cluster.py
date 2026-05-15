@@ -563,7 +563,7 @@ class KubernetesCluster(Environment):
             return
         
         if procedure == 'remove_node':
-            group = self.make_group_from_roles(['control-plane', 'balancer'])
+            group = self.get_unchanged_nodes().having_roles(['control-plane', 'balancer'])
         else:
             group = self.make_group_from_roles(['control-plane', 'balancer']).include_group(self.get_new_nodes_or_self())
 
