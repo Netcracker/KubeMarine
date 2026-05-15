@@ -4566,7 +4566,7 @@ To fix above issue with old OpenStack, recommended approach is to simply change 
 ignore-volume-microversion=true
 ```
 
-This configuration tells openstack-cinder-csi plugin to work in a mode compatible with old OpenStack. With this change, new versions of openstack-cinder-csi will work with old OpenStack.
+This configuration tells openstack-cinder-csi plugin to work in a mode compatible with old OpenStack. With this change, new versions of openstack-cinder-csi will work with old OpenStack. DO NOT set this option for new OpenStack versions, only for old ones.
 
 Previously, for old OpenStack we recommeded to use old version of openstack-cinder-csi plugin. This approach is no longer recommeded, since `cloud.conf` option is better one. If you still want to use older version of openstack-cinder-csi plugin, you need to specify older version of openstack-cinder-csi chart and older plugin image, like following:
 ```yaml
