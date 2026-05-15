@@ -5,12 +5,6 @@
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.
 
 calico:
-  v1.32.0:
-    version: v3.29.1
-  v1.32.2:
-    version: v3.29.5
-  v1.32.10:
-    version: v3.31.2
   v1.33.0:
     version: v3.30.3
   v1.33.6:
@@ -18,19 +12,12 @@ calico:
   v1.34.1:
     version: v3.30.3
   v1.34.2:
-    version: v3.31.2
+    version: v3.32.0
   v1.35.0:
-    version: v3.31.2
+    version: v3.32.0
+  v1.36.0:
+    version: v3.32.0
 nginx-ingress-controller:
-  v1.32.0:
-    version: v1.16.0
-    webhook-version: v1.6.9
-  v1.32.2:
-    version: v1.16.0
-    webhook-version: v1.6.9
-  v1.32.10:
-    version: v1.16.0
-    webhook-version: v1.6.9
   v1.33.0:
     version: v1.16.0
     webhook-version: v1.6.9
@@ -44,18 +31,12 @@ nginx-ingress-controller:
     version: v1.16.0
     webhook-version: v1.6.9
   v1.35.0:
+    version: v1.16.0
+    webhook-version: v1.6.9
+  v1.36.0:
     version: v1.16.0
     webhook-version: v1.6.9
 kubernetes-dashboard:
-  v1.32.0:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.32.2:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.32.10:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
   v1.33.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
@@ -71,16 +52,10 @@ kubernetes-dashboard:
   v1.35.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
+  v1.36.0:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
 local-path-provisioner:
-  v1.32.0:
-    version: v0.0.27
-    busybox-version: 1.34.1
-  v1.32.2:
-    version: v0.0.27
-    busybox-version: 1.34.1
-  v1.32.10:
-    version: v0.0.32
-    busybox-version: 1.34.1
   v1.33.0:
     version: v0.0.31
     busybox-version: 1.34.1
@@ -96,25 +71,10 @@ local-path-provisioner:
   v1.35.0:
     version: v0.0.32
     busybox-version: 1.34.1
+  v1.36.0:
+    version: v0.0.32
+    busybox-version: 1.34.1
 envoy-gateway:
-  v1.32.0:
-    version: 2.2.0
-    envoyGateway-version: v1.7.0
-    envoy-version: distroless-v1.37.0
-    kubectl-version: 0.0.6
-    ratelimit-version: 3fb70258
-  v1.32.2:
-    version: 2.2.0
-    envoyGateway-version: v1.7.0
-    envoy-version: distroless-v1.37.0
-    kubectl-version: 0.0.6
-    ratelimit-version: 3fb70258
-  v1.32.10:
-    version: 2.2.0
-    envoyGateway-version: v1.7.0
-    envoy-version: distroless-v1.37.0
-    kubectl-version: 0.0.6
-    ratelimit-version: 3fb70258
   v1.33.0:
     version: 2.2.0
     envoyGateway-version: v1.7.0
@@ -140,6 +100,12 @@ envoy-gateway:
     kubectl-version: 0.0.6
     ratelimit-version: 3fb70258
   v1.35.0:
+    version: 2.2.0
+    envoyGateway-version: v1.7.0
+    envoy-version: distroless-v1.37.0
+    kubectl-version: 0.0.6
+    ratelimit-version: 3fb70258
+  v1.36.0:
     version: 2.2.0
     envoyGateway-version: v1.7.0
     envoy-version: distroless-v1.37.0
