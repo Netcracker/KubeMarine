@@ -1282,8 +1282,11 @@ def fix_flag_kubelet(group: NodeGroup) -> bool:
                 # remove the deprecated kubelet flag for versions starting from 1.27.0
                 updated_kubeadm_flags = updated_kubeadm_flags.replace(container_runtime_flag, '')
 
-            if infra_image_flag not in updated_kubeadm_flags:
+            if infra_image_flag not in updated_kubeadm_flags \
+                and components.kubernetes_minor_release_less_than(cluster.inventory, "v1.36"):
                 # patch --pod-infra-container-image with target sandbox_image
+                # NOTE: we should not add this flag for k8s v1.36+, it is not supported anymore,
+                # and if this flag already exists it will be removed by kubeadm itself
                 updated_kubeadm_flags = config_changer(updated_kubeadm_flags, infra_image_flag)
 
             if kubeadm_flags != updated_kubeadm_flags:

@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "corrupted_node": {
+      "type": "string",
+      "description": "ETCD member that will be removed and added once again.",
+      "minLength": 1
+    },
+    "healthy_node": {
+      "type": "string",
+      "description": "ETCD member that will be used to remove and add the corrupted node.",
+      "minLength": 1
+    }
+  },
+  "required": ["corrupted_node", "healthy_node"]
+}
