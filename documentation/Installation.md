@@ -4606,7 +4606,36 @@ plugins:
 
 ##### csi-snapshot-controller
 
-TODO
+`csi-snapshot-controller` deploys a controller which is required for `VolumeSnapshot` functionality to work:
+* https://github.com/kubernetes-csi/external-snapshotter#csi-snapshotter
+
+By default, the csi-snapshot-controller plugin is not installed, however, you can install it by enabling the plugin and providing required configuration, for example:
+```yaml
+plugins:
+  csi-snapshot-controller:
+    install: true
+    installation:
+      registry: $YOUR_K8S_REGISTRY_PROXY_HERE
+    additionalResources: |
+      ---
+      apiVersion: snapshot.storage.k8s.io/v1
+      kind: VolumeSnapshotClass
+      metadata:
+        annotations:
+          snapshot.storage.kubernetes.io/is-default-class: "true"
+        labels:
+          velero.io/csi-volumesnapshot-class: "true"
+        name: cinder-csi-retain
+      driver: cinder.csi.openstack.org
+      deletionPolicy: Retain
+      parameters:
+        force-create: "true"
+```
+
+**Note**:
+* Above configuration also creates default `VolumeSnapshotClass` for openstack cinder driver.
+* `csi-snapshot-controller` only works with recent versions of `openstack-cinder-csi` plugin, because old version contains a bug:
+  * https://github.com/kubernetes/cloud-provider-openstack/issues/1812
 
 #### Plugins Features
 
