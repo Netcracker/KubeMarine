@@ -1,0 +1,60 @@
+controller:
+  replicaCount: 1
+
+  revisionHistoryLimit: 10
+
+  fullnameOverride: ""
+
+  args:
+    leaderElection: true
+    leaderElectionNamespace: "$(NAMESPACE)"
+    httpEndpoint: ":8080"
+
+  image:
+    repository: registry.k8s.io/sig-storage/snapshot-controller
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+
+  imagePullSecrets: []
+
+  podAnnotations: {}
+
+  podLabels: {}
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+
+  resources: {}
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  topologySpreadConstraints: []
+
+  priorityClassName: ""
+    # Specifies wether a Priority Class should be attached to deployment pods
+
+  # Change `hostNetwork` to `true` when you want the pod to share its host's network namespace.
+  hostNetwork: false
+
+  # DNS settings for the controller pod. https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-config
+  dnsConfig: {}
+  # DNS Policy for controller pod. For Pods running with hostNetwork, set to `ClusterFirstWithHostNet`
+  # For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+  dnsPolicy: ClusterFirst

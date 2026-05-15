@@ -4594,6 +4594,10 @@ plugins:
 * If you use registry other than `docker.io`, you need to edit `csi.plugin.image.repository` in above configuration accordingly.
 * For old OpenStack version, OpenStack credentials should be stored on nodes under `/etc/kubernetes/cloud.conf`
 
+##### csi-snapshot-controller
+
+TODO
+
 #### Plugins Features
 
 This section provides information about the plugin features in detail.
