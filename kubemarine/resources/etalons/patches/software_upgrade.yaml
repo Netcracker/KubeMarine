@@ -14,6 +14,7 @@ thirdparties:
 packages:
   containerd:
     version_debian: []
+    version_ubuntu26.04: []
   containerdio:
     version_rhel8: []
     version_rhel9: []
@@ -23,11 +24,13 @@ packages:
     version_rhel9: false
     version_rhel10: false
     version_debian: false
+    version_ubuntu26.04: false
   keepalived:
     version_rhel8: false
     version_rhel9: false
     version_rhel10: false
     version_debian: false
+    version_ubuntu26.04: false
 plugins:
   calico: []
   nginx-ingress-controller: []

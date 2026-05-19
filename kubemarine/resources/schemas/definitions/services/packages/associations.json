@@ -4,6 +4,7 @@
   "allOf": [{"$ref": "#/definitions/Associations"}],
   "properties": {
     "debian": {"$ref": "#/definitions/OSFamilyAssociations"},
+    "ubuntu26.04": {"$ref": "#/definitions/OSFamilyAssociations"},
     "rhel8": {"$ref": "#/definitions/OSFamilyAssociations"},
     "rhel9": {"$ref": "#/definitions/OSFamilyAssociations"},
     "rhel10": {"$ref": "#/definitions/OSFamilyAssociations"}
@@ -11,7 +12,7 @@
   "propertyNames": {
     "anyOf": [
       {"$ref": "#/definitions/AssociationsNames"},
-      {"enum": ["debian", "rhel8", "rhel9", "rhel10"]}
+      {"enum": ["debian", "ubuntu26.04", "rhel8", "rhel9", "rhel10"]}
     ]
   },
   "definitions": {

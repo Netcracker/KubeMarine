@@ -1696,7 +1696,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os('debian')
+        group = cluster.nodes['all'].get_subgroup_with_os('debian', 'ubuntu26.04')
         if group.is_empty():
             return tc.success("No Debian nodes found")
         results = group.sudo("aa-enabled")
@@ -1723,7 +1723,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '228', "Security", "Apparmor Configuration") as tc:
-        group = cluster.nodes['all'].get_subgroup_with_os('debian')
+        group = cluster.nodes['all'].get_subgroup_with_os('debian', 'ubuntu26.04')
         if group.is_empty():
             return tc.success("No Debian nodes found")
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})

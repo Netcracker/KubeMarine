@@ -26,7 +26,7 @@ from kubemarine.procedures import add_node
 
 def new_debian_cluster(inventory: dict) -> FakeKubernetesCluster:
     context = demo.create_silent_context()
-    nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+    nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
     return demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
 
 
@@ -257,7 +257,7 @@ class AssociationsEnrichment(unittest.TestCase):
             new_debian_cluster(inventory)
 
     def _nodes_context_one_different_os(self, inventory, host_different_os):
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
         nodes_context[host_different_os]['os'] = {
             'name': 'centos',
             'family': 'rhel9',
@@ -274,7 +274,7 @@ class PackagesUtilities(unittest.TestCase):
         self.assertEqual('docker-ce', get_package_name('rhel9', 'docker-ce'))
 
     def test_get_package_name_debian(self):
-        self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.9-0ubuntu1~20.04.4'))
+        self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.9-0ubuntu1~22.04.4'))
         self.assertEqual('containerd', get_package_name('debian', 'containerd=1.5.*'))
         self.assertEqual('containerd', get_package_name('debian', 'containerd=*'))
         self.assertEqual('containerd', get_package_name('debian', 'containerd'))
@@ -282,10 +282,10 @@ class PackagesUtilities(unittest.TestCase):
     def test_detect_versions_debian(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
 
-        expected_pkg = 'containerd=1.5.9-0ubuntu1~20.04.4'
+        expected_pkg = 'containerd=1.5.9-0ubuntu1~22.04.4'
         queried_pkg = 'containerd=1.5.*'
         group = cluster.nodes['all']
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
@@ -330,7 +330,7 @@ class CacheVersions(unittest.TestCase):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
-        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         self.hosts = [node['address'] for node in self.inventory['nodes']]
         first_control_plane_idx = next(i for i, node in enumerate(self.inventory['nodes']) if 'control-plane' in node['roles'])
         self.new_host = self.inventory['nodes'][first_control_plane_idx]['address']
@@ -353,7 +353,7 @@ class CacheVersions(unittest.TestCase):
         self._packages_install(self.inventory).extend(['curl2', 'unzip2'])
         cluster = self._new_cluster()
         utils.stub_associations_packages(cluster, {
-            'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
+            'containerd': {host: 'containerd=1.5.9-0ubuntu1~22.04.4' for host in self.initial_hosts},
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
             'kmod': {host: 'kmod=27-1ubuntu2.1' for host in self.initial_hosts}
         })
@@ -364,7 +364,7 @@ class CacheVersions(unittest.TestCase):
 
         cache_installed_packages(cluster)
 
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
@@ -377,7 +377,7 @@ class CacheVersions(unittest.TestCase):
                          "Custom packages versions should be not detected when adding node")
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
@@ -390,7 +390,7 @@ class CacheVersions(unittest.TestCase):
                          "Custom packages versions should be detected in finalized inventory")
 
     def test_cache_versions_global_off(self):
-        expected_containerd = 'containerd=1.5.9-0ubuntu1~20.04.4'
+        expected_containerd = 'containerd=1.5.9-0ubuntu1~22.04.4'
         expected_kmod = 'kmod=27-1ubuntu2.1'
         default_containerd = ASSOCIATIONS_DEFAULTS['debian']['containerd']['package_name']
         default_kmod = ASSOCIATIONS_DEFAULTS['debian']['kmod']['package_name']
@@ -431,7 +431,7 @@ class CacheVersions(unittest.TestCase):
         set_cache_versions_false(self.inventory, 'debian', 'curl')
         cluster = self._new_cluster()
         utils.stub_associations_packages(cluster, {
-            'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
+            'containerd': {host: 'containerd=1.5.9-0ubuntu1~22.04.4' for host in self.initial_hosts},
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
             'haproxy': {host: 'haproxy=2.0.29-0ubuntu1' for host in self.initial_hosts},
             'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.initial_hosts},
@@ -453,7 +453,7 @@ class CacheVersions(unittest.TestCase):
                          "curl should be default because caching versions is off")
 
         finalized_inventory = utils.make_finalized_inventory(cluster, stub_cache_packages=False)
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
@@ -500,7 +500,7 @@ class CacheVersions(unittest.TestCase):
         for node in self.inventory['nodes']:
             if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 last_k8s_host = node['address']
-                containerd_hosts_stub[last_k8s_host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
+                containerd_hosts_stub[last_k8s_host] = 'containerd=1.5.9-0ubuntu1~22.04.4'
         containerd_hosts_stub[last_k8s_host] = 'containerd=2'
         utils.stub_associations_packages(cluster, {'containerd': containerd_hosts_stub})
 
@@ -529,7 +529,7 @@ class CacheVersions(unittest.TestCase):
         for node in self.inventory['nodes']:
             host = node['address']
             if 'control-plane' in node['roles'] or 'worker' in node['roles']:
-                packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
+                packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~22.04.4'
                 packages_hosts_stub['conntrack'][host] = 'conntrack=1:1.4.5-2'
 
         packages_hosts_stub['containerd'][self.new_host] = 'containerd=2'
@@ -538,7 +538,7 @@ class CacheVersions(unittest.TestCase):
 
         cache_installed_packages(cluster)
 
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be detected by initial nodes")
         self.assertEqual('conntrack=1:1.4.5-2',
@@ -551,7 +551,7 @@ class CacheVersions(unittest.TestCase):
         for node in self.inventory['nodes']:
             host = node['address']
             if 'control-plane' in node['roles'] or 'worker' in node['roles']:
-                packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
+                packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~22.04.4'
                 packages_hosts_stub['conntrack'][host] = 'conntrack=1:1.4.5-2'
             else:
                 packages_hosts_stub['containerd'][host] = 'containerd=2'
@@ -561,7 +561,7 @@ class CacheVersions(unittest.TestCase):
 
         cache_installed_packages(cluster)
 
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('conntrack=1:1.4.5-2',
@@ -569,7 +569,7 @@ class CacheVersions(unittest.TestCase):
                          "conntrack was not detected")
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
-        self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
+        self.assertEqual('containerd=1.5.9-0ubuntu1~22.04.4',
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('conntrack=1:1.4.5-2',
@@ -588,7 +588,7 @@ class CacheVersions(unittest.TestCase):
         }
         last_host = ''
         for last_host in self.initial_hosts:
-            packages_hosts_stub['containerd'][last_host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
+            packages_hosts_stub['containerd'][last_host] = 'containerd=1.5.9-0ubuntu1~22.04.4'
             packages_hosts_stub['auditd'][last_host] = 'auditd=1:2.8.5-2ubuntu6'
             packages_hosts_stub['kmod'][last_host] = 'kmod=27-1ubuntu2.1'
 
@@ -622,12 +622,12 @@ class CacheVersions(unittest.TestCase):
         default_containerd = ASSOCIATIONS_DEFAULTS['debian']['containerd']['package_name']
         default_kmod = ASSOCIATIONS_DEFAULTS['debian']['kmod']['package_name']
 
-        self.nodes_context[self.new_host]['os']['version'] = '22.04'
+        self.nodes_context[self.new_host]['os']['version'] = '24.04'
         self._packages_install(self.inventory).extend(['curl2=7.*'])
         cluster = self._new_cluster()
 
         utils.stub_associations_packages(cluster, {
-            'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
+            'containerd': {host: 'containerd=1.5.9-0ubuntu1~22.04.4' for host in self.initial_hosts},
             'kmod': {host: 'kmod=27-1ubuntu2.1' for host in self.initial_hosts},
         })
         utils.stub_detect_packages(cluster, {
@@ -736,7 +736,7 @@ class SystemUtilities(unittest.TestCase):
     def test_detect_kernel_upgrade_non_rhel(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
 
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
         group = cluster.nodes['all']

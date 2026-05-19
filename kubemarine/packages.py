@@ -58,7 +58,7 @@ def enrich_inventory_associations(cluster: KubernetesCluster) -> None:
             continue
 
         os_associations = utils.deepcopy_yaml(static.GLOBALS['packages']['common_associations'])
-        if association_name == 'debian':
+        if association_name in ('debian', 'ubuntu26.04'):
             del os_associations['semanage']
         for association_params in os_associations.values():
             del association_params['groups']
@@ -79,7 +79,7 @@ def enrich_inventory_associations(cluster: KubernetesCluster) -> None:
             # move remained associations properties to the specific OS family section and merge with priority
             default_merger.merge(enriched_associations[os_family], associations)
 
-    if 'semanage' in enriched_associations.get('debian', {}):
+    if 'semanage' in enriched_associations.get('debian', {}) or 'semanage' in enriched_associations.get('ubuntu26.04', {}):
         raise Exception(ERROR_SEMANAGE_NOT_MANAGED_DEBIAN)
 
 
@@ -464,7 +464,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
 
 def disable_unattended_upgrade(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
-    if group.get_nodes_os() != 'debian':
+    if group.get_nodes_os() not in ('debian', 'ubuntu26.04'):
         cluster.log.debug("Skipped - unattended upgrades are supported only on Ubuntu/Debian os family")
         return
 
@@ -482,7 +482,7 @@ def disable_unattended_upgrade(group: NodeGroup) -> None:
 
 def get_associations_os_family_keys() -> List[str]:
     # Generic 'rhel' is removed; use rhel8/rhel9/rhel10.
-    return ['debian', 'rhel8', 'rhel9', 'rhel10']
+    return ['debian', 'ubuntu26.04', 'rhel8', 'rhel9', 'rhel10']
 
 
 def get_compatibility_version_key(os_family: str) -> str:
@@ -538,7 +538,7 @@ def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]) -> PackageManager:
 
     if os_family in ['rhel8', 'rhel9', 'rhel10']:
         return yum
-    elif os_family == 'debian':
+    elif os_family in ['debian', "ubuntu26.04"]:
         return apt
 
     raise Exception('Failed to return package manager for unknown or multiple OS')
@@ -671,7 +671,7 @@ def detect_installed_packages_version_hosts(
 
 
 def get_package_version_separator(os_family: str) -> str:
-    return '=' if os_family == 'debian' else '-'
+    return '=' if os_family in ('debian', 'ubuntu26.04') else '-'
 
 
 def get_package_name(os_family: str, package: str) -> str:

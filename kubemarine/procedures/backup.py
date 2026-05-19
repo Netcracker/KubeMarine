@@ -47,6 +47,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
         "/etc/resolv.conf",
         "/etc/hosts",
         "/etc/chrony.conf",
+        "/etc/chrony/chrony.conf",
         "/etc/selinux/config",
         "/etc/yum.repos.d/",
         "/etc/apt/sources.list.d/",

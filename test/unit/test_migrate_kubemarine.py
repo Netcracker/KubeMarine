@@ -176,7 +176,7 @@ class UpgradeCRI(unittest.TestCase):
         }
 
     def test_enrich_and_finalize_inventory(self):
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = 'containerd-new'
         res = self._run_and_check(True, EnrichmentStage.PROCEDURE)
@@ -194,7 +194,7 @@ class UpgradeCRI(unittest.TestCase):
                          "Package associations are enriched incorrectly")
 
     def test_run_other_patch_not_enrich_inventory(self):
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = 'containerd-new'
 
@@ -215,13 +215,13 @@ class UpgradeCRI(unittest.TestCase):
                             "Package associations should not be enriched")
 
     def test_simple_upgrade_required(self):
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
     def test_specific_os_family_cri_association_upgrade_required(self):
         for os_name, os_family, os_version in (
-                ('ubuntu', 'debian', '20.04'),
+                ('ubuntu', 'debian', '22.04'),
                 ('centos', 'rhel9', '9'),
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
@@ -250,7 +250,7 @@ class UpgradeCRI(unittest.TestCase):
                     ('containerd-redefined', True)
             ):
                 with self.subTest(f"global: {global_section}, upgrade: {expected_upgrade_required}"):
-                    self.prepare_environment('ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '22.04')
                     self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                     associations = self.inventory['services']['packages']['associations']
@@ -265,7 +265,7 @@ class UpgradeCRI(unittest.TestCase):
     def test_package_template_upgrade_required(self):
         for template in (False, True):
             with self.subTest(f"template: {template}"):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
 
                 redefined_package, expected_package = 'containerd-inventory', 'containerd-inventory'
                 if template:
@@ -301,12 +301,12 @@ class UpgradeCRI(unittest.TestCase):
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_debian'] = [get_kubernetes_versions()[-2]]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_changed_other_os_family_upgrade_not_required(self):
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_rhel9'] = [self.kubernetes_version]
         self._run_and_check(False, EnrichmentStage.DEFAULT)
 
@@ -315,7 +315,7 @@ class UpgradeCRI(unittest.TestCase):
             with self.subTest(f"global: {global_section}"), \
                     test_utils.assert_raises_kme(self, "KME0010", package='containerd',
                                                  previous_version_spec='', next_version_spec=''):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                 associations = self.inventory['services']['packages']['associations']
@@ -329,7 +329,7 @@ class UpgradeCRI(unittest.TestCase):
         for package in ('haproxy', 'keepalived', 'audit', 'conntrack'):
             for global_section in (False, True):
                 with self.subTest(f"package: {package}, global: {global_section}"):
-                    self.prepare_environment('ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '22.04')
                     self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
 
                     associations = self.inventory['services']['packages']['associations']
@@ -341,7 +341,7 @@ class UpgradeCRI(unittest.TestCase):
                     self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_package_redefinition(self):
-        self.prepare_environment('ubuntu', '20.04')
+        self.prepare_environment('ubuntu', '22.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
 
@@ -592,7 +592,7 @@ class UpgradeThirdparties(unittest.TestCase):
             self._run_and_check('upgrade_crictl', False, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_source_redefinition(self):
-        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
         self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-redefined'
 
@@ -657,7 +657,7 @@ class UpgradeBalancers(unittest.TestCase):
     def test_enrich_and_finalize_inventory(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages'][package]['version_debian'] = True
                 self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = f'{package}-new'
                 res = self._run_and_check(f'upgrade_{package}', True, EnrichmentStage.PROCEDURE)
@@ -677,7 +677,7 @@ class UpgradeBalancers(unittest.TestCase):
     def test_run_other_patch_not_enrich_inventory(self):
         for package, other_package in (('haproxy', 'keepalived'), ('keepalived', 'haproxy')):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages'][package]['version_debian'] = True
                 self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = f'{package}-new'
 
@@ -695,7 +695,7 @@ class UpgradeBalancers(unittest.TestCase):
     def test_simple_upgrade_required(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages'][package]['version_debian'] = True
                 self._run_and_check(f'upgrade_{package}', True, EnrichmentStage.PROCEDURE)
 
@@ -707,7 +707,7 @@ class UpgradeBalancers(unittest.TestCase):
                         (f'{package}-redefined', True)
                 ):
                     with self.subTest(f"package: {package}, global: {global_section}, upgrade: {expected_upgrade_required}"):
-                        self.prepare_environment('ubuntu', '20.04')
+                        self.prepare_environment('ubuntu', '22.04')
                         self.changed_config['packages'][package]['version_debian'] = True
 
                         associations = self.inventory['services']['packages']['associations']
@@ -723,7 +723,7 @@ class UpgradeBalancers(unittest.TestCase):
         for package in ('haproxy', 'keepalived'):
             for template in (False, True):
                 with self.subTest(f"package: {package}, template: {template}"):
-                    self.prepare_environment('ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '22.04')
 
                     redefined_package, expected_package = f'{package}-inventory', f'{package}-inventory'
                     if template:
@@ -752,19 +752,19 @@ class UpgradeBalancers(unittest.TestCase):
     def test_changed_other_os_family_upgrade_not_required(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages'][package]['version_rhel9'] = True
                 self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_balancers_upgrade_not_required(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04', scheme=demo.FULLHA_NOBALANCERS)
+                self.prepare_environment('ubuntu', '22.04', scheme=demo.FULLHA_NOBALANCERS)
                 self.changed_config['packages'][package]['version_debian'] = True
                 self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_keepalived_upgrade_not_required(self):
-        self.prepare_environment('ubuntu', '20.04', scheme=demo.NON_HA_BALANCER)
+        self.prepare_environment('ubuntu', '22.04', scheme=demo.NON_HA_BALANCER)
         self.changed_config['packages']['keepalived']['version_debian'] = True
         self._run_and_check(f'upgrade_keepalived', False, EnrichmentStage.DEFAULT)
 
@@ -774,7 +774,7 @@ class UpgradeBalancers(unittest.TestCase):
                 with self.subTest(f"package: {package}, global: {global_section}"), \
                         test_utils.assert_raises_kme(self, "KME0010", package=package,
                                                      previous_version_spec='', next_version_spec=''):
-                    self.prepare_environment('ubuntu', '20.04')
+                    self.prepare_environment('ubuntu', '22.04')
                     self.changed_config['packages'][package]['version_debian'] = True
 
                     associations = self.inventory['services']['packages']['associations']
@@ -787,7 +787,7 @@ class UpgradeBalancers(unittest.TestCase):
     def test_run_other_patch_not_require_package_redefinition(self):
         for package, other_package in (('haproxy', 'keepalived'), ('keepalived', 'haproxy')):
             with self.subTest(package):
-                self.prepare_environment('ubuntu', '20.04')
+                self.prepare_environment('ubuntu', '22.04')
                 self.changed_config['packages'][package]['version_debian'] = True
                 self.inventory['services']['packages']['associations'][package]['package_name'] = f'{package}-redefined'
 
