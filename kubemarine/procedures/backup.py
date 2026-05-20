@@ -143,7 +143,8 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 
     backup_command = 'cd /tmp && ' \
                      'sudo rm -f /tmp/kubemarine-backup.tar.gz && ' \
-                     'sudo tar -czvf /tmp/kubemarine-backup.tar.gz -P $(sudo readlink -e %s) && ' \
+                     'sudo tar -czvf /tmp/kubemarine-backup.tar.gz -P ' \
+                        '$(sudo readlink -e $(sudo find %s -not -type d 2>&1 | grep -v "No such file")) && ' \
                      'sudo ls -la /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo du -hs /tmp/kubemarine-backup.tar.gz' % (' '.join(backup_list))
 
