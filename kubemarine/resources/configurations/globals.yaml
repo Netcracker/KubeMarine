@@ -125,6 +125,10 @@ plugins:
     manifests: [] # manifests are empty because it is helm chart
     requirements:
       default: https://github.com/kubernetes/cloud-provider-openstack/blob/openstack-cinder-csi-{version}/docs/cinder-csi-plugin/using-cinder-csi-plugin.md#csi-compatibility
+  csi-snapshot-controller:
+    manifests: [] # manifests are empty because it is helm chart
+    requirements:
+      default: https://github.com/kubernetes-csi/external-snapshotter#compatibility
 
 software:
   containerd:

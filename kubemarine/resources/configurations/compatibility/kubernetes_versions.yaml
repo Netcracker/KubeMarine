@@ -18,6 +18,7 @@ compatibility_map:
     local-path-provisioner: v0.0.31
     crictl: v1.33.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
   v1.33.6:
     calico: v3.31.2
     nginx-ingress-controller: v1.16.0
@@ -26,6 +27,7 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.33.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
   v1.34.1:
     calico: v3.30.3
     nginx-ingress-controller: v1.16.0
@@ -34,6 +36,7 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
   v1.34.2:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
@@ -42,6 +45,7 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
   v1.35.0:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
@@ -50,6 +54,7 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.35.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
   v1.36.0:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
@@ -58,6 +63,7 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.36.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
 # After any change, please run scripts/thirdparties/sync.py
 
 # The following optional keys are supported in addition to the 5 required software keys:

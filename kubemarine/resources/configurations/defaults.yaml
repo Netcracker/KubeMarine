@@ -936,6 +936,31 @@ plugins:
               - '{{ plugins["openstack-cinder-csi"].releaseName }}-nodeplugin'
               namespace: '{{ plugins["openstack-cinder-csi"].namespace }}'
 
+  csi-snapshot-controller:
+    version: '{{ globals.compatibility_map.software["csi-snapshot-controller"][services.kubeadm.kubernetesVersion].version }}'
+    install: false
+    namespace: "csi-snapshot-controller"
+    releaseName: "csi-snapshot-controller"
+    values: {}
+    installation:
+      priority: 3
+      procedures:
+        - python:
+            module: plugins/csi_snapshot_controller.py
+            method: apply_snapshot_controller_chart
+        - expect:
+            deployments:
+              - name: '{{ plugins["csi-snapshot-controller"].releaseName }}'
+                namespace: '{{ plugins["csi-snapshot-controller"].namespace }}'
+            pods:
+              list:
+              - '{{ plugins["csi-snapshot-controller"].releaseName }}'
+              namespace: '{{ plugins["csi-snapshot-controller"].namespace }}'
+        - python:
+            module: plugins/csi_snapshot_controller.py
+            method: apply_additional_resources
+    additionalResources: ""
+
 rbac:
   account_defaults:
     namespace: kube-system

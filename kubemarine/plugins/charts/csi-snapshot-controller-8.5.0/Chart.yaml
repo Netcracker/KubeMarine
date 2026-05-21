@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: v8.5.0
+description: 'Deploys a Snapshot Controller in a cluster.'
+name: csi-snapshot-controller
+version: 8.5.0

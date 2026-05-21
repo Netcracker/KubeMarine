@@ -166,3 +166,16 @@ openstack-cinder-csi:
     livenessprobe-version: v2.17.0
     nodeDriverRegistrar-version: v2.15.0
     plugin-version: v1.35.0
+csi-snapshot-controller:
+  v1.33.0:
+    version: 8.5.0
+  v1.33.6:
+    version: 8.5.0
+  v1.34.1:
+    version: 8.5.0
+  v1.34.2:
+    version: 8.5.0
+  v1.35.0:
+    version: 8.5.0
+  v1.36.0:
+    version: 8.5.0
