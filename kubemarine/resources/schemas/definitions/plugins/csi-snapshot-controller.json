@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Change the default settings for the 'csi-snapshot-controller' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of csi-snapshot-controller helm chart"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace where csi-snapshot-controller should be installed",
+      "default": "kube-system"
+    },
+    "releaseName": {
+      "type": "string",
+      "description": "Release name for csi-snapshot-controller helm chart",
+      "default": "openstack-cinder-csi"
+    },
+    "values": {
+      "type": "object",
+      "description": "Override values for csi-snapshot-controller helm chart"
+    },
+    "additionalResources": {
+      "type": "string",
+      "description": "Multi-line string containing additional resources manifests to apply after plugin installation (e.g. CRs)",
+      "default": ""
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "namespace", "releaseName", "values", "additionalResources"]}
+    ]
+  }
+}

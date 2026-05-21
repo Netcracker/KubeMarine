@@ -39,3 +39,4 @@ plugins:
   local-path-provisioner: []
   envoy-gateway: []
   openstack-cinder-csi: []
+  csi-snapshot-controller: []

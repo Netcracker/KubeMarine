@@ -17,6 +17,12 @@
     },
     "envoy-gateway": {
       "$ref": "plugins/envoy-gateway.json"
+    },
+    "openstack-cinder-csi": {
+      "$ref": "plugins/openstack-cinder-csi.json"
+    },
+    "csi-snapshot-controller": {
+      "$ref": "plugins/csi-snapshot-controller.json"
     }
   },
   "additionalProperties": {

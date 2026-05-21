@@ -72,6 +72,7 @@ This section provides information about the inventory, features, and steps for i
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
         - [openstack-cinder-csi](#openstack-cinder-csi)
+        - [csi-snapshot-controller](#csi-snapshot-controller)
       - [Plugins Features](#plugins-features)
         - [plugin_defaults](#plugin_defaults)
         - [Plugins Reinstallation](#plugins-reinstallation)
@@ -4554,17 +4555,25 @@ plugins:
 * Above configuration assumes that nodes have OpenStack credentials stored on all nodes under `/etc/config/cloud.conf` file. You need to put this file on nodes during nodes provisioning.
 * By default, this plugin uses `openstack-cinder-csi` namespace and helm release name.
 
-If you are using an old OpenStack, above configuration will not work, because it installs new version of Cinder CSI plugin, which is not compatible with old OpenStack APIs. You may see issues like following:
+If you are using an old OpenStack, above configuration may not work, because it installs new version of Cinder CSI plugin, which expects new OpenStack APIs. You may see issues like following:
 ```
 E0428 10:09:13.203111      12 utils.go:99] [ID:36] GRPC error: rpc error: code = Internal desc = Failed to get volumes: Expected HTTP response code [200 204 300] when accessing [GET ...], but got 400 instead: {"badRequest": {"message": "Invalid filters name are found in query options.", "code": 400}}
 ```
 
-For old OpenStack, you should use older version of openstack-cinder-csi chart and older plugin image, like following:
+To fix above issue with old OpenStack, recommended approach is to simply change your `cloud.conf` file adding below configuration:
+```toml
+[BlockStorage]
+ignore-volume-microversion=true
+```
+
+This configuration tells openstack-cinder-csi plugin to work in a mode compatible with old OpenStack. With this change, new versions of openstack-cinder-csi will work with old OpenStack. DO NOT set this option for new OpenStack versions, only for old ones.
+
+Previously, for old OpenStack we recommeded to use old version of openstack-cinder-csi plugin. This approach is no longer recommeded, since `cloud.conf` option is better one. If you still want to use older version of openstack-cinder-csi plugin, you need to specify older version of openstack-cinder-csi chart and older plugin image, like following:
 ```yaml
 plugins:
   openstack-cinder-csi:
     install: true
-    version: 2.2.0 # changed for old OpenStack
+    version: 2.2.0 # changed
     values:
       storageClass:
         enabled: false
@@ -4582,7 +4591,7 @@ plugins:
           allowVolumeExpansion: true
           parameters:
             type: $YOUR_OPENSTACK_VOLUME_TYPE_HERE
-      # changed for old OpenStack
+      # changed
       csi:
         plugin:
           image:
@@ -4591,8 +4600,42 @@ plugins:
 ```
 
 **Note**:
+* Using old openstack-cinder-csi version is NOT recommended, please use approach with `cloud.conf` option.
 * If you use registry other than `docker.io`, you need to edit `csi.plugin.image.repository` in above configuration accordingly.
-* For old OpenStack version, OpenStack credentials should be stored on nodes under `/etc/kubernetes/cloud.conf`
+* For old openstack-cinder-csi version, OpenStack credentials should be stored on nodes under `/etc/kubernetes/cloud.conf`
+
+##### csi-snapshot-controller
+
+`csi-snapshot-controller` deploys a controller which is required for `VolumeSnapshot` functionality to work:
+* https://github.com/kubernetes-csi/external-snapshotter#csi-snapshotter
+
+By default, the csi-snapshot-controller plugin is not installed, however, you can install it by enabling the plugin and providing required configuration, for example:
+```yaml
+plugins:
+  csi-snapshot-controller:
+    install: true
+    installation:
+      registry: $YOUR_K8S_REGISTRY_PROXY_HERE
+    additionalResources: |
+      ---
+      apiVersion: snapshot.storage.k8s.io/v1
+      kind: VolumeSnapshotClass
+      metadata:
+        annotations:
+          snapshot.storage.kubernetes.io/is-default-class: "true"
+        labels:
+          velero.io/csi-volumesnapshot-class: "true"
+        name: cinder-csi-retain
+      driver: cinder.csi.openstack.org
+      deletionPolicy: Retain
+      parameters:
+        force-create: "true"
+```
+
+**Note**:
+* Above configuration also creates default `VolumeSnapshotClass` for openstack cinder driver.
+* `csi-snapshot-controller` only works with recent versions of `openstack-cinder-csi` plugin, because old version contains a bug:
+  * https://github.com/kubernetes/cloud-provider-openstack/issues/1812
 
 #### Plugins Features
 
