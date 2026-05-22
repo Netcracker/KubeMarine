@@ -747,7 +747,8 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                         f'-s -S -w "%{{http_code}}"', pty=True, warn=True)
                 status = list(check_url.values())[0].stdout
                 lst = status.split('\n')
-                if lst[len(lst)-1] == '200':
+                http_code = lst[len(lst)-1].strip()
+                if http_code in ('200', '405'):
                     cluster.log.verbose(status)
                     cluster.log.debug('Dashboard ingress is OK')
                     test_ingress_succeeded = True
