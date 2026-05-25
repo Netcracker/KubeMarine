@@ -944,16 +944,14 @@ def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
     # 1. Create anonymous pipe
     # 2. Create python listener process in background and redirect output to pipe
     # 3. Wait till the listener fails and exits, or till it responds with message
-    # 4. Read the remained data from pipe in non-blocking mode
-    # 5. Exit with success or fail depending on what was received from pipe
+    # 4. Exit with success or fail depending on what was received from pipe
     return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
            f"sudo nohup {python_executable} {port_listener} $PORT >&3 2>&1 & " \
            "PID=$(echo $!); " \
            "while sudo kill -0 $PID 2>/dev/null ; do " \
-               "read -t 0.1 DATA <&3; " \
+               "read -t 1 DATA <&3; " \
                "if [[ -n $DATA ]]; then break; fi; " \
            "done; " \
-           "DATA=$(echo -n \"$DATA\" && read -t 0.1 <&3); " \
            "if [[ $DATA == \"In use\" ]]; then " \
                "echo \"$PORT in use\" ; " \
                "exit 0; " \
