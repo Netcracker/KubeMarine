@@ -950,10 +950,10 @@ def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
            f"sudo nohup {python_executable} {port_listener} $PORT >&3 2>&1 & " \
            "PID=$(echo $!); " \
            "while sudo kill -0 $PID 2>/dev/null ; do " \
-               "DATA=$(dd iflag=nonblock status=none <&3 2>/dev/null) ; " \
-               "if [[ -n $DATA ]]; then break; else sleep 0.1; fi; " \
+               "read -t 0.1 DATA <&3; " \
+               "if [[ -n $DATA ]]; then break; fi; " \
            "done; " \
-           "DATA=$(echo -n \"$DATA\" && dd iflag=nonblock status=none <&3 2>/dev/null); " \
+           "DATA=$(echo -n \"$DATA\" && read -t 0.1 <&3); " \
            "if [[ $DATA == \"In use\" ]]; then " \
                "echo \"$PORT in use\" ; " \
                "exit 0; " \
