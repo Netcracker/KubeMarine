@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Go
+  - package-ecosystem: "gomod"
+    directory: "/kubemarine/resources/scripts/source/ipip_check"
+    schedule:
+      interval: "weekly"
+  
+  # Dockerfiles
+  - package-ecosystem: "docker"
+    directories:
+      - "/"
+      - "/ci"
+    schedule:
+      interval: "weekly"
+  
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
