@@ -47,6 +47,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
         "/etc/resolv.conf",
         "/etc/hosts",
         "/etc/chrony.conf",
+        "/etc/chrony/chrony.conf",
         "/etc/selinux/config",
         "/etc/yum.repos.d/",
         "/etc/apt/sources.list.d/",
@@ -142,7 +143,8 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 
     backup_command = 'cd /tmp && ' \
                      'sudo rm -f /tmp/kubemarine-backup.tar.gz && ' \
-                     'sudo tar -czvf /tmp/kubemarine-backup.tar.gz -P $(sudo readlink -e %s) && ' \
+                     'sudo tar -czvf /tmp/kubemarine-backup.tar.gz -P ' \
+                        '$(sudo readlink -e $(sudo find %s -not -type d 2>&1 | grep -v "No such file")) && ' \
                      'sudo ls -la /tmp/kubemarine-backup.tar.gz && ' \
                      'sudo du -hs /tmp/kubemarine-backup.tar.gz' % (' '.join(backup_list))
 

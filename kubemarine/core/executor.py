@@ -743,7 +743,7 @@ class RawExecutor:
 
             self.logger.verbose("Attempting to connect to nodes...")
             # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
-            results.update(self._do_nopasswd(left_nodes, tpe, "last reboot"))
+            results.update(self._do_nopasswd(left_nodes, tpe, "uptime -s"))
             left_nodes = [host for host, result in results.items()
                           if (isinstance(result, BaseException)
                               # Something is wrong with sudo access. Node is active.

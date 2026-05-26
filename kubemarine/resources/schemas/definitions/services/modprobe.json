@@ -3,13 +3,14 @@
   "type": "object",
   "properties": {
     "debian": {"$ref": "#/definitions/OSFamilyModules"},
+    "ubuntu26.04": {"$ref": "#/definitions/OSFamilyModules"},
     "rhel8": {"$ref": "#/definitions/OSFamilyModules"},
     "rhel9": {"$ref": "#/definitions/OSFamilyModules"},
     "rhel10": {"$ref": "#/definitions/OSFamilyModules"}
   },
   "propertyNames": {
     "anyOf": [
-      {"enum": ["debian", "rhel8", "rhel9", "rhel10"]}
+      {"enum": ["debian", "ubuntu26.04", "rhel8", "rhel9", "rhel10"]}
     ]
   },
   "definitions": {

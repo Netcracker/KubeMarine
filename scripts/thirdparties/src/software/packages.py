@@ -86,6 +86,7 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
         'version_rhel9',
         'version_rhel10',
         'version_debian',
+        'version_ubuntu26.04',
     ]
     if package_name == 'containerd':
         keys.remove('version_rhel8')
@@ -93,6 +94,7 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
         keys.remove('version_rhel10')
     elif package_name == 'containerdio':
         keys.remove('version_debian')
+        keys.remove('version_ubuntu26.04')
 
     return keys
 

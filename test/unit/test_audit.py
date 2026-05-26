@@ -27,7 +27,7 @@ class TestAuditInstallation(unittest.TestCase):
 
     def new_debian_cluster(self) -> FakeKubernetesCluster:
         context = demo.create_silent_context()
-        nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         return demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
     def get_detect_package_version_cmd(self, os_family: str, package_name: str):

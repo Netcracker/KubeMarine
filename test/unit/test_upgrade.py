@@ -243,7 +243,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
-        self.setUpNodesContext('ubuntu', '20.04')
+        self.setUpNodesContext('ubuntu', '22.04')
 
     def setUpNodesContext(self, os_name: str, os_version: str):
         # pylint: disable-next=attribute-defined-outside-init
@@ -365,7 +365,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def test_compatibility_upgrade_required(self):
         for os_name, os_family, os_version in (
-                ('ubuntu', 'debian', '20.04'),
+                ('ubuntu', 'debian', '22.04'),
                 ('centos', 'rhel9', '9'),
                 ('rhel', 'rhel8', '8.7'),
                 ('rhel', 'rhel9', '9.2')
@@ -894,7 +894,7 @@ class UpgradeContainerdConfigEnrichment(_AbstractUpgradeEnrichmentTest):
 
     def setUpVersions(self, old: str, _new: List[str]):
         super().setUpVersions(old, _new)
-        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         self.inventory['services']['cri'].setdefault('containerdConfig', {})\
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})
         for new in _new:

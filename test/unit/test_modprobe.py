@@ -214,6 +214,7 @@ class ModulesEnrichment(unittest.TestCase):
     def _get_os_context(self, os_family: str) -> Tuple[str, str]:
         return {
             'debian': ('ubuntu', '22.04'),
+            'ubuntu26.04': ('ubuntu', '26.04'),
             'rhel8': ('rhel', '8.7'),
             'rhel9': ('rhel', '9.2'),
             'rhel10': ('rocky', '10.1')

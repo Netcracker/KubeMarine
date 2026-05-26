@@ -161,6 +161,7 @@ services:
     rhel9: *modprobe-default-modules
     rhel10: *modprobe-default-modules
     debian: *modprobe-default-modules
+    ubuntu26.04: *modprobe-default-modules
 
   sysctl:
     net.ipv4.ip_nonlocal_bind:
@@ -471,6 +472,16 @@ services:
     # 'package.<OS family>' sections of globals.yaml, target Kubernetes version, and the compatibility map.
     associations:
       debian:
+        containerd: {}
+        haproxy:
+          executable_name: 'haproxy'
+          service_name: 'haproxy'
+        keepalived: {}
+        audit:
+          package_name: 'auditd'
+        conntrack:
+          package_name: 'conntrack'
+      ubuntu26.04:
         containerd: {}
         haproxy:
           executable_name: 'haproxy'

@@ -477,7 +477,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
         # TODO: think about better parsing
         repository_urls: List[str] = []
         repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
-        if cluster.get_os_family() not in ['debian', 'rhel8', 'rhel9', 'rhel10']:
+        if cluster.get_os_family() not in ['debian', 'ubuntu26.04', 'rhel8', 'rhel9', 'rhel10']:
             # Skip check in case of multiply or unknown OS
             raise TestWarn("Can't check package repositories on multiple or unknown OS")
         if isinstance(repositories, list):
@@ -944,16 +944,14 @@ def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
     # 1. Create anonymous pipe
     # 2. Create python listener process in background and redirect output to pipe
     # 3. Wait till the listener fails and exits, or till it responds with message
-    # 4. Read the remained data from pipe in non-blocking mode
-    # 5. Exit with success or fail depending on what was received from pipe
+    # 4. Exit with success or fail depending on what was received from pipe
     return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
            f"sudo nohup {python_executable} {port_listener} $PORT >&3 2>&1 & " \
            "PID=$(echo $!); " \
            "while sudo kill -0 $PID 2>/dev/null ; do " \
-               "DATA=$(dd iflag=nonblock status=none <&3 2>/dev/null) ; " \
-               "if [[ -n $DATA ]]; then break; else sleep 0.1; fi; " \
+               "read -t 1 DATA <&3; " \
+               "if [[ -n $DATA ]]; then break; fi; " \
            "done; " \
-           "DATA=$(echo -n \"$DATA\" && dd iflag=nonblock status=none <&3 2>/dev/null); " \
            "if [[ $DATA == \"In use\" ]]; then " \
                "echo \"$PORT in use\" ; " \
                "exit 0; " \
