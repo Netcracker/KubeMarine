@@ -4654,6 +4654,7 @@ plugins:
         releaseName: "my-release"
     ```
 * You can override chart values using `plugins.csi-snapshot-controller.values` field. Supported parameters could be found in the chart [`values.yaml`](/kubemarine/plugins/charts/csi-snapshot-controller-8.5.0/values.yaml).
+* `VolumeSnapshotClass` fields are mostly immutable, so if you want to change them, you need to first manually delete existing VolumeSnapshotClass on the cluster (with the same name). Alternatively you can add a new VolumeSnapshotClass and make it the default.
 
 #### Plugins Features
 
