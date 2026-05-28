@@ -186,9 +186,9 @@ The actual information about the supported versions can be found in `compatibili
   * Internal communication:
     * 22: SSH 
     * 53: CoreDNS, if access is needed from services bound to the host network.
-    * 80 (or 20080, if balancers are presented): HTTP
+    * 80, 20080, 21080: HTTP
     * 179: Calico BGP
-    * 443 (or 20443, if balancers are presented): HTTPS
+    * 443, 20443, 21443: HTTPS
     * 5443: Calico API server, if enabled
     * 5473: Calico networking with Typha enabled
     * 6443: Kubernetes API server
@@ -396,6 +396,8 @@ This deployment provides a single Kubemarine control-plane.
 This scheme has one node assigned as control-plane and worker roles; balancer role is optional. This scheme is used for developing and demonstrating purposes only.
 An example of this scheme is available in the [All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml).
 
+**Note:** If you install both ingress-nginx and envoy-gateway at the same time in this schema, you should explicitly provide hostPorts configuration to these plugins, otherwise they both will compete for ports 80/443.
+
 The following image illustrates the All-in-one scheme.
 
 ![All-in-one Scheme](/documentation/images/all-in-one.png)
@@ -411,8 +413,10 @@ This schema might be useful if:
 In this case, you can use schema with single control plane node (which runs envoy-gateway/ingress-nginx) and many (1 or more) workers.
 An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](../examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
 
-**Note**: Optionally, if you want control-plane node to be able to run workloads, 
+**Note**: 
+* Optionally, if you want control-plane node to be able to run workloads, 
 you need to add "worker" role to this node.
+* If you install both ingress-nginx and envoy-gateway at the same time in this schema, you should explicitly provide hostPorts configuration to these plugins, otherwise they both will compete for ports 80/443.
 
 The following image illustrates the "One Control Plane and Many Workers" schema.
 
