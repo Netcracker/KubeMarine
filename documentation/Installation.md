@@ -3278,7 +3278,7 @@ services:
 
 ###### target_backend
 
-This section selects which ingress stack receives traffic from HAProxy: `nginx` or `envoy`. Default is `nginx` if nginx-ingress-controller is installed, otherwise `envoy`. If you do not install nginx and envoy plugins, this option has no effect.
+This section selects which ingress stack receives traffic from HAProxy: `nginx` or `envoy`. Default is `nginx` if nginx-ingress-controller is installed, otherwise `envoy`. If you do not install nginx and envoy plugins, this option simply selects target_ports pair.
 
 **Note**: Envoy Gateway uses Gateway API resources (HTTPRoutes, etc) instead of Ingresses. Thus, when you migrate cluster from Ingress-NGINX to Envoy Gateway, your applications should also migrate from Ingresses to Gateway API resources, otherwise routing will not work.
 
