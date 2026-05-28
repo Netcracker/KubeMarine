@@ -17,17 +17,10 @@ import os
 import yaml
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine import plugins, haproxy
+from kubemarine import plugins
 from kubemarine.core.yaml_merger import default_merger
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for envoy gateway plugin since it is not installed"
-
-@enrichment(EnrichmentStage.FULL)
-def enrich_inventory(cluster: KubernetesCluster) -> None:    
-    # We override priority from 1 to 2, to make envoy install after nginx if envoy is target_backend.
-    # This is required to make sure nginx frees hostPorts
-    if haproxy.get_target_backend(cluster.inventory) == "envoy":
-        cluster.inventory["plugins"]["envoy-gateway"]["installation"]["priority"] = 2
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
 def cert_renew_enrichment(cluster: KubernetesCluster) -> None:
@@ -200,14 +193,15 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
             "key": base64.b64encode(envoy_plugin["externalGateway"]["certificate"]["key"].encode("utf-8")).decode("ascii"),
         }
 
-    if haproxy.get_target_backend(cluster.inventory) == "envoy":
-        targetPorts = cluster.inventory["services"]["loadbalancer"]["target_ports"]
+    has_balancers = any('balancer' in node['roles'] for node in cluster.inventory['nodes'])
+    if has_balancers and envoy_plugin["externalGateway"]["hostPorts"]["http"] == 0 \
+            and envoy_plugin["externalGateway"]["hostPorts"]["https"] == 0:
+        target_ports = cluster.inventory["services"]["loadbalancer"]["target_ports"]
         helm_plugin_config["values"]["defaultGateways"]["external"]["proxyProtocol"] = True
         helm_plugin_config["values"]["defaultGateways"]["external"]["hostPorts"] = True
-        helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = targetPorts["http"]
-        helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = targetPorts["https"]
-    else:
-        # If HAProxy is not used in front of Envoy, then we should not enable proxyProtocol
+        helm_plugin_config["values"]["defaultGateways"]["external"]["httpHostPort"] = target_ports["envoy_http"]
+        helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = target_ports["envoy_https"]
+    elif not has_balancers:
         helm_plugin_config["values"]["defaultGateways"]["external"]["proxyProtocol"] = False
 
     if envoy_plugin["externalGateway"]["hostPorts"]["http"] != 0 \

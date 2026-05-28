@@ -89,17 +89,27 @@
     },
     "target_ports": {
       "type": "object",
-      "description": "The section contains the information about http/https ports, which are used in connection from balancers to worker nodes",
+      "description": "HTTP/HTTPS ports on worker nodes. Nginx uses http/https; Envoy uses envoy_http/envoy_https. HAProxy backends use http/https or envoy_http/envoy_https depending on target_backend.",
       "properties": {
         "http": {
           "type": ["string", "integer"],
           "default": 80,
-          "description": "Target http port"
+          "description": "Nginx ingress HTTP hostPort and HAProxy backend when target_backend is nginx"
         },
         "https": {
           "type": ["string", "integer"],
           "default": 443,
-          "description": "Target https port"
+          "description": "Nginx ingress HTTPS hostPort and HAProxy backend when target_backend is nginx"
+        },
+        "envoy_http": {
+          "type": ["string", "integer"],
+          "default": 80,
+          "description": "Envoy Gateway HTTP hostPort and HAProxy backend when target_backend is envoy"
+        },
+        "envoy_https": {
+          "type": ["string", "integer"],
+          "default": 443,
+          "description": "Envoy Gateway HTTPS hostPort and HAProxy backend when target_backend is envoy"
         }
       },
       "additionalProperties": false

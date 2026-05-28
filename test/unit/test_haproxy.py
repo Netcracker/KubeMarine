@@ -60,6 +60,36 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
                                      "Invalid exception message")
 
 
+class TestHaproxyTargetPorts(unittest.TestCase):
+
+    def test_get_haproxy_target_ports_for_nginx_backend(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_backend'] = 'nginx'
+        cluster = demo.new_cluster(inventory)
+        target_ports = haproxy.get_haproxy_target_ports(cluster.inventory)
+        self.assertEqual(20080, int(target_ports['http']))
+        self.assertEqual(20443, int(target_ports['https']))
+
+    def test_get_haproxy_target_ports_for_envoy_backend(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_backend'] = 'envoy'
+        cluster = demo.new_cluster(inventory)
+        target_ports = haproxy.get_haproxy_target_ports(cluster.inventory)
+        self.assertEqual(21080, int(target_ports['http']))
+        self.assertEqual(21443, int(target_ports['https']))
+
+    def test_haproxy_config_uses_envoy_backend_ports(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_backend'] = 'envoy'
+        cluster = demo.new_cluster(inventory)
+        balancer_node = cluster.nodes['balancer'].get_first_member()
+        config = haproxy.get_config(cluster, balancer_node.get_config())
+        self.assertIn(':21080', config)
+        self.assertIn(':21443', config)
+        self.assertNotIn(':20080', config)
+        self.assertNotIn(':20443', config)
+
+
 class TestHaproxyInstallation(unittest.TestCase):
 
     def test_haproxy_installation_when_already_installed(self):

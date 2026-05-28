@@ -318,6 +318,8 @@ class TestInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         self.assertEqual(80, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
+        self.assertEqual(80, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_http']))
+        self.assertEqual(443, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_https']))
         self.assertEqual(80, int(next(filter(
             lambda port: port['name'] == 'http',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
@@ -330,6 +332,8 @@ class TestInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         self.assertEqual(20080, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(20443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
+        self.assertEqual(21080, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_http']))
+        self.assertEqual(21443, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_https']))
         self.assertEqual(20080, int(next(filter(
             lambda port: port['name'] == 'http',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
@@ -342,6 +346,8 @@ class TestInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         self.assertEqual(20080, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(20443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
+        self.assertEqual(21080, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_http']))
+        self.assertEqual(21443, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_https']))
         self.assertEqual(20080, int(next(filter(
             lambda port: port['name'] == 'http',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
@@ -354,6 +360,8 @@ class TestInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         self.assertEqual(20080, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(20443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
+        self.assertEqual(21080, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_http']))
+        self.assertEqual(21443, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_https']))
         self.assertEqual(20080, int(next(filter(
             lambda port: port['name'] == 'http',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
@@ -366,10 +374,23 @@ class TestInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         self.assertEqual(80, int(cluster.inventory['services']['loadbalancer']['target_ports']['http']))
         self.assertEqual(443, int(cluster.inventory['services']['loadbalancer']['target_ports']['https']))
+        self.assertEqual(80, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_http']))
+        self.assertEqual(443, int(cluster.inventory['services']['loadbalancer']['target_ports']['envoy_https']))
         self.assertEqual(80, int(next(filter(
             lambda port: port['name'] == 'http',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
         self.assertEqual(443, int(next(filter(
+            lambda port: port['name'] == 'https',
+            cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
+
+    def test_nginx_host_ports_when_envoy_is_target_backend(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_backend'] = 'envoy'
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual(20080, int(next(filter(
+            lambda port: port['name'] == 'http',
+            cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
+        self.assertEqual(20443, int(next(filter(
             lambda port: port['name'] == 'https',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
 

@@ -135,6 +135,16 @@ def get_target_backend(inventory: dict) -> str:
 
     return "envoy"
 
+
+def get_haproxy_target_ports(inventory: dict) -> dict:
+    """
+    Returns http/https ports for HAProxy worker backends based on target_backend.
+    """
+    target_ports = inventory['services']['loadbalancer']['target_ports']
+    if get_target_backend(inventory) == "envoy":
+        return {'http': target_ports['envoy_http'], 'https': target_ports['envoy_https']}
+    return {'http': target_ports['http'], 'https': target_ports['https']}
+
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
     defer = group.new_defer()
@@ -202,7 +212,7 @@ def get_config(cluster: KubernetesCluster, node: NodeConfig, maintenance: bool =
     if config_string is not None:
         return config_string
 
-    target_ports: dict = inventory['services']['loadbalancer']['target_ports']
+    target_ports: dict = get_haproxy_target_ports(inventory)
 
     # todo support custom template for maintenance mode
     if not maintenance and config_options.get('config_file'):
