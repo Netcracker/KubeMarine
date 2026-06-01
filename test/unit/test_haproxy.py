@@ -89,6 +89,35 @@ class TestHaproxyTargetPorts(unittest.TestCase):
         self.assertNotIn(':20080', config)
         self.assertNotIn(':20443', config)
 
+    def test_overlapping_ingress_target_ports_fail_when_both_plugins_installed(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('plugins', {}).setdefault('envoy-gateway', {})['install'] = True
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_ports'] = {
+            'http': 20080,
+            'https': 20443,
+            'envoy_http': 20080,
+            'envoy_https': 20443,
+        }
+
+        with self.assertRaises(Exception) as cm:
+            demo.new_cluster(inventory)
+
+        self.assertEqual(
+            haproxy.ERROR_INGRESS_TARGET_PORTS_OVERLAP % '20080, 20443',
+            str(cm.exception),
+        )
+
+    def test_overlapping_target_ports_allowed_if_nginx_not_installed(self):
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        inventory.setdefault('plugins', {}).setdefault('nginx-ingress-controller', {})['install'] = False
+        inventory.setdefault('services', {}).setdefault('loadbalancer', {})['target_ports'] = {
+            'http': 20080,
+            'https': 20443,
+            'envoy_http': 20080,
+            'envoy_https': 20443,
+        }
+
+        demo.new_cluster(inventory)
 
 class TestHaproxyInstallation(unittest.TestCase):
 
