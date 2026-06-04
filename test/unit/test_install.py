@@ -23,7 +23,7 @@ class ManageMandatoryPackages(unittest.TestCase):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.context = demo.create_silent_context()
-        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
         self.mandatory_pkgs_setup = {}
         for package in static.DEFAULTS["services"]["packages"]['mandatory'].keys():
             self.mandatory_pkgs_setup[package] = []

@@ -404,7 +404,7 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
 
 
 def get_reboot_history(group: NodeGroup) -> RunnersGroupResult:
-    return group.sudo('last reboot')
+    return group.sudo('uptime -s')
 
 
 def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
@@ -437,7 +437,11 @@ def configure_chronyd(group: NodeGroup, retries: int = 60) -> RunnersGroupResult
         chronyd_config += "\nrtcsync"
 
     utils.dump_file(cluster, chronyd_config, 'chrony.conf')
-    group.put(io.StringIO(chronyd_config), '/etc/chrony.conf', backup=True, sudo=True)
+
+    chrony_conf_path = '/etc/chrony.conf'
+    if group.get_nodes_os() == "ubuntu26.04":
+        chrony_conf_path = '/etc/chrony/chrony.conf'
+    group.put(io.StringIO(chronyd_config), chrony_conf_path, backup=True, sudo=True)
     group.sudo('systemctl restart chronyd')
     while retries > 0:
         log.debug("Waiting for time sync, retries left: %s" % retries)
@@ -526,7 +530,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
     else:
         log.debug('Selinux verification skipped - origin task was not completed')
 
-    if cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
+    if cluster.is_task_completed('prepare.system.setup_apparmor') and os_family in ('debian', 'ubuntu26.04'):
         log.debug("Verifying Apparmor...")
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         apparmor_configured = apparmor.is_state_valid(group, expected_profiles)
@@ -609,7 +613,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
     exc = None
     results: GenericGroupResult[GenericResult]
     try:
-        # This should invoke sudo last reboot
+        # This should invoke sudo uptime -s
         results = group_unknown_status.wait_and_get_boot_history(timeout=check_active_timeout)
     except GroupResultException as e:
         exc = e

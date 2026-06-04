@@ -126,7 +126,7 @@ def is_config_valid(group: NodeGroup, state: str = None, policy: str = None, per
         -> Tuple[bool, RunnersGroupResult, Dict[str, dict]]:
     log = group.cluster.log
 
-    if group.get_nodes_os() == 'debian':
+    if group.get_nodes_os() in ('debian', 'ubuntu26.04'):
         raise Exception("Selinux is not supported on Ubuntu/Debian os family")
 
     log.verbose('Verifying selinux configs...')

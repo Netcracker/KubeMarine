@@ -80,6 +80,11 @@ def system_prepare_check_sudoer(cluster: KubernetesCluster) -> None:
     if not_sudoers:
         raise KME("KME0005", hostnames=not_sudoers)
 
+    # for Ubuntu 26.04 nodes, we need to return sudo back to non-rust version,
+    # because sudo-rs behaves differently in certain cases
+    groupNew = cluster.get_new_nodes_or_self()
+    if groupNew.get_nodes_os() == "ubuntu26.04":
+        groupNew.sudo("update-alternatives --set sudo /usr/bin/sudo.ws")
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_check_system(group: NodeGroup) -> None:

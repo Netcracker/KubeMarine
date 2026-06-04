@@ -132,7 +132,7 @@ class KubernetesClusterTest(unittest.TestCase):
                          msg="Package associations are not redefined")
 
     def _nodes_context_one_different_os(self, inventory, host_different_os):
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
         nodes_context[host_different_os]['os'] = {
             'name': 'centos',
             'family': 'rhel9',

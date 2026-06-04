@@ -605,6 +605,7 @@ By default, the following files are backed up from all nodes in the cluster:
 * /etc/resolv.conf
 * /etc/hosts
 * /etc/chrony.conf
+* /etc/chrony/chrony.conf
 * /etc/selinux/config
 * /etc/systemd/system/kubelet.service
 * /etc/containerd/config.toml

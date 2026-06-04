@@ -22,7 +22,7 @@ from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 )
 
-DEBIAN_HEADERS = 'sudo DEBIAN_FRONTEND=noninteractive'
+DEBIAN_HEADERS = 'sudo PAGER=cat DEBIAN_FRONTEND=noninteractive'
 
 
 def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:

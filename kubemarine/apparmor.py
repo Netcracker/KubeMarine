@@ -119,7 +119,7 @@ def configure_apparmor(group: NodeGroup, expected_profiles: dict) -> RunnersGrou
 def setup_apparmor(group: NodeGroup) -> bool:
     log = group.cluster.log
 
-    if group.get_nodes_os() != 'debian':
+    if group.get_nodes_os() not in ('debian', 'ubuntu26.04'):
         log.debug("Skipped - Apparmor is supported only on Ubuntu/Debian")
         return False
 

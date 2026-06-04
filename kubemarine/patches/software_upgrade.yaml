@@ -8,14 +8,13 @@
 # The order of upgrade of defined by the implementation.
 
 thirdparties:
-  calicoctl:
-  - v1.34.2
-  - v1.35.0
+  calicoctl: []
   crictl: []
   etcdutl: []
 packages:
   containerd:
     version_debian: []
+    version_ubuntu26.04: []
   containerdio:
     version_rhel8: []
     version_rhel9: []
@@ -25,15 +24,15 @@ packages:
     version_rhel9: false
     version_rhel10: false
     version_debian: false
+    version_ubuntu26.04: false
   keepalived:
     version_rhel8: false
     version_rhel9: false
     version_rhel10: false
     version_debian: false
+    version_ubuntu26.04: false
 plugins:
-  calico:
-  - v1.34.2
-  - v1.35.0
+  calico: []
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []

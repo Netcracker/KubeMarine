@@ -188,6 +188,16 @@ packages:
     keepalived:
       package_name:
         - keepalived: keepalived
+  ubuntu26.04:
+    containerd:
+      package_name:
+        - containerd: containerd
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
   rhel8:
     containerd:
       package_name:
@@ -354,11 +364,12 @@ compatibility_map:
     ubuntu:
       - os_family: 'debian'
         versions:
-          - '20.04'
           - '22.04'
           - '24.04'
         unstable_kernel:
           - '5.4.0-132-generic'
+      - os_family: 'ubuntu26.04'
+        versions: ["26.04"]
     debian:
       - os_family: 'debian'
         versions:
