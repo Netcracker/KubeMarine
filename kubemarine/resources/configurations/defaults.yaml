@@ -451,6 +451,8 @@ services:
     target_ports:
       http: '{% if nodes | select("has_role", "balancer") | first %}20080{% else %}80{% endif %}'
       https: '{% if nodes | select("has_role", "balancer") | first %}20443{% else %}443{% endif %}'
+      envoy_http: '{% if nodes | select("has_role", "balancer") | first %}21080{% else %}80{% endif %}'
+      envoy_https: '{% if nodes | select("has_role", "balancer") | first %}21443{% else %}443{% endif %}'
     keepalived:
       keep_configs_updated: True
       global: {}
@@ -692,7 +694,7 @@ plugins:
     install: true
     installation:
       registry: ghcr.io
-      priority: 1 # will be changed to 2 if LB target_backend is nginx
+      priority: 1
       procedures:
         - python:
             module: plugins/nginx_ingress.py
@@ -770,8 +772,8 @@ plugins:
       certificate:
         cert: ""
         key: ""
-      # HostPorts are enabled by default only if LB target_backend is envoy,
-      # in this case hostPorts will be equal to LB target_ports.
+      # HostPorts are enabled by default when balancer nodes exist,
+      # using services.loadbalancer.target_ports.envoy_http/envoy_https.
       # HostPorts also could be enabled and configured explicitly.
       hostPorts:
         http: 0
@@ -779,7 +781,7 @@ plugins:
     valuesOverride: {}
     crValuesOverride: {}
     installation:
-      priority: 1 # will be changed to 2 if LB target_backend is envoy
+      priority: 1
       procedures:
         - python:
             module: plugins/envoy_gateway.py

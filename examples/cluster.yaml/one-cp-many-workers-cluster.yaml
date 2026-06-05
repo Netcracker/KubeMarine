@@ -19,6 +19,12 @@ nodes:
     internal_address: "192.168.0.99"
     roles: ["worker"]
 
+services:
+  loadbalancer:
+    target_ports:
+      envoy_http: 21080
+      envoy_https: 21443
+
 # NodeSelector and Tolerations are required to make sure
 # envoy-gateway/nginx-ingress runs on control-plane node
 plugins:

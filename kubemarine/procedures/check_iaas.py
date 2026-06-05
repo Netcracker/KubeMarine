@@ -662,7 +662,10 @@ def get_ports_connectivity(cluster: KubernetesCluster, proto: str) -> Dict[str, 
     random_user_port = str(random.randint(1024, 65535))
     if proto == 'tcp':
         target_ports = cluster.inventory['services']['loadbalancer']['target_ports']
-        ingress_ports = [str(target_ports['http']), str(target_ports['https'])]
+        ingress_ports = [
+            str(target_ports['http']), str(target_ports['https']), 
+            str(target_ports['envoy_http']), str(target_ports['envoy_https'])
+        ]
         connectivity_ports = {
             'internal': {
                 'input': {

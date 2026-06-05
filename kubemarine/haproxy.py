@@ -33,6 +33,10 @@ ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC = \
     'Balancer is combined with other role and has no configured VRRP IP ' \
     'that is not marked with maintenance-type: "not bind"'
 
+ERROR_INGRESS_TARGET_PORTS_OVERLAP = \
+    'nginx-ingress-controller and envoy-gateway cannot use the same worker hostPorts: %s. ' \
+    'Use different values for services.loadbalancer.target_ports ' \
+    '(http/https for nginx and envoy_http/envoy_https for envoy).'
 
 def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
     maintenance_mode: bool = cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_mode']
@@ -78,9 +82,23 @@ def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> Li
     return list(set(bindings))
 
 
+def _verify_target_ports_do_not_overlap(inventory: dict) -> None:
+    if not inventory['plugins']['envoy-gateway']['install'] or not inventory['plugins']['nginx-ingress-controller']['install']:
+        return
+
+    target_ports = inventory['services']['loadbalancer']['target_ports']
+    nginx_host_ports = {int(target_ports['http']), int(target_ports['https'])}
+    envoy_host_ports = {int(target_ports['envoy_http']), int(target_ports['envoy_https'])}
+
+    overlap = nginx_host_ports & envoy_host_ports
+    if overlap:
+        raise Exception(ERROR_INGRESS_TARGET_PORTS_OVERLAP % ', '.join(str(port) for port in overlap))
+
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     inventory = cluster.inventory
+
+    _verify_target_ports_do_not_overlap(inventory)
 
     for group in cluster.make_group_from_roles(['balancer']).get_accessible_nodes().get_ordered_members_list():
         node = group.get_config()
@@ -134,6 +152,16 @@ def get_target_backend(inventory: dict) -> str:
         return "nginx"
 
     return "envoy"
+
+
+def get_haproxy_target_ports(inventory: dict) -> dict:
+    """
+    Returns http/https ports for HAProxy worker backends based on target_backend.
+    """
+    target_ports = inventory['services']['loadbalancer']['target_ports']
+    if get_target_backend(inventory) == "envoy":
+        return {'http': target_ports['envoy_http'], 'https': target_ports['envoy_https']}
+    return {'http': target_ports['http'], 'https': target_ports['https']}
 
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
@@ -202,7 +230,7 @@ def get_config(cluster: KubernetesCluster, node: NodeConfig, maintenance: bool =
     if config_string is not None:
         return config_string
 
-    target_ports: dict = inventory['services']['loadbalancer']['target_ports']
+    target_ports: dict = get_haproxy_target_ports(inventory)
 
     # todo support custom template for maintenance mode
     if not maintenance and config_options.get('config_file'):

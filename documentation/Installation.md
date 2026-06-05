@@ -186,9 +186,9 @@ The actual information about the supported versions can be found in `compatibili
   * Internal communication:
     * 22: SSH 
     * 53: CoreDNS, if access is needed from services bound to the host network.
-    * 80 (or 20080, if balancers are presented): HTTP
+    * 80, 20080, 21080: HTTP
     * 179: Calico BGP
-    * 443 (or 20443, if balancers are presented): HTTPS
+    * 443, 20443, 21443: HTTPS
     * 5443: Calico API server, if enabled
     * 5473: Calico networking with Typha enabled
     * 6443: Kubernetes API server
@@ -396,6 +396,8 @@ This deployment provides a single Kubemarine control-plane.
 This scheme has one node assigned as control-plane and worker roles; balancer role is optional. This scheme is used for developing and demonstrating purposes only.
 An example of this scheme is available in the [All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml).
 
+**Note:** If you install both ingress-nginx and envoy-gateway at the same time in this schema, you should explicitly provide hostPorts configuration to these plugins, otherwise they both will compete for ports 80/443.
+
 The following image illustrates the All-in-one scheme.
 
 ![All-in-one Scheme](/documentation/images/all-in-one.png)
@@ -411,8 +413,10 @@ This schema might be useful if:
 In this case, you can use schema with single control plane node (which runs envoy-gateway/ingress-nginx) and many (1 or more) workers.
 An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](../examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
 
-**Note**: Optionally, if you want control-plane node to be able to run workloads, 
+**Note**: 
+* Optionally, if you want control-plane node to be able to run workloads, 
 you need to add "worker" role to this node.
+* If you install both ingress-nginx and envoy-gateway at the same time in this schema, you should explicitly provide hostPorts configuration to these plugins, otherwise they both will compete for ports 80/443.
 
 The following image illustrates the "One Control Plane and Many Workers" schema.
 
@@ -3215,8 +3219,12 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 ###### target_ports
 
-This section describes the ports, which are used for http/https connections from balancer nodes to workers. 
-Those parameters are specified as backend ports in haproxy configuration and as host ports in envoy-gateay or ingress-nginx-controller plugin (depending on `target_backend` value).
+This section describes the ports used for http/https connections from balancer nodes to workers.
+
+- `target_ports.http` / `target_ports.https` — nginx ingress hostPorts on workers and HAProxy backend ports when `target_backend` is `nginx`.
+- `target_ports.envoy_http` / `target_ports.envoy_https` — Envoy Gateway hostPorts on workers and HAProxy backend ports when `target_backend` is `envoy`.
+
+Both ingress plugins can be installed at the same time; each binds its own port pair. HAProxy forwards traffic to the pair selected by `target_backend`.
 
 Default values depend on balancer availability:  
 
@@ -3242,6 +3250,18 @@ Default values depend on balancer availability:
     <td>20443</td>
     <td>443</td>
   </tr>
+  <tr>
+    <td>target_ports.envoy_http</td>
+    <td>integer</td>
+    <td>21080</td>
+    <td>80</td>
+  </tr>
+  <tr>
+    <td>target_ports.envoy_https</td>
+    <td>integer</td>
+    <td>21443</td>
+    <td>443</td>
+  </tr>
 </tbody>
 </table>
 
@@ -3252,15 +3272,19 @@ services:
     target_ports:
       http: 80
       https: 443
+      envoy_http: 21080
+      envoy_https: 21443
 ```
+
+**Note**: if you change `target_ports`, make sure you run `install` procedure with both below tasks for changes to take effect:
+* `deploy.loadbalancer.haproxy.configure`
+* `deploy.plugins`
 
 ###### target_backend
 
-This section describes who should listen `target_ports` on worker nodes, either `nginx` or `envoy`. Default is `nginx` for backward compatibility, but it is recommended to use `envoy`. If you do not install nginx and envoy plugins, this option has no effect.
+This section selects which ingress stack receives traffic from HAProxy: `nginx` or `envoy`. Default is `nginx` if nginx-ingress-controller is installed, otherwise `envoy`. If you do not install nginx and envoy plugins, this option simply selects target_ports pair.
 
 **Note**: Envoy Gateway uses Gateway API resources (HTTPRoutes, etc) instead of Ingresses. Thus, when you migrate cluster from Ingress-NGINX to Envoy Gateway, your applications should also migrate from Ingresses to Gateway API resources, otherwise routing will not work.
-
-This options also influences plugins installation priority. Selected target backend (e.g. `nginx`) will be installed with priority `2`, while the other plugin (e.g. `envoy`) will be installed with priority `1`. This is to allow other plugin to configure first and free host ports for target backend.
 
 You can specify this option in `cluster.yaml` as following:
 ```yaml
@@ -3268,6 +3292,11 @@ services:
   loadbalancer:
     target_backend: "envoy"
 ```
+
+To switch traffic between nginx and envoy without redeploying ingress plugins:
+
+1. Set `services.loadbalancer.target_backend` to `"nginx"` or `"envoy"` in `cluster.yaml`.
+2. Run `kubemarine install --tasks=deploy.loadbalancer.haproxy.configure`.
 
 ##### haproxy
 
@@ -4319,8 +4348,8 @@ plugins:
       certificate:
         cert: ""
         key: ""
-      # HostPorts are enabled by default only if services.loadbalancer.target_backend is envoy,
-      # in this case hostPorts will be equal to LB target_ports.
+      # HostPorts are enabled by default when balancer nodes exist,
+      # using services.loadbalancer.target_ports.envoy_http/envoy_https.
       # HostPorts also could be enabled and configured explicitly.
       hostPorts:
         http: 0
@@ -4688,8 +4717,8 @@ Plugins are installed in a strict sequential order. The installation sequence is
 |Plugin|Priority|
 |---|---|
 |calico|`0`|
-|envoy-gateway|`1` if `services.lb.target_backend` is `nginx`, otherwise `2` |
-|nginx-ingress-controller|`2` if `services.lb.target_backend` is `nginx`, otherwise `1` |
+|envoy-gateway|`1`|
+|nginx-ingress-controller|`1`|
 |kubernetes-dashboard|`3`|
 |local-path-provisioner|`3`|
 

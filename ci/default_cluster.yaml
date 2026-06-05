@@ -11,6 +11,10 @@ nodes:
 cluster_name: "test-local-k8s.com"
 
 services:
+  loadbalancer:
+    target_ports:
+      envoy_http: 21080
+      envoy_https: 21443
   kubeadm:
     kubernetesVersion: '{{ env.KUBERNETES_VERSION }}'
 
