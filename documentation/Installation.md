@@ -3254,6 +3254,10 @@ services:
       https: 443
 ```
 
+**Note**: if you change `target_ports`, make sure you run `install` procedure with both below tasks for changes to take effect:
+* `deploy.loadbalancer.haproxy.configure`
+* `deploy.plugins`
+
 ###### target_backend
 
 This section describes who should listen `target_ports` on worker nodes, either `nginx` or `envoy`. Default is `nginx` for backward compatibility, but it is recommended to use `envoy`. If you do not install nginx and envoy plugins, this option has no effect.
