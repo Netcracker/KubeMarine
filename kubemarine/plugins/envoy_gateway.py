@@ -164,6 +164,9 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
                 "external": {
                     "ctpName": "external-client-traffic-policy",
                     "ctpSpec": {
+                        "http1": {
+                            "http10": {}
+                        },
                         "headers": {
                             "withUnderscoresAction": "Allow",
                             "earlyRequestHeaders": {
