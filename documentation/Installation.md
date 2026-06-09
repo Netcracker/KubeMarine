@@ -4584,7 +4584,15 @@ plugins:
 
 **Note:** 
 * Above configuration assumes that nodes have OpenStack credentials stored on all nodes under `/etc/config/cloud.conf` file. You need to put this file on nodes during nodes provisioning.
-* By default, this plugin uses `openstack-cinder-csi` namespace and helm release name.
+* By default, this plugin uses `openstack-cinder-csi` namespace and helm release name. You can change namespace and release name using following configuraion options:
+    ```
+    plugins:
+      openstack-cinder-csi:
+        namespace: "my-namespace"
+        releaseName: "my-release"
+    ```
+* You can override chart values using `plugins.openstack-cinder-csi.values` field. Supported parameters could be found in the chart [`values.yaml`](/kubemarine/plugins/charts/openstack-cinder-csi-2.35.0/values.yaml).
+* `StorageClass` fields are mostly immutable, so if you want to change them, you need to first manually delete existing StorageClass on the cluster (with the same name). Alternatively you can add a new StorageClass and make it the default.
 
 If you are using an old OpenStack, above configuration may not work, because it installs new version of Cinder CSI plugin, which expects new OpenStack APIs. You may see issues like following:
 ```
@@ -4667,6 +4675,15 @@ plugins:
 * Above configuration also creates default `VolumeSnapshotClass` for openstack cinder driver.
 * `csi-snapshot-controller` only works with recent versions of `openstack-cinder-csi` plugin, because old version contains a bug:
   * https://github.com/kubernetes/cloud-provider-openstack/issues/1812
+* By default, this plugin uses `csi-snapshot-controller` namespace and helm release name. You can change namespace and release name using following configuraion options:
+    ```
+    plugins:
+      csi-snapshot-controller:
+        namespace: "my-namespace"
+        releaseName: "my-release"
+    ```
+* You can override chart values using `plugins.csi-snapshot-controller.values` field. Supported parameters could be found in the chart [`values.yaml`](/kubemarine/plugins/charts/csi-snapshot-controller-8.5.0/values.yaml).
+* `VolumeSnapshotClass` fields are mostly immutable, so if you want to change them, you need to first manually delete existing VolumeSnapshotClass on the cluster (with the same name). Alternatively you can add a new VolumeSnapshotClass and make it the default.
 
 #### Plugins Features
 
@@ -6339,6 +6356,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.34.2
 | Type     | Name                                                  | Versions           |                       |                    |                    |                    |                    |                    |                    | Note                                                                                 |
@@ -6381,6 +6399,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
 
@@ -6426,6 +6445,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.36.0
 
@@ -6471,3 +6491,4 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
