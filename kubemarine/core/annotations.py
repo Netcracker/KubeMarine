@@ -13,7 +13,12 @@
 # limitations under the License.
 from typing import Callable, TypeVar
 
-from typing_extensions import ParamSpec
+try:
+    # Prefer stdlib ParamSpec on modern Python to avoid compatibility issues
+    # with typing_extensions on newer interpreters (e.g. Python 3.13).
+    from typing import ParamSpec  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - fallback for older Python versions
+    from typing_extensions import ParamSpec  # type: ignore[no-redef]
 
 from kubemarine.core.group import NodeGroup
 

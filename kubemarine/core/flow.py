@@ -434,6 +434,12 @@ def new_tasks_flow_parser(cli_help: str, tasks: dict = None) -> argparse.Argumen
                         action='store_true',
                         help='prevent tasks to be executed')
 
+    parser.add_argument('--nodes',
+                        default='',
+                        help='limit tasks execution to nodes selected by attributes, '
+                             'for example: --nodes \"labels=region=infra\" or '
+                             '\"labels=region=infra;zone=dc1,roles=worker\"')
+
     parser.add_argument('--tasks',
                         default='',
                         help='define comma-separated tasks to be executed')
