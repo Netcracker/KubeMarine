@@ -907,7 +907,7 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         if not kubeadm_extended_dryrun(cluster):
             return None
 
-        # Use upload-config kubelet --dry-run to catch all inserted/updated/deleted properties.
+        # Use kubeadm init --dry-run to catch all inserted/updated/deleted properties.
 
         temp_config = utils.get_remote_tmp_path()
         patches_dir = utils.get_remote_tmp_path()
@@ -920,30 +920,28 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         _create_kubeadm_patches_for_component_on_node(
             cluster, defer, 'kubelet', patches_dir=patches_dir, reset=False)
 
-        init_phase = CONFIGMAPS_CONSTANTS[configmap]['init_phase']
-        defer.sudo(f'kubeadm init phase {init_phase} --dry-run --config {temp_config}',
+        defer.sudo(f'kubeadm init --dry-run --config {temp_config} --ignore-preflight-errors="all"',
                    callback=collector)
 
         defer.flush()
         output = collector.result[control_plane.get_host()].stdout
 
         split_logs = re.compile(r'^\[.*].*$\n', flags=re.M)
-        cfg = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
-        cfg = dedent(cfg)
+        generated_cfg = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
+        generated_cfg = dedent(generated_cfg)
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
-        generated_config = yaml.safe_load(cfg)['data'][key]
         if 'resolvConf' not in kubeadm_config.maps[configmap]:
-            generated_config = _filter_kubelet_configmap_resolv_conf(generated_config)
+            generated_cfg = _filter_kubelet_configmap_resolv_conf(generated_cfg)
 
         kubeadm_config.load(configmap, control_plane)
         # Use loaded_maps that preserve original formatting
         stored_config = kubeadm_config.loaded_maps[configmap].obj["data"][key]
 
-        if yaml.safe_load(generated_config) == yaml.safe_load(stored_config):
+        if yaml.safe_load(generated_cfg) == yaml.safe_load(stored_config):
             return None
 
-        return utils.get_unified_diff(stored_config, generated_config,
+        return utils.get_unified_diff(stored_config, generated_cfg,
                                       fromfile=f'{configmap} ConfigMap',
                                       tofile="generated from 'services.kubeadm_kubelet' section")
 
