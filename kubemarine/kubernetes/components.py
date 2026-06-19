@@ -928,7 +928,7 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
 
         split_logs = re.compile(r'^\[.*].*$\n', flags=re.M)
         cfg = next(filter(lambda ln: 'kubelet: |' in ln, split_logs.split(output)))
-        cfg = dedent(generated_config)
+        cfg = dedent(cfg)
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         generated_config = yaml.safe_load(cfg)['data'][key]
