@@ -927,21 +927,21 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         output = collector.result[control_plane.get_host()].stdout
 
         split_logs = re.compile(r'^\[.*].*$\n', flags=re.M)
-        generated_cfg = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
-        generated_cfg = dedent(generated_cfg)
+        generated_config = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
+        generated_config = dedent(generated_config)
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         if 'resolvConf' not in kubeadm_config.maps[configmap]:
-            generated_cfg = _filter_kubelet_configmap_resolv_conf(generated_cfg)
+            generated_config = _filter_kubelet_configmap_resolv_conf(generated_config)
 
         kubeadm_config.load(configmap, control_plane)
         # Use loaded_maps that preserve original formatting
         stored_config = kubeadm_config.loaded_maps[configmap].obj["data"][key]
 
-        if yaml.safe_load(generated_cfg) == yaml.safe_load(stored_config):
+        if yaml.safe_load(generated_config) == yaml.safe_load(stored_config):
             return None
 
-        return utils.get_unified_diff(stored_config, generated_cfg,
+        return utils.get_unified_diff(stored_config, generated_config,
                                       fromfile=f'{configmap} ConfigMap',
                                       tofile="generated from 'services.kubeadm_kubelet' section")
 
