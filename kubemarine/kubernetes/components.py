@@ -927,10 +927,11 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         output = collector.result[control_plane.get_host()].stdout
 
         split_logs = re.compile(r'^\[.*].*$\n', flags=re.M)
-        generated_config = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
-        generated_config = dedent(generated_config)
+        cfg = next(filter(lambda ln: 'kubelet: |' in ln, split_logs.split(output)))
+        cfg = dedent(generated_config)
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
+        generated_config = yaml.safe_load(cfg)['data'][key]
         if 'resolvConf' not in kubeadm_config.maps[configmap]:
             generated_config = _filter_kubelet_configmap_resolv_conf(generated_config)
 
