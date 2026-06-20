@@ -1368,7 +1368,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
                     for service in services:
                         deployment = Deployment(cluster, name=service, namespace=namespace)
                         deployment.reload(control_plane=first_control_plane, suppress_exceptions=True)
-                        if not daemon_set.is_actual_and_ready():
+                        if not deployment.is_actual_and_ready():
                             not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
             tc.success(results='valid')
