@@ -12,9 +12,9 @@ Describe solution. List all changes that you made during implementation.
 
 ### How to apply
 Provide steps how to apply on top previous Kubemarine version to execute on existing clusters
-* [Install task/s](documentation/Installation.md#installation-tasks-description)
+* [Install task/s](docs/public/Installation.md#installation-tasks-description)
 * Manual step 
-* [Upgrade procedure](documentation/Maintenance.md#upgrade-procedure)
+* [Upgrade procedure](docs/public/Maintenance.md#upgrade-procedure)
 
 
 ### Test Cases

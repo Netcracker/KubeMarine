@@ -6,7 +6,7 @@ Approved
 
 ## Context
 
-We have [migrate_kubemarine](../Maintenance.md#kubemarine-migration-procedure) procedure,
+We have [migrate_kubemarine](/docs/public/Maintenance.md#kubemarine-migration-procedure) procedure,
 but have no stable process to deliver new versions of software (plugin, thirdparties, packages) 
 that we recommend for existing Kubernetes versions.
 
@@ -41,7 +41,7 @@ If there is nothing to upgrade for the particular instance of software,
 the corresponding patch should not be shown in the list and not executed.
 
 The procedure to upgrade each type of software should be similar to that in 
-Kubernetes [upgrade](../Maintenance.md#upgrade-procedure) procedure.
+Kubernetes [upgrade](/docs/public/Maintenance.md#upgrade-procedure) procedure.
 
 #### Patches priority
 

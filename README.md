@@ -10,27 +10,27 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 ## Highlights
 - Easy to use
 - Many procedures supported following the [generic maintenance approach](documentation/Maintenance.md#basics):
-  - [install](documentation/Installation.md#)
-  - [add_node](documentation/Maintenance.md#add-node-procedure)
-  - [remove_node](documentation/Maintenance.md#remove-node-procedure)
-  - [upgrade](documentation/Maintenance.md#upgrade-procedure)
-  - [backup](documentation/Maintenance.md#backup-procedure)
-  - [restore](documentation/Maintenance.md#restore-procedure)
-  - [reconfigure](documentation/Maintenance.md#reconfigure-procedure)
-  - [check_iaas](documentation/Kubecheck.md#iaas-procedure)
-  - [check_paas](documentation/Kubecheck.md#paas-procedure)
-  - [migrate_kubemarine](documentation/Maintenance.md#kubemarine-migration-procedure)
-  - [manage_pss](documentation/Maintenance.md#manage-pss-procedure)
-  - [cert_renew](documentation/Maintenance.md#certificate-renew-procedure)
-- [Single cluster inventory](documentation/Installation.md#configuration) for all operations, highly customizable
+  - [install](docs/public/Installation.md#)
+  - [add_node](docs/public/Maintenance.md#add-node-procedure)
+  - [remove_node](docs/public/Maintenance.md#remove-node-procedure)
+  - [upgrade](docs/public/Maintenance.md#upgrade-procedure)
+  - [backup](docs/public/Maintenance.md#backup-procedure)
+  - [restore](docs/public/Maintenance.md#restore-procedure)
+  - [reconfigure](docs/public/Maintenance.md#reconfigure-procedure)
+  - [check_iaas](docs/public/Kubecheck.md#iaas-procedure)
+  - [check_paas](docs/public/Kubecheck.md#paas-procedure)
+  - [migrate_kubemarine](docs/public/Maintenance.md#kubemarine-migration-procedure)
+  - [manage_pss](docs/public/Maintenance.md#manage-pss-procedure)
+  - [cert_renew](docs/public/Maintenance.md#certificate-renew-procedure)
+- [Single cluster inventory](docs/public/Installation.md#configuration) for all operations, highly customizable
 - Default values of all parameters in configurations with a minimum of required parameters
-- [Control planes balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP
-- Ability to [resume or skip specific task](documentation/Installation.md#tasks-list-redefinition) without re-running entire pipeline
-- [Pre-built plugins](documentation/Installation.md#predefined-plugins) out of the box and [custom plugins](documentation/Installation.md#custom-plugins-installation-procedures) support
-- Support for [executing in closed environments](documentation/Installation.md#installation-without-internet-resources) with private registries
-- Extended [logging](documentation/Logging.md), configs [dumping](documentation/Installation.md#dump-files)
+- [Control planes balancing](docs/public/Installation.md#full-ha-scheme) with external balancers and VRRP
+- Ability to [resume or skip specific task](docs/public/Installation.md#tasks-list-redefinition) without re-running entire pipeline
+- [Pre-built plugins](docs/public/Installation.md#predefined-plugins) out of the box and [custom plugins](docs/public/Installation.md#custom-plugins-installation-procedures) support
+- Support for [executing in closed environments](docs/public/Installation.md#installation-without-internet-resources) with private registries
+- Extended [logging](docs/public/Logging.md), configs [dumping](docs/public/Installation.md#dump-files)
 - Build supported as a package, container, and binary
-- Package extension with [open extension API](documentation/PackageExtension.md)
+- Package extension with [open extension API](docs/public/PackageExtension.md)
 - Support different deployment schemes (all-in-one, mini-HA, HA, and so on)
 
 ## Repository structure
@@ -70,7 +70,7 @@ To install Kubemarine as package on your environment:
    ```bash
    python -m pip install --upgrade pip
    ```
-1. Ensure your environment meets the [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node).
+1. Ensure your environment meets the [Deployment Node Prerequisites](docs/public/Installation.md#prerequisites-for-deployment-node).
 1. Create and activate a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/) if necessary.
 1. Install Kubemarine package.
 
@@ -126,8 +126,8 @@ The exception is instead of installing the package from [PyPI](https://pypi.org/
 
 ## Running Cluster Installation
 To install a Kubernetes cluster using Kubemarine:
-1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and the selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes).
-1. Create the `cluster.yaml` inventory file, and describe your environment. Make sure that all configurations are done. For more information, see [inventory configs available](documentation/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to enter all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
+1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](docs/public/Installation.md#recommended-hardware-requirements) and the selected [Deployment Scheme](docs/public/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](docs/public/Installation.md#prerequisites-for-cluster-nodes).
+1. Create the `cluster.yaml` inventory file, and describe your environment. Make sure that all configurations are done. For more information, see [inventory configs available](docs/public/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to enter all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
    ```yaml
    node_defaults:
      keyfile: "/home/username/.ssh/id_rsa"
@@ -174,23 +174,23 @@ Run Kubemarine from the container, for example:
    docker run -it --mount type=bind,source=/root/cluster.yaml,target=/opt/kubemarine/cluster.yaml --mount type=bind,source=/root/rsa_key,target=/opt/kubemarine/rsa_key kubemarine install -c /opt/kubemarine/cluster.yaml
    ```
    *Note*: Do not forget to pass the inventory file and connection key inside the container.
-   For more execution details, refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
+   For more execution details, refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/docs/public/Installation.md#installation-of-kubernetes-using-cli).
 
 ## Documentation
 The following documents and tutorials are available:
-- [Installation](documentation/Installation.md)
-- [Maintenance](documentation/Maintenance.md)
-- [Troubleshooting](documentation/Troubleshooting.md)
-- [Kubecheck](documentation/Kubecheck.md)
-- [Logging](documentation/Logging.md)
+- [Installation](docs/public/Installation.md)
+- [Maintenance](docs/public/Maintenance.md)
+- [Troubleshooting](docs/public/Troubleshooting.md)
+- [Kubecheck](docs/public/Kubecheck.md)
+- [Logging](docs/public/Logging.md)
 
 Also, check out the following inventory examples:
 - [cluster.yaml](examples/cluster.yaml)
 - [procedure.yaml](examples/procedure.yaml)
 
 For maintainers and developers there is useful [internal documentation](/documentation/internal/), for example:
-* [How to write patches](/documentation/internal/Patches.md)
-* [How to make new release](/documentation/internal/Release.md)
+* [How to write patches](/docs/internal/Patches.md)
+* [How to make new release](/docs/internal/Release.md)
 
 ## Issues, Questions
 If you have any problems while working with Kubemarine, feel free to open a [new issue](https://github.com/netcracker/kubemarine/issues) or even

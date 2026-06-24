@@ -25,7 +25,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional Procedures](#additional-procedures)
     - [Changing Calico Settings](#changing-calico-settings)
-    - [Data Encryption in Kubernetes](internal/Hardening.md#data-encryption-in-kubernetes)
+    - [Data Encryption in Kubernetes](/docs/internal/Hardening.md#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
     - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Common Practice](#common-practice)
@@ -97,7 +97,7 @@ where, `<patches>` are the patch identifiers separated by comma.
 The procedure accepts optional positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_kubemarine.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/migrate_kubemarine.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 ### Software Upgrade Patches
@@ -247,7 +247,7 @@ The configuration format for the plugins is the same.
 The procedure accepts required positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/upgrade.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### Upgrade Plan
@@ -564,10 +564,10 @@ backup-Jan-01-21-09-00-00.tar.gz
 The procedure accepts optional positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/backup.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
-**Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
+**Note**: There are some examples located in [procedure.yaml examples](/examples/procedure.yaml).
 
 By default, no parameters are required. However, if necessary, you can specify custom.
 
@@ -737,10 +737,10 @@ After recovery, the procedure reboots all cluster nodes.
 The procedure accepts required positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/restore.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
-**Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
+**Note**: There are some examples located in [procedure.yaml examples](/examples/procedure.yaml).
 
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
 
@@ -756,7 +756,7 @@ backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 source_node: ''
 ```
 
-If `source_node` parameter is set, the backup archive will be used from that control plane node. The `backup_location` must be set accordingly because it needs the location on control plane node, e.g.: [full-restore_with_source_node.yaml](../examples/procedure.yaml/full-restore_with_source_node.yaml)
+If `source_node` parameter is set, the backup archive will be used from that control plane node. The `backup_location` must be set accordingly because it needs the location on control plane node, e.g.: [full-restore_with_source_node.yaml](/examples/procedure.yaml/full-restore_with_source_node.yaml)
 
 #### etcd Parameters
 
@@ -835,7 +835,7 @@ Also pay attention to the following:
 
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/add_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
@@ -966,7 +966,7 @@ Removing a node from a Kubernetes cluster is done in the following order:
 
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/remove_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
@@ -1052,7 +1052,7 @@ If you are looking for how to reconfigure other settings, consider the following
 The procedure accepts required positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reconfigure.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/reconfigure.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 **Common Considerations**
@@ -1254,7 +1254,7 @@ The manage PSS procedure allows:
 
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/manage_pss.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 To manage PSS on existing cluster one should configure the **procedure.yaml** file similar the following:
@@ -1329,7 +1329,7 @@ This procedure allows you to safely reboot all nodes in one click. By default, a
 The procedure accepts optional positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/reboot.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### graceful_reboot Parameter
@@ -1386,7 +1386,7 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 The procedure accepts required positional argument with the path to the procedure inventory file.
 You can find description and examples of the accepted parameters in the next sections.
 
-The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### Configuring Certificate Renew Procedure for Envoy Gateway
@@ -1728,7 +1728,7 @@ The common practice information is given below.
 
 ## Security Hardening Guide
 
-For more information, refer to the [Security Hardening Guide](./internal/Hardening.md).
+For more information, refer to the [Security Hardening Guide](/docs/internal/Hardening.md).
 
 ## Worker Nodes Should be Managed by Kubelet
 
