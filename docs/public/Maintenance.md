@@ -854,7 +854,7 @@ nodes:
 
 **Note**:
 
-* The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#nodedefaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
+* The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#node_defaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
 * If you intend to add a new `balancer` node with VRRP IP, and have previously not configured the `vrrp_ips` section, you need to do the following preliminarily:
   * And the section to the main `cluster.yaml`.
   * If you already have balancers without VRRP IPs, reconfigure the balancers and DNS,
