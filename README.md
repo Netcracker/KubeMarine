@@ -9,7 +9,7 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 
 ## Highlights
 - Easy to use
-- Many procedures supported following the [generic maintenance approach](documentation/Maintenance.md#basics):
+- Many procedures supported following the [generic maintenance approach](docs/public/Maintenance.md#basics):
   - [install](docs/public/Installation.md#)
   - [add_node](docs/public/Maintenance.md#add-node-procedure)
   - [remove_node](docs/public/Maintenance.md#remove-node-procedure)
@@ -40,7 +40,7 @@ There are following key locations in the repository
 | Paths | Description |
 | ----- | ----------- |
 | `.github/workflows/`, `ci/` | Contain GitHub Actions configuration which runs unit/integration tests, builds/publishes artifacts, etc |
-| `documentation/`, `examples/`, `README.md` | Contain documentation and examples |
+| `docs/`, `examples/`, `README.md` | Contain documentation and examples |
 | `kubemarine/` | Contains source code for KubeMarine python package |
 | `test/` | Contains tests |
 | `bin/`, `scripts/ci/` | Contains auxiliary scripts used during KubeMarine build |
@@ -188,7 +188,7 @@ Also, check out the following inventory examples:
 - [cluster.yaml](examples/cluster.yaml)
 - [procedure.yaml](examples/procedure.yaml)
 
-For maintainers and developers there is useful [internal documentation](/documentation/internal/), for example:
+For maintainers and developers there is useful [internal documentation](/docs/internal/), for example:
 * [How to write patches](/docs/internal/Patches.md)
 * [How to make new release](/docs/internal/Release.md)
 
