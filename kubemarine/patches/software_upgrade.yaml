@@ -13,7 +13,13 @@ thirdparties:
   etcdutl: []
 packages:
   containerd:
-    version_debian: []
+    version_debian:
+    - v1.33.0
+    - v1.33.6
+    - v1.34.1
+    - v1.34.2
+    - v1.35.0
+    - v1.36.0
     version_ubuntu26.04: []
   containerdio:
     version_rhel8: []
