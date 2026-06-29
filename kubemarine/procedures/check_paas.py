@@ -1341,7 +1341,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
                 if calico.is_typha_enabled(cluster.inventory):
                     entities_to_check["kube-system"]["Deployment"].append("calico-typha")
 
-            if plugin == 'ingress-nginx-controller':
+            if plugin == 'nginx-ingress-controller':
                 entities_to_check['ingress-nginx'] = {"DaemonSet": ["ingress-nginx-controller"]}
             if plugin == 'envoy-gateway':
                 entities_to_check['gateway-system'] = {
@@ -1368,7 +1368,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
                     for service in services:
                         deployment = Deployment(cluster, name=service, namespace=namespace)
                         deployment.reload(control_plane=first_control_plane, suppress_exceptions=True)
-                        if not daemon_set.is_actual_and_ready():
+                        if not deployment.is_actual_and_ready():
                             not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
             tc.success(results='valid')
