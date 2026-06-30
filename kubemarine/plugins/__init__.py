@@ -264,7 +264,7 @@ def expect_daemonset(cluster: KubernetesCluster,
     raise Exception('In the expected time, the DaemonSets did not become ready. '
                     'Try to increase number of retries in expect.daemonsets: '
                     # pylint: disable-next=line-too-long
-                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+                    'https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_replicaset(cluster: KubernetesCluster,
@@ -319,7 +319,7 @@ def expect_replicaset(cluster: KubernetesCluster,
     raise Exception('In the expected time, the ReplicaSets did not become ready. '
                     'Try to increase number of retries in expect.replicasets: '
                     # pylint: disable-next=line-too-long
-                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+                    'https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_statefulset(cluster: KubernetesCluster,
@@ -374,7 +374,7 @@ def expect_statefulset(cluster: KubernetesCluster,
     raise Exception('In the expected time, the StatefulSets did not become ready. '
                     'Try to increase number of retries in expect.statefulsets: '
                     # pylint: disable-next=line-too-long
-                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+                    'https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_deployment(cluster: KubernetesCluster,
@@ -429,7 +429,7 @@ def expect_deployment(cluster: KubernetesCluster,
     raise Exception('In the expected time, the Deployments did not become ready. '
                     'Try to increase number of retries in expect.deployments: '
                     # pylint: disable-next=line-too-long
-                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+                    'https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = None,

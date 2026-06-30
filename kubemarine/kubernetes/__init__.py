@@ -636,7 +636,7 @@ def wait_for_nodes(group: NodeGroup) -> None:
 
     raise Exception(f"Nodes did not become ready in the expected time, {retries} retries every {timeout} seconds. "
                     "Try to increase node.ready.retries parameter in globals: "
-                    "https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#globals")
+                    "https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#globals")
 
 
 def init_workers(group: NodeGroup) -> None:

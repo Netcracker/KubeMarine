@@ -34,7 +34,7 @@ To check the cluster network performance, it is necessary to do the following:
             effect: NoSchedule
     ```
    
-2. Run the [installation](documentation/public/Installation.md) procedure and wait until it is completed.
+2. Run the [installation](/docs/public/Installation.md) procedure and wait until it is completed.
 3. Go to any control-plane node, and run the following script:
    ```bash
    #!/usr/bin/env bash
