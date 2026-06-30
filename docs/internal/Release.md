@@ -10,5 +10,5 @@ If you want to make a new KubeMarine release, you need to do following:
     * KubeMarine binaries for different OS. They could be found in release assets.
     * KubeMarine python distribution package. It could be found in release assets.
     * [KubeMarine image](https://github.com/Netcracker/KubeMarine/pkgs/container/kubemarine).
-    * [Kubemarine documentation](https://github.com/Netcracker/KubeMarine/tree/main/documentation).
+    * [Kubemarine documentation](https://github.com/Netcracker/KubeMarine/tree/main/docs).
 3. Once you have verified that KubeMarine artifacts are OK, change your release from `pre-release` to `latest release` on [GitHub Release page](https://github.com/Netcracker/KubeMarine/releases). This will publish KubeMarine distribution package to PyPI.

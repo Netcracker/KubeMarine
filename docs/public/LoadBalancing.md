@@ -17,7 +17,7 @@ The following functions are installed in this section.
 This is the default recommended approach to the TLS termination on kubemarine-installed environments. This approach is applicable when MTLS is not used in kubernetes and all communications between the pods are over plain HTTP.
 A high-level overview of this approach is shown in the following image.
 
-![](/documentation/images/tls-termination.png)
+![](/docs/images/tls-termination.png)
 
 Here, the client creates a HTTPS connection to the TCP load balancer, which in turn proxies the traffic to the Envoy Gateway (or Nginx Ingress Controller) without a TLS termination.
 Envoy Gateway (or Nginx Ingress Controller) uses a default wildcard certificate to authenticate itself to a client and to terminate the HTTPS connection.
@@ -44,16 +44,16 @@ Nginx Ingress controller is installed by default, so you do not need to enable t
 To enable TLS termination on Nginx Ingress Controller using the default certificate, it is required to customize the "nginx" plugin with a custom default certificate.
 This can be done during:
 
-* Installation; for details, refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
-* On an already installed Nginx Ingress Controller, using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
+* Installation; for details, refer to [nginx plugin installation](/docs/public/Installation.md#nginx-ingress-controller).
+* On an already installed Nginx Ingress Controller, using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/docs/public/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
 
 **Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
 
 ### How to Install Envoy Gateway (Recommended)
 
-Envoy Gateway currently is not installed by default, you need to provide additional configuration in `cluster.yaml` to install it. To install Envoy Gateway with TLS termination using the default certificate, refer to [envoy-gateway plugin installation section](/documentation/Installation.md#envoy-gateway).
+Envoy Gateway currently is not installed by default, you need to provide additional configuration in `cluster.yaml` to install it. To install Envoy Gateway with TLS termination using the default certificate, refer to [envoy-gateway plugin installation section](/docs/public/Installation.md#envoy-gateway).
 
-On an already installed Envoy Gateway, certificates could be installed or renewed using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-envoy-gateway).
+On an already installed Envoy Gateway, certificates could be installed or renewed using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/docs/public/Maintenance.md#configuring-certificate-renew-procedure-for-envoy-gateway).
 
 **Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
 
@@ -61,9 +61,9 @@ On an already installed Envoy Gateway, certificates could be installed or renewe
 
 Using kubemarine you can install and configure HAProxy TCP load balancers in the HA mode using VRRP.
 To do so, assign a `balancer` role to the hosts where HAProxy and Keepalived should be installed.
-For more information, refer to the [`nodes` Installation Section](/documentation/Installation.md#nodes).
-For instructions on how to configure VRRP IPs for balancer nodes, refer to the [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
-For load balancer nodes' hardware requirements, refer to [Minimal Hardware Requirements](/documentation/Installation.md#minimal-hardware-requirements).
+For more information, refer to the [`nodes` Installation Section](/docs/public/Installation.md#nodes).
+For instructions on how to configure VRRP IPs for balancer nodes, refer to the [`vrrp_ips` Installation Section](/docs/public/Installation.md#vrrp_ips).
+For load balancer nodes' hardware requirements, refer to [Minimal Hardware Requirements](/docs/public/Installation.md#minimal-hardware-requirements).
 
 ### Using Custom TCP Load Balancer
 
@@ -71,7 +71,7 @@ You can also use your own TCP load balancer instead of kubemarine-provided HAPro
 In this case, your custom TCP load balancer should meet the following requirements:
 
 * The load balancer should be fully configured and working before running the cluster installation using kubemarine.
-* The load balancer's internal and external VRRP IP addresses should be specified in `cluster.yaml`. For more information, refer to the [`control_plain` Installation Section](/documentation/Installation.md#control_plain).
+* The load balancer's internal and external VRRP IP addresses should be specified in `cluster.yaml`. For more information, refer to the [`control_plain` Installation Section](/docs/public/Installation.md#control_plain).
 * The load balancer should be an L4 pass-through TCP load balancer, without TLS termination.
 * The load balancer should be Highly Available.
 * The load balancer should have HTTPS (port 443) and Kubernetes API (port 6443) frontends.
@@ -180,9 +180,9 @@ In this mode, only the technical traffic is served normally.
 To start using Maintenance Mode on the Kubemarine cluster, it is required to do two things during the cluster installation:
 
 1. Configure at least two vIP - one for business traffic and one for technical traffic.
-   Business vIP should be marked with [`params.maintenance-type: "not bind"`](/documentation/Installation.md#maintenance-type) to be "dropped" during the maintenance mode.
+   Business vIP should be marked with [`params.maintenance-type: "not bind"`](/docs/public/Installation.md#maintenance-type) to be "dropped" during the maintenance mode.
 
-1. Maintenance Mode support should be enabled using [`haproxy.maintenance_mode: True`](/documentation/Installation.md#maintenance-mode).
+1. Maintenance Mode support should be enabled using [`haproxy.maintenance_mode: True`](/docs/public/Installation.md#maintenance-mode).
    This does not enable the maintenance mode on HAProxy immediately, instead it uploads **additional** maintenance configuration on HAProxy nodes, which could be then used to enable the maintenance mode.
 
 After these steps, HAProxy nodes support enabling the maintenance mode.

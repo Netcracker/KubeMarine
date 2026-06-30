@@ -117,7 +117,7 @@ class SummaryTracker(ChangesTracker):
             info("Deleted unexpected content")
 
         if self.new_k8s or self.deleted_k8s or self.updated_k8s:
-            info("Please do not forget to update documentation/Installation.md")
+            info("Please do not forget to update docs/public/Installation.md")
         elif not self.deleted_unexpected_content:
             info("Nothing has changed")
 
