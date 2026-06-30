@@ -6,22 +6,22 @@
 # After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 containerd:
   v1.33.0:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
   v1.33.6:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
   v1.34.1:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
   v1.34.2:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
   v1.35.0:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
   v1.36.0:
-    version_debian: 1.7.*
+    version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
 containerdio:
   v1.33.0:
