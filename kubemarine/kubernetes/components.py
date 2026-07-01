@@ -887,6 +887,15 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
         stored = stored_config.results[host][0].stdout
         generated = generated_config.results[host][0].stdout
 
+        # The same containerd socket could be found by these two paths.
+        # This path is usually configured by kubeadm for containerRuntimeEndpoint in /var/lib/kubelet/instance-config.yaml file.
+        # As of k8s 1.36, "/var/run" socket path variant is usually used by kubeadm on fresh install.
+        # However, upgrade 1.33 to 1.34 for some reason sets socket path using "/run" variant, which breaks check.
+        # Since these paths are interchangeable, we just replace "/run" with "/var/run". 
+        varRunSockPath = "unix:///var/run/containerd/containerd.sock"
+        runSockPath = "unix:///run/containerd/containerd.sock"
+        if varRunSockPath in generated and runSockPath in stored:
+            stored = stored.replace(runSockPath, varRunSockPath)
         diff = utils.get_yaml_diff(stored, generated,
                                    fromfile='/var/lib/kubelet/config.yaml',
                                    tofile=tofile)
