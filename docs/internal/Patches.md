@@ -10,7 +10,7 @@
 
 Patch is an automatic action that is needed to migrate a cluster managed by Kubemarine from one Kubemarine release to another.  
 Patches are needed when we update Kubemarine 3rd parties, specific Kubernetes parameters, Kubemarine procedures/features, and so on.  
-Patches are installed during specific [Kubemarine migration procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
+Patches are installed during specific [Kubemarine migration procedure](/docs/public/Maintenance.md#kubemarine-migration-procedure).
 
 ## How to Write Your Own Patch
 
@@ -41,7 +41,7 @@ There is one more type of patches that upgrades different types of software.
 Such patches are executed after patches of the type `InventoryOnlyPatch` and before patches of the type `RegularPatch`,
 and are registered automatically as long as the [`kubemarine/patches/software_upgrade.yaml`](/kubemarine/patches/software_upgrade.yaml) configuration is changed.
 
-For more information, refer to the [design document](/documentation/design/1-upgrade-patches-registration-and-implementation.md).
+For more information, refer to the [design document](/docs/design/1-upgrade-patches-registration-and-implementation.md).
 
 ## Examples
 
@@ -155,7 +155,7 @@ The following examples illustrate how to implement it in some common situations.
 
 ### Installation Task
 
-In some cases applying of a patch can be effectively equal to running of some [installation task](../Installation.md#installation-tasks-description).
+In some cases applying of a patch can be effectively equal to running of some [installation task](/docs/public/Installation.md#installation-tasks-description).
 For example, it can be possible to apply changes in the configuration of HAProxy by simple `kubemarine install --tasks deploy.loadbalancer.haproxy.configure`.
 To do the same through a patch, use the following:
 
@@ -179,7 +179,7 @@ class TheAction(Action):
 
 ### Reinstall Predefined Plugin
 
-If it is necessary to re-install some [predefined plugin](../Installation.md#predefined-plugins), use the following:
+If it is necessary to re-install some [predefined plugin](/docs/public/Installation.md#predefined-plugins), use the following:
 
 ```python
 from kubemarine import plugins

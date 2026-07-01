@@ -140,7 +140,7 @@ Ensure the following requirements are met:
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-For more information about the different types of Kubemarine installation, refer to [README](../README.md).
+For more information about the different types of Kubemarine installation, refer to [README](/README.md).
 
 **System Clock**
 
@@ -177,7 +177,7 @@ For cluster machines, ensure the following requirements are met:
 **Note**: Ubuntu 20.04 is not supported for Kubernetes 1.35 and higher 
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L299).
+The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](/kubemarine/resources/configurations/globals.yaml#L299).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -394,13 +394,13 @@ This deployment provides a single Kubemarine control-plane.
 #### All-in-one Scheme
 
 This scheme has one node assigned as control-plane and worker roles; balancer role is optional. This scheme is used for developing and demonstrating purposes only.
-An example of this scheme is available in the [All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml).
+An example of this scheme is available in the [All-in-one Inventory Example](/examples/cluster.yaml/allinone-cluster.yaml).
 
 **Note:** If you install both ingress-nginx and envoy-gateway at the same time in this schema, you should explicitly provide hostPorts configuration to these plugins, otherwise they both will compete for ports 80/443.
 
 The following image illustrates the All-in-one scheme.
 
-![All-in-one Scheme](/documentation/images/all-in-one.png)
+![All-in-one Scheme](/docs/images/all-in-one.png)
 
 #### One Control Plane and Many Workers Schema
 
@@ -411,7 +411,7 @@ This schema might be useful if:
 * AND you do not want to bother with vIP configuration (otherwise, you could combine control-plane and balancer role on one node, without explicit envoy-gateway/ingress-nginx placement).
 
 In this case, you can use schema with single control plane node (which runs envoy-gateway/ingress-nginx) and many (1 or more) workers.
-An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](../examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
+An example of this schema is available in the [One Control Plane and Many Workers Inventory Example](/examples/cluster.yaml/one-cp-many-workers-cluster.yaml).
 
 **Note**: 
 * Optionally, if you want control-plane node to be able to run workloads, 
@@ -420,7 +420,7 @@ you need to add "worker" role to this node.
 
 The following image illustrates the "One Control Plane and Many Workers" schema.
 
-![One Control Plane and Many Workers Schema](/documentation/images/one-cp-many-workers.png)
+![One Control Plane and Many Workers Schema](/docs/images/one-cp-many-workers.png)
 
 ### HA Deployment Schemes
 
@@ -429,21 +429,21 @@ This deployment type provides a highly available and reliable solution.
 #### Mini-HA Scheme
 
 In this scheme, the control-plane, balancer, and worker roles are all assigned to odd number of identical nodes (at least 3).
-In this scheme, it is mandatory to enable VRRP to leverage balancing. An example of this scheme is available in the [Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml).
+In this scheme, it is mandatory to enable VRRP to leverage balancing. An example of this scheme is available in the [Mini-HA Inventory Example](/examples/cluster.yaml/miniha-cluster.yaml).
 
 The following image illustrates the Mini-HA scheme.
 
-![Mini-HA Scheme](/documentation/images/mini-ha.png)
+![Mini-HA Scheme](/docs/images/mini-ha.png)
 
 #### Full-HA Scheme
 
 In this scheme, several nodes are assigned different roles. The number of control-plane nodes should be odd, three, or more.
 The number of worker nodes should be greater than one or more than three. The recommended number of balancer nodes is two, with configured VRRP, but one balancer without VRRP is also supported.
-An example of this scheme presented is available in the [Minimal Full-HA Inventory Example](../examples/cluster.yaml/minimal-cluster.yaml) and [Typical Full-HA Inventory Example](../examples/cluster.yaml/typical-cluster.yaml).
+An example of this scheme presented is available in the [Minimal Full-HA Inventory Example](/examples/cluster.yaml/minimal-cluster.yaml) and [Typical Full-HA Inventory Example](/examples/cluster.yaml/typical-cluster.yaml).
 
 The following image illustrates the Full-HA scheme.
 
-![Full-HA Scheme](/documentation/images/full-ha.png)
+![Full-HA Scheme](/docs/images/full-ha.png)
 
 ## Taints and Toleration
 
@@ -526,16 +526,16 @@ If you create your own plugins, the tolerations settings should be taken into ac
 All the installation configurations for the cluster are in a single inventory file. It is recommended to name this file as **cluster.yaml**.
 
 For more information about the structure of the inventory and how to specify the values, refer to the following configuration examples:
-* [Minimal Full-HA Inventory Example](../examples/cluster.yaml/minimal-cluster.yaml) - It provides the minimum set of parameters required to install a cluster out of the box.
-* [Typical Full-HA Inventory Example](../examples/cluster.yaml/typical-cluster.yaml) - It provides a set of parameters that you probably want to configure.
-* [Full Full-HA Inventory Example](../examples/cluster.yaml/full-cluster.yaml) - It provides almost all the possible parameters that you can configure.
-* [Minimal All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
-* [Minimal Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
+* [Minimal Full-HA Inventory Example](/examples/cluster.yaml/minimal-cluster.yaml) - It provides the minimum set of parameters required to install a cluster out of the box.
+* [Typical Full-HA Inventory Example](/examples/cluster.yaml/typical-cluster.yaml) - It provides a set of parameters that you probably want to configure.
+* [Full Full-HA Inventory Example](/examples/cluster.yaml/full-cluster.yaml) - It provides almost all the possible parameters that you can configure.
+* [Minimal All-in-one Inventory Example](/examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
+* [Minimal Mini-HA Inventory Example](/examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
 
 #### Inventory validation
 
 When configuring the inventory, you can use your favorite IDE supporting YAML validation by JSON schema.
-JSON schema for inventory file can be used by [URL](../kubemarine/resources/schemas/cluster.json?raw=1).
+JSON schema for inventory file can be used by [URL](/kubemarine/resources/schemas/cluster.json?raw=1).
 Do not try to copy the schema content.
 
 Make sure to use a raw URL (at raw.githubusercontent.com) without any query parameters.
@@ -681,7 +681,7 @@ nodes:
       region: europe
 ```
 
-The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
+The example is also available in [Full Inventory Example](/examples/cluster.yaml/full-cluster.yaml).
 
 **Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The 
 `control-plane` and `master` roles are interchangeable at the moment. Therefore it's possible to use the `control-plane` and 
@@ -1092,7 +1092,7 @@ vrrp_ips:
 
 Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
 The following example describes the type of traffic that is applicable for a particular IP 
-in the [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) configuration. (`not bind` specifies that the IP receives neither TCP nor HTTP traffic):
+in the [maintenance mode](/docs/public/LoadBalancing.md#maintenance-mode) configuration. (`not bind` specifies that the IP receives neither TCP nor HTTP traffic):
 
 ```yaml
 vrrp_ips:
@@ -2829,7 +2829,7 @@ services:
         - ntp2.example.com iburst
 ```
 
-An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](/examples/cluster.yaml/full-cluster.yaml).
 
 Synchronization is configured with the` prepare.ntp.chrony` task. The task performs the following:
 * Generates the `chrony.conf` file and uploads it to the `/etc/chrony` (or `/etc/chrony/chrony.conf` for Ubuntu 26.04) directory on all cluster hosts. If dumping is enabled, the config dump is saved.
@@ -3632,7 +3632,7 @@ As an example of a template, you can look at [default template](/kubemarine/temp
 
 #### maintenance mode
 
-Kubemarine supports [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
+Kubemarine supports [maintenance mode](/docs/public/LoadBalancing.md#maintenance-mode) for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
 
 ```yaml
 services:
@@ -3918,7 +3918,7 @@ plugins:
 
 ```
 
-An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](/examples/cluster.yaml/full-cluster.yaml).
 
 ###### Calico BGP Configuration
 
@@ -4115,7 +4115,7 @@ plugins:
 ```
 
 **Note**: Calico API server requires its annual certificates' renewal.
-For more information, refer to [Configuring Certificate Renew Procedure for calico](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-calico).
+For more information, refer to [Configuring Certificate Renew Procedure for calico](/docs/public/Maintenance.md#configuring-certificate-renew-procedure-for-calico).
 
 Kubemarine waits for the API server availability during the installation.
 If the default wait timeout does not fit, it can be extended in the same `apiserver` section of the `calico` plugin.
@@ -4180,7 +4180,7 @@ plugins:
       image: k8s-artifacts-prod/netcracker/ingress-nginx/controller:v1.16.0
 ```
 
-An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](/examples/cluster.yaml/full-cluster.yaml).
 
 The plugin configuration supports the following parameters:
 
@@ -6071,7 +6071,7 @@ and can be passed as a source inventory in future runs of Kubemarine procedures.
 
 **Note**: The **cluster_finalized.yaml** inventory file is aimed to reflect the current cluster state together with the Kubemarine version using which it is created.
 This in particular means that the file cannot be directly used with a different Kubemarine version.
-Though, it still can be migrated together with the managed cluster using the [Kubemarine Migration Procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
+Though, it still can be migrated together with the managed cluster using the [Kubemarine Migration Procedure](/docs/public/Maintenance.md#kubemarine-migration-procedure).
 
 In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
 For example, consider the following package's origin configuration:
@@ -6325,7 +6325,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | calicoctl                                             | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | SHA1: 69ddd6d818cfa9bceb8a70a8d2a05efef955dfba Required only if calico is installed. |
 |          | etcdutl                                               | v3.5.24            | v3.5.24               | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | SHA1: 3d84b2cd25782560b81512298601e8680b733aff                                       |
 |          | crictl                                                | v1.33.0            | v1.33.0               | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | SHA1: d702fd5792aba3ebf451e4488df2916010a76a0d                                       |
-| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 1.7.*              | 1.7.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
+| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
 |          | haproxy                                               | 2.4*               | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
 |          | keepalived                                            | 2.2                | 2.1                   | 2.*                | 2.*                | 2.*                | 2.1                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
 | images   | registry.k8s.io/kube-apiserver                        | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            |                                                                                      |
@@ -6368,7 +6368,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | etcdutl                                               | v3.6.5             | v3.6.5                | v3.6.5             | v3.6.5             | v3.6.5             | v3.6.5             | v3.6.5             | v3.6.5             | SHA1: 0e09479497c015db418761a190a3446a2ba2abcb                                       |
 |          | calicoctl                                             | v3.32.0            | v3.32.0               | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | SHA1: a542ce4af15481a1d99297d39621710b094222b2 Required only if calico is installed. |
 |          | crictl                                                | v1.34.0            | v1.34.0               | v1.34.0            | v1.34.0            | v1.34.0            | v1.34.0            | v1.34.0            | v1.34.0            | SHA1: 8d1c0fbbeb7a78a975fee674d4edd54da6124ddd                                       |
-| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 1.7.*              | 1.7.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
+| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
 |          | haproxy/rh-haproxy                                    | 2.4*               | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
 |          | keepalived                                            | 2.2                | 2.1                   | 2.*                | 2.*                | 2.*                | 2.1                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
 | images   | registry.k8s.io/kube-apiserver                        | v1.34.2            | v1.34.2               | v1.34.2            | v1.34.2            | v1.34.2            | v1.34.2            | v1.34.2            | v1.34.2            |                                                                                      |
@@ -6414,7 +6414,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | etcdutl                                               | v3.6.6             | v3.6.6                | v3.6.6             | v3.6.6             | v3.6.6             | v3.6.6             | v3.6.6             | v3.6.6             | SHA1: 7e6df3e42fb5e99dc2b983e0b08fa55629b16b52                                       |
 |          | calicoctl                                             | v3.32.0            | v3.32.0               | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | SHA1: a542ce4af15481a1d99297d39621710b094222b2 Required only if calico is installed. |
 |          | crictl                                                | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | SHA1: 371f4bba4bb0ea5a3fbf7168dadcd541ab1bc880                                       |
-| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 1.7.*              | 1.7.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
+| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
 |          | haproxy/rh-haproxy                                    | 1.8                | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
 |          | keepalived                                            | 1.3                | 2.1                   | 2.*                | 2.*                | 2.*                | 1.3                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
 | images   | registry.k8s.io/kube-apiserver                        | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            |                                                                                      |
@@ -6460,7 +6460,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | etcdutl                                               | v3.6.8             | v3.6.8                | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | SHA1: eaacf285474634db11a45973084a99e5f85784bd                                       |
 |          | calicoctl                                             | v3.32.0            | v3.32.0               | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | SHA1: a542ce4af15481a1d99297d39621710b094222b2 Required only if calico is installed. |
 |          | crictl                                                | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 8abff03f7296e8fca9ef7db18f29be3638ae874e                                       |
-| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 1.7.*              | 1.7.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
+| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
 |          | haproxy/rh-haproxy                                    | 1.8                | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
 |          | keepalived                                            | 1.3                | 2.1                   | 2.*                | 2.*                | 2.*                | 1.3                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
 | images   | registry.k8s.io/kube-apiserver                        | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            |                                                                                      |

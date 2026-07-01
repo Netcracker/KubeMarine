@@ -905,7 +905,7 @@ Not applicable.
 ### How to resolve
 The root cause of the issue is a corrupted etcd database. 
 
-If you have a relevant backup created by the [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster, you can use the [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
+If you have a relevant backup created by the [`kubemarine backup`](/docs/public/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster, you can use the [`kubemarine restore`](/docs/public/Maintenance.md#restore-procedure) procedure.
 
 If you prefer to restore only the etcd database rather than the entire cluster, you can use the `kubemarine restore` procedure with a list of required tasks:
 ```bash
@@ -1163,7 +1163,7 @@ Not applicable.
 Not applicable.
 
 ### How to resolve
-The root cause of the issue is that `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. These settings can be customized during the installation process by modifying the `config_map` section, as described in the [nginx-ingress-controller plugin documentation](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#nginx-ingress-controller).
+The root cause of the issue is that `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. These settings can be customized during the installation process by modifying the `config_map` section, as described in the [nginx-ingress-controller plugin documentation](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#nginx-ingress-controller).
 
 To resolve this issue, update the `Ingress` resource by adding an annotation that manages the list of supported ciphers. The following example adds the `AES128-SHA256` cipher, which is not supported by default:
 
@@ -1269,7 +1269,7 @@ Not applicable.
 ### How to resolve
 The root cause of this issue is a network policy applied at the infrastructure level that blocks traffic for the `podSubnet` and/or `serviceSubnet` on the nodes' ports.
 
-To resolve the issue, ensure that the [prerequisites](/documentation/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are properly configured.
+To resolve the issue, ensure that the [prerequisites](/docs/public/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are properly configured.
 
 For OpenStack IaaS environments:
 1. Check both the Security Group settings and the Allowed Address Pairs settings (if Port Security is enabled on the nodes' ports).
@@ -2250,7 +2250,7 @@ Error from server: error dialing backend: remote error: tls: internal error
 
 ### How to resolve
 1. Perform the Certificate Signing Request (CSR) approval process by following the steps outlined in the maintenance guide.
-2. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/internal/Hardening.md#kubelet-server-certificate-approval) section for detailed instructions on how to approve the kubelet server certificate.
+2. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/docs/internal/Hardening.md#kubelet-server-certificate-approval) section for detailed instructions on how to approve the kubelet server certificate.
 
 ### Recommendations
 Ensure that the cluster's certificate management process is aligned with the security policies. Regularly check the status of certificates to avoid such issues.

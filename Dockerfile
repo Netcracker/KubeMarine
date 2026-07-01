@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build ipip_check binary
-FROM golang:1.25.8 AS go-build
+FROM golang:1.26.4 AS go-build
 
 WORKDIR /opt
 
@@ -12,7 +12,7 @@ RUN go mod download && \
     gzip ipip_check
 
 FROM alpine:3.23.3 AS helm-downloader
-ARG HELM_VERSION=v3.20.0
+ARG HELM_VERSION=v3.21.2
 ADD https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz /tmp/helm.tar.gz
 RUN tar -xzf /tmp/helm.tar.gz -C /tmp \
     && mv /tmp/linux-amd64/helm /helm \
