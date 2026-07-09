@@ -623,6 +623,65 @@ def parse_aligned_table(table_text: str) -> List[Dict[str, str]]:
     return data
 
 
+def parse_nodes_filter_expr(expr: str) -> Dict[str, object]:
+    """
+    Parse nodes filter expression provided from CLI into structured selectors.
+
+    Supported syntax (comma separated parts):
+      - labels=key1=value1;key2=value2
+      - roles=role1;role2
+
+    Examples:
+      labels=region=infra
+      labels=region=infra;zone=dc1,roles=worker
+    """
+    selectors: Dict[str, object] = {}
+
+    expr = expr.strip()
+    if not expr:
+        return selectors
+
+    parts = [p.strip() for p in expr.split(',') if p.strip()]
+    for part in parts:
+        if '=' not in part:
+            raise ValueError(f"Invalid nodes filter fragment {part!r}: expected key=value")
+
+        key, rest = part.split('=', 1)
+        key = key.strip()
+        rest = rest.strip()
+        if not rest:
+            raise ValueError(f"Invalid nodes filter fragment {part!r}: empty value")
+
+        if key in ('role', 'roles'):
+            roles = [r.strip() for r in rest.split(';') if r.strip()]
+            if not roles:
+                raise ValueError(f"Invalid roles selector in nodes filter fragment {part!r}")
+            existing = selectors.setdefault('roles', [])
+            if not isinstance(existing, list):
+                raise ValueError("Internal error: roles selector has unexpected type")
+            existing.extend(roles)
+        elif key == 'labels':
+            labels = selectors.setdefault('labels', {})
+            if not isinstance(labels, dict):
+                raise ValueError("Internal error: labels selector has unexpected type")
+
+            label_parts = [r.strip() for r in rest.split(';') if r.strip()]
+            for label_part in label_parts:
+                if '=' not in label_part:
+                    raise ValueError(
+                        f"Invalid labels selector in nodes filter fragment {part!r}: expected label=value")
+                l_key, l_val = label_part.split('=', 1)
+                l_key = l_key.strip()
+                l_val = l_val.strip()
+                if not l_key:
+                    raise ValueError(f"Invalid labels selector in nodes filter fragment {part!r}: empty label key")
+                labels[l_key] = l_val
+        else:
+            raise ValueError(f"Unsupported nodes filter key {key!r}, supported: 'labels', 'roles'")
+
+    return selectors
+
+
 class ClusterStorage:
     """
     File preservation:
