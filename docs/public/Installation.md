@@ -3203,6 +3203,19 @@ services:
 
 More information could be found in [coredns documention](https://coredns.io/plugins/log/)
 
+##### errors logs
+
+Error messages are managed by [errors plugin](https://coredns.io/plugins/errors/). By default it doesn't have any additional settings:
+
+```yaml
+services:
+  coredns:
+    configmap:
+      Corefile:
+        '.:53':
+          errors: True
+```
+
 ##### deployment
 
 This section contains YAML settings that are applied to Coredns service via a patch. By default, this section contains the following data:
