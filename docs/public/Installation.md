@@ -3188,6 +3188,21 @@ The lesser the priority value, the earlier in `Corefile` config this entry appea
 
 **Warning**: It is strongly discouraged to change the configuration of the CoreDNS manually, if you need to change the configuration, you must reflect them in the `cluster.yaml` and call the installation procedure with `--tasks="deploy.coredns"` argument. This will help keep the cluster configuration consistent.
 
+##### queries logs
+
+The incomming queries could be reflected in the logs. For instance, the cluster-1.local zone queries:
+
+```yaml
+services:
+  coredns:
+    configmap:
+      Corefile:
+        'cluster-1.local':
+          log: true
+```
+
+More information could be found in [coredns documention](https://coredns.io/plugins/log/)
+
 ##### deployment
 
 This section contains YAML settings that are applied to Coredns service via a patch. By default, this section contains the following data:
