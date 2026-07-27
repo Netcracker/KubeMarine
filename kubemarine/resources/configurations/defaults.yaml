@@ -89,7 +89,10 @@ services:
       extraVolumes: []
     etcd:
       local:
-        extraArgs: {}
+        extraArgs:
+          auto-compaction-mode: "periodic"
+          auto-compaction-retention: "1h"
+          watch-progress-notify-interval: "5m"
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []
