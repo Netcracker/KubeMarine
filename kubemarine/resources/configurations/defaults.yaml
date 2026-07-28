@@ -92,7 +92,9 @@ services:
         extraArgs:
           auto-compaction-mode: "periodic"
           auto-compaction-retention: "1h"
-          watch-progress-notify-interval: "5m"
+          # TODO: implement watch-progress-notify-interval/experimental-watch-progress-notify-interval choice by the ETCD verssion
+          experimental-watch-progress-notify-interval: "5m"
+
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []
