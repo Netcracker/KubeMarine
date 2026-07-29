@@ -177,6 +177,7 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
                                     }
                                 ],
                             },
+                            "requestID": "PreserveOrGenerate",
                         },
                     },
                 },
