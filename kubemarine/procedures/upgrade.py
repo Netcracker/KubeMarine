@@ -116,6 +116,22 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         preconfigure_components.append('kube-apiserver')
         preconfigure_functions['kubeadm-config'] = apply_kubelet_feature_gates
 
+    if utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.34") \
+            and utils.version_key(upgrade_version)[0:2] >= utils.minor_version_key("v1.34"):
+
+        # experimental-watch-progress-notify-interval was renamed to watch-progress-notify-interval in k8s 1.34.
+        # See kubernetes.enrich_inventory() / _enrich_etcd_watch_progress()
+        def rename_etcd_watch_progress_arg(cluster_config: dict) -> dict:
+            etcd_args = cluster_config.get("etcd", {}).get("local", {}).get("extraArgs", {})
+            old_arg = "experimental-watch-progress-notify-interval"
+            new_arg = "watch-progress-notify-interval"
+            if old_arg in etcd_args and new_arg not in etcd_args:
+                etcd_args[new_arg] = etcd_args.pop(old_arg)
+            return cluster_config
+
+        preconfigure_components.append('etcd')
+        preconfigure_functions['kubeadm-config'] = rename_etcd_watch_progress_arg
+
     if preconfigure_components:
         upgrade_group.call(kubernetes.components.reconfigure_components,
                            components=preconfigure_components, edit_functions=preconfigure_functions)
