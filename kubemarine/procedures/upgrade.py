@@ -125,13 +125,11 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         # experimental-watch-progress-notify-interval was renamed to watch-progress-notify-interval in k8s 1.34.
         def rename_etcd_watch_progress_arg(cluster_config: dict) -> dict:
             etcd_args = cluster_config.get("etcd", {}).get("local", {}).get("extraArgs", [])
-            cluster.log.info(f"ARGS1: {etcd_args}")
             old_arg = "experimental-watch-progress-notify-interval"
             new_arg = "watch-progress-notify-interval"
             for etcd_arg_item in etcd_args:
                 if etcd_arg_item['name'] == old_arg:
                     etcd_arg_item['name'] = new_arg
-            cluster.log.info(f"ARGS2: {etcd_args}")
             return cluster_config
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
