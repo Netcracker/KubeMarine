@@ -48,7 +48,7 @@ class _EtcdReconfigurationAction(Action):
             stale_arg = _NEW_ARG
 
         def edit_etcd_args(cluster_config: dict) -> dict:
-            # cluster_config is the live ClusterConfiguration from the kubeadm-config ConfigMap.
+            # Get the config from the kubeadm-config ConfigMap.
             etcd_local: dict = (cluster_config
                                 .setdefault("etcd", {})
                                 .setdefault("local", {}))
@@ -56,9 +56,8 @@ class _EtcdReconfigurationAction(Action):
         
             existing_names = {entry["name"] for entry in etcd_args}
     
-            # Skip if either variant is already present on the live cluster
+            # Check if the option must be set
             if _NEW_ARG not in existing_names and _OLD_ARG not in existing_names:
-                # Remove stale arg (e.g. after k8s upgrade without re-running this patch)
                 etcd_local["extraArgs"] = [e for e in etcd_args if e["name"] != stale_arg]
                 etcd_local["extraArgs"].append({"name": target_arg, "value": "5m"})
             else:

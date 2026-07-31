@@ -201,7 +201,7 @@ def _enrich_etcd_watch_progress(cluster: KubernetesCluster) -> None:
     else:
         arg_name = "experimental-watch-progress-notify-interval"
 
-    # Only set the default if the user has not explicitly provided either arg
+    # Set the default if the option has not explicitly provided
     if "watch-progress-notify-interval" not in etcd_extra_args \
             and "experimental-watch-progress-notify-interval" not in etcd_extra_args:
         etcd_extra_args[arg_name] = "5m"
