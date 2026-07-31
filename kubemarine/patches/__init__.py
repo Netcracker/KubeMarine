@@ -34,7 +34,7 @@ _RENAME_VERSION = "1.34"
 
 class _EtcdReconfigurationAction(Action):
     def __init__(self) -> None:
-        super().__init__("Add etcd watch-progress-notify-interval")
+        super().__init__("Add default etcd options")
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
@@ -96,10 +96,11 @@ class EtcdReconfigurationPatch(RegularPatch):
     @property
     def description(self) -> str:
         return dedent("""\
-            Add watch-progress-notify-interval (or its experimental predecessor) to etcd extraArgs.
+            Add auto-compaction-mode, auto-compaction-retention, snapshot-count, and
+            watch-progress-notify-interval (or its experimental predecessor) to etcd extraArgs.
             For Kubernetes >= 1.34: sets --watch-progress-notify-interval=5m
             For Kubernetes <= 1.33: sets --experimental-watch-progress-notify-interval=5m
-            Skipped if either arg is already explicitly set in the inventory.
+            The existing args in the inventory are skipped.
             """.rstrip())
 
 patches: List[Patch] = [
