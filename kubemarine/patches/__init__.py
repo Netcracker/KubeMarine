@@ -64,7 +64,10 @@ class _EtcdReconfigurationAction(Action):
                 cluster.log.info(
                     "etcd watch-progress-notify-interval is already configured on the cluster, skipping.")
 
-            options_dict: Dict[str, str] = {"auto-compaction-mode": "periodic", "auto-compaction-retention": "1h", "snapshot-count": "100000"}
+            options_dict: Dict[str, str] = {
+                    "auto-compaction-mode": "periodic",
+                    "auto-compaction-retention": "1h",
+                    "snapshot-count": "100000"}
             for name, value in options_dict.items():
                 if name not in existing_names:
                     etcd_local["extraArgs"].append({"name": name, "value": value})
