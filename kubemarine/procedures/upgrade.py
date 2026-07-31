@@ -120,6 +120,24 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         upgrade_group.call(kubernetes.components.reconfigure_components,
                            components=preconfigure_components, edit_functions=preconfigure_functions)
 
+    if utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.34") \
+            and utils.version_key(upgrade_version)[0:2] >= utils.minor_version_key("v1.34"):
+        # experimental-watch-progress-notify-interval was renamed to watch-progress-notify-interval in k8s 1.34.
+        def rename_etcd_watch_progress_arg(cluster_config: dict) -> dict:
+            etcd_args = cluster_config.get("etcd", {}).get("local", {}).get("extraArgs", [])
+            old_arg = "experimental-watch-progress-notify-interval"
+            new_arg = "watch-progress-notify-interval"
+            for etcd_arg_item in etcd_args:
+                if etcd_arg_item['name'] == old_arg:
+                    etcd_arg_item['name'] = new_arg
+            return cluster_config
+
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        kubeadm_config = kubernetes.components.KubeadmConfig(cluster)
+        if not kubeadm_config.is_loaded('kubeadm-config'):
+            kubeadm_config.load('kubeadm-config', first_control_plane, rename_etcd_watch_progress_arg)
+        kubeadm_config.apply('kubeadm-config', first_control_plane)
+
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
     disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)

@@ -1142,6 +1142,11 @@ By default, the installer uses the following parameters:
 | controllerManager.extraArgs.profiling                   | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.terminated-pod-gc-threshold | `1000`                                                   |                                                                                        |
 | featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes versions 1.33, 1.34 and 1.35                                               |
+| etcd.local.extraArgs.auto-compaction-mode               | `periodic`                                               |
+| etcd.local.extraArgs.auto-compaction-retention          | `1h`                               |                     |
+| etcd.local.extraArgs.snapshot-count                     | `100000`                           |                     |
+| etcd.local.extraArgs.experimental-watch-progress-notify-interval | `5m`                           | Provided for Kubernetes versions up to v1.33 |
+| etcd.local.extraArgs.watch-progress-notify-interval              | `5m`                           | Provided for Kubernetes versions from v1.34  |
 
 The following is an example of kubeadm defaults override:
 
