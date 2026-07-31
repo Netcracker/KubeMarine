@@ -20,7 +20,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 """
 
 from textwrap import dedent
-from typing import List
+from typing import List, Dict
 
 from kubemarine.core.action import Action
 from kubemarine.core.patch import Patch, RegularPatch
@@ -56,7 +56,7 @@ class _EtcdReconfigurationAction(Action):
         
             existing_names = {entry["name"] for entry in etcd_args}
     
-            # Check if the option must be set
+            # Check if the options must be set
             if _NEW_ARG not in existing_names and _OLD_ARG not in existing_names:
                 etcd_local["extraArgs"] = [e for e in etcd_args if e["name"] != stale_arg]
                 etcd_local["extraArgs"].append({"name": target_arg, "value": "5m"})
@@ -64,23 +64,13 @@ class _EtcdReconfigurationAction(Action):
                 cluster.log.info(
                     "etcd watch-progress-notify-interval is already configured on the cluster, skipping.")
 
-            if "auto-compaction-mode" not in existing_names:
-                etcd_local["extraArgs"].append({"name": "auto-compaction-mode", "value": "periodic"})
-            else:
-                cluster.log.info(
-                    "etcd auto-compaction-mode is already configured on the cluster, skipping.")
-
-            if "auto-compaction-retention" not in existing_names:
-                etcd_local["extraArgs"].append({"name": "auto-compaction-retention", "value": "1h"})
-            else:
-                cluster.log.info(
-                    "etcd auto-compaction-retention is already configured on the cluster, skipping.")
-
-            if "snapshot-count" not in existing_names:
-                etcd_local["extraArgs"].append({"name": "snapshot-count", "value": "100000"})
-            else:
-                cluster.log.info(
-                    "etcd snapshot-count is already configured on the cluster, skipping.")
+            options_dict: Dict[str, str] = {"auto-compaction-mode": "periodic", "auto-compaction-retention": "1h", "snapshot-count": "100000"}
+            for name, value in options_dict.items():
+                if name not in existing_names:
+                    etcd_local["extraArgs"].append({"name": name, "value": value})
+                else:
+                    cluster.log.info(
+                        f"etcd {name} is already configured on the cluster, skipping.")
 
             return cluster_config
 
