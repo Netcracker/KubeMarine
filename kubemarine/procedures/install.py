@@ -22,7 +22,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import (
     system, sysctl, haproxy, keepalived, kubernetes, plugins,
-    kubernetes_accounts, selinux, thirdparties, audit, coredns, cri, packages, apparmor, modprobe
+    kubernetes_accounts, selinux, thirdparties, audit, coredns, cri, packages, apparmor, modprobe, fsmount
 )
 from kubemarine.core import flow, utils, summary
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
@@ -138,6 +138,15 @@ def system_prepare_system_sysctl(group: NodeGroup) -> None:
     is_updated = system.configure_sensitive_service(group, sysctl.setup_sysctl)
     if is_updated:
         group.call(system.verify_sysctl)
+
+
+@_applicable_for_new_nodes_with_roles('all')
+def system_prepare_system_fsmount(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    if not cluster.inventory.get('services', {}).get('fsmount'):
+        cluster.log.debug("Skipped - no fsmount items defined in config file")
+        return
+    group.call(fsmount.setup_fsmount)
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -535,6 +544,7 @@ tasks = OrderedDict({
             "disable_swap": system_prepare_system_disable_swap,
             "modprobe": system_prepare_system_modprobe,
             "sysctl": system_prepare_system_sysctl,
+            "fsmount": system_prepare_system_fsmount,
             "audit": {
                 "install": system_install_audit,
                 "configure": system_prepare_audit,
@@ -577,9 +587,11 @@ cumulative_points = {
     # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
         "prepare.system.modprobe",
+        "prepare.system.fsmount",
         "prepare.system.audit"
     ],
     system.verify_system: [
+        "prepare.system.fsmount",
         "prepare.system.audit"
     ],
     # Some checks can be done only at the end when the necessary services are configured.

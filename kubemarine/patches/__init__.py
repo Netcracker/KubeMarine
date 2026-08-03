@@ -21,9 +21,37 @@ The whole directory is automatically cleared and reset after new version of Kube
 
 from typing import List
 
-from kubemarine.core.patch import Patch
+from kubemarine import fsmount
+from kubemarine.core.action import Action
+from kubemarine.core.patch import Patch, RegularPatch
+from kubemarine.core.resources import DynamicResources
+
+
+class _FsmountPatchAction(Action):
+    def __init__(self) -> None:
+        super().__init__('fsmount')
+
+    def run(self, res: DynamicResources) -> None:
+        cluster = res.cluster()
+        group = cluster.nodes['all']
+        group.call(fsmount.setup_fsmount)
+
+
+class _FsmountPatch(RegularPatch):
+    def __init__(self) -> None:
+        super().__init__('fsmount')
+
+    @property
+    def action(self) -> Action:
+        return _FsmountPatchAction()
+
+    @property
+    def description(self) -> str:
+        return "Sets up fsmount items (e.g. zram) with default settings on all existing cluster nodes."
+
 
 patches: List[Patch] = [
+    _FsmountPatch(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
