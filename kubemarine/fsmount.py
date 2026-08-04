@@ -26,24 +26,11 @@ from kubemarine.core.group import NodeGroup
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     fsmount_list: List[dict] = cluster.inventory.get('services', {}).get('fsmount', [])
-    # JSON schema
     for i, item in enumerate(fsmount_list):
-        path = ['services', 'fsmount', i]
-        if not isinstance(item, dict):
-            raise Exception(f"fsmount item at {utils.pretty_path(path)} must be a mapping")
+        path: List[Union[str, int]] = ['services', 'fsmount', i]
 
-        for required in ('name', 'device', 'path'):
-            if not item.get(required):
-                raise Exception(f"{required!r} is required for fsmount item at {utils.pretty_path(path)}")
-
-        if not item.get('template', {}).get('source'):
-            raise Exception(f"'template.source' is required for fsmount item at {utils.pretty_path(path)}")
-        if not item.get('template', {}).get('destination'):
-            raise Exception(f"'template.destination' is required for fsmount item at {utils.pretty_path(path)}")
-
-        ## TODO: SKIP
-        #if item.get('groups') is None and item.get('nodes') is None:
-        #    item['groups'] = ['control-plane', 'worker', 'balancer']
+        if item.get('groups') is None and item.get('nodes') is None:
+            continue
 
         preparation_script = item.get('preparation_script')
         if preparation_script is not None:
