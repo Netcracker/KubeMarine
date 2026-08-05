@@ -49,7 +49,7 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                     f"provided for fsmount item {item['name']!r}.")
 
 
-def _get_applicable_items(cluster: KubernetesCluster, node: NodeGroup) -> List[dict]:
+def get_applicable_items(cluster: KubernetesCluster, node: NodeGroup) -> List[dict]:
     fsmount_list: List[dict] = cluster.inventory.get('services', {}).get('fsmount', [])
     applicable = []
     for item in fsmount_list:
@@ -93,7 +93,7 @@ def is_mounted(group: NodeGroup) -> bool:
     results = group.sudo("cat /proc/mounts")
 
     for node in group.get_ordered_members_list():
-        applicable = _get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node)
         if not applicable:
             continue
         host = node.get_host()
@@ -113,7 +113,7 @@ def check_mounts(group: NodeGroup) -> List[str]:
     errors = []
 
     for node in group.get_ordered_members_list():
-        applicable = _get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node)
         if not applicable:
             continue
         host = node.get_host()
@@ -141,7 +141,7 @@ def setup_fsmount(group: NodeGroup) -> bool:
 
     changed = False
     for node in group.get_ordered_members_list():
-        applicable = _get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node)
         if not applicable:
             continue
 

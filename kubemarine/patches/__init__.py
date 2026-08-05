@@ -47,7 +47,7 @@ class _FsmountPatchAction(Action):
                     kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
                     warn=True, pty=True)
 
-            applicable = fsmount._get_applicable_items(cluster, node)
+            applicable = fsmount.get_applicable_items(cluster, node)
             for item in applicable:
                 mount_path = item['path'].rstrip('/')
                 cluster.log.debug(f"Removing files in {mount_path!r} on {node_name!r}")
