@@ -78,6 +78,16 @@ def _render_unit(item: dict) -> str:
     )
 
 
+def _parse_mounts(mounts_output: str) -> dict:
+    """Parse /proc/mounts into {mountpoint: fstype}."""
+    result = {}
+    for line in mounts_output.splitlines():
+        parts = line.split()
+        if len(parts) >= 3:
+            result[parts[1]] = parts[2]
+    return result
+
+
 def is_mounted(group: NodeGroup) -> bool:
     cluster: KubernetesCluster = group.cluster
     results = group.sudo("cat /proc/mounts")
@@ -87,13 +97,38 @@ def is_mounted(group: NodeGroup) -> bool:
         if not applicable:
             continue
         host = node.get_host()
-        mounts_output = results[host].stdout
+        mounts = _parse_mounts(results[host].stdout)
         for item in applicable:
-            if item['path'].rstrip('/') not in mounts_output:
+            if item['path'].rstrip('/') not in mounts:
                 cluster.log.debug(f"Mount path {item['path']!r} not found in /proc/mounts on {host}")
                 return False
 
     return True
+
+
+def check_mounts(group: NodeGroup) -> List[str]:
+    """Return a list of human-readable error strings for missing or wrong-type mounts."""
+    cluster: KubernetesCluster = group.cluster
+    results = group.sudo("cat /proc/mounts")
+    errors = []
+
+    for node in group.get_ordered_members_list():
+        applicable = _get_applicable_items(cluster, node)
+        if not applicable:
+            continue
+        host = node.get_host()
+        node_name = node.get_node_name()
+        mounts = _parse_mounts(results[host].stdout)
+        for item in applicable:
+            mount_path = item['path'].rstrip('/')
+            expected_type = item.get('type', '')
+            if mount_path not in mounts:
+                errors.append(f"{node_name}: {mount_path!r} is not mounted")
+            elif expected_type and mounts[mount_path] != expected_type:
+                errors.append(
+                    f"{node_name}: {mount_path!r} has fstype {mounts[mount_path]!r}, expected {expected_type!r}")
+
+    return errors
 
 
 def setup_fsmount(group: NodeGroup) -> bool:
