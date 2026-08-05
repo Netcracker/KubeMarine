@@ -21,7 +21,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 
 from typing import List
 
-from kubemarine import fsmount
+from kubemarine import fsmount, kubernetes, system
 from kubemarine.core.action import Action
 from kubemarine.core.patch import Patch, RegularPatch
 from kubemarine.core.resources import DynamicResources
@@ -33,8 +33,38 @@ class _FsmountPatchAction(Action):
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
-        group = cluster.nodes['all']
-        group.call(fsmount.setup_fsmount)
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            node_name = node.get_node_name()
+            node_config = node.get_config()
+            is_k8s_node = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
+
+            if is_k8s_node:
+                cluster.log.debug(f"Draining node {node_name!r} before fsmount setup")
+                first_control_plane.sudo(
+                    kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
+                    warn=True, pty=True)
+
+            applicable = fsmount._get_applicable_items(cluster, node)
+            for item in applicable:
+                mount_path = item['path'].rstrip('/')
+                cluster.log.debug(f"Removing files in {mount_path!r} on {node_name!r}")
+                node.sudo(f"rm -rf {mount_path}/*")
+
+            node.call(fsmount.setup_fsmount)
+
+            cluster.log.debug(f"Rebooting node {node_name!r} after fsmount setup")
+            system.perform_group_reboot(node)
+
+            if is_k8s_node:
+                cluster.log.debug(f"Uncordoning node {node_name!r} after reboot")
+                first_control_plane.wait_command_successful(
+                    f"kubectl uncordon {node_name}",
+                    hide=False, pty=True,
+                    timeout=timeout_config['timeout'],
+                    retries=timeout_config['retries'])
 
 
 class _FsmountPatch(RegularPatch):

@@ -101,7 +101,6 @@ def setup_fsmount(group: NodeGroup) -> bool:
     logger = cluster.log
 
     if is_mounted(group):
-        # ???
         logger.debug("Skipped - all required filesystems are already mounted")
         return False
 
