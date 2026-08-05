@@ -20,7 +20,7 @@ from jinja2 import Template
 
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, CollectorCallback
 
 
 @enrichment(EnrichmentStage.FULL)
@@ -109,7 +109,14 @@ def is_mounted(group: NodeGroup) -> bool:
 def check_mounts(group: NodeGroup) -> List[str]:
     """Return a list of human-readable error strings for missing or wrong-type mounts."""
     cluster: KubernetesCluster = group.cluster
-    results = group.sudo("cat /proc/mounts")
+
+    mounts_collector = CollectorCallback(cluster)
+    zramctl_collector = CollectorCallback(cluster)
+    defer = group.new_defer()
+    defer.sudo("cat /proc/mounts", callback=mounts_collector)
+    defer.sudo("zramctl --output-all", warn=True, callback=zramctl_collector)
+    defer.flush()
+
     errors = []
 
     for node in group.get_ordered_members_list():
@@ -118,7 +125,9 @@ def check_mounts(group: NodeGroup) -> List[str]:
             continue
         host = node.get_host()
         node_name = node.get_node_name()
-        mounts = _parse_mounts(results[host].stdout)
+        mounts = _parse_mounts(mounts_collector.result[host].stdout)
+        zramctl_output = zramctl_collector.result[host].stdout
+
         for item in applicable:
             mount_path = item['path'].rstrip('/')
             expected_type = item.get('type', '')
@@ -127,6 +136,9 @@ def check_mounts(group: NodeGroup) -> List[str]:
             elif expected_type and mounts[mount_path] != expected_type:
                 errors.append(
                     f"{node_name}: {mount_path!r} has fstype {mounts[mount_path]!r}, expected {expected_type!r}")
+
+            if item['device'].startswith('/dev/zram') and mount_path not in zramctl_output:
+                errors.append(f"{node_name}: {mount_path!r} not found in zramctl output")
 
     return errors
 
