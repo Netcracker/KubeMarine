@@ -25,6 +25,42 @@ from kubemarine import fsmount, kubernetes, system
 from kubemarine.core.action import Action
 from kubemarine.core.patch import Patch, RegularPatch
 from kubemarine.core.resources import DynamicResources
+from kubemarine.kubernetes import components
+
+
+class _KubeletLogLimitsPatchAction(Action):
+    def __init__(self) -> None:
+        super().__init__('kubelet-log-limits', recreate_inventory=True)
+
+    def run(self, res: DynamicResources) -> None:
+        inventory = res.inventory()
+        kubelet = inventory.setdefault('services', {}).setdefault('kubeadm_kubelet', {})
+        changed = False
+        for key, value in (('containerLogMaxSize', '5Mi'), ('containerLogMaxFiles', 2)):
+            if key not in kubelet:
+                kubelet[key] = value
+                changed = True
+
+        if not changed:
+            res.logger().info("containerLogMaxSize/containerLogMaxFiles already set, skipping.")
+            return
+
+        cluster = res.cluster()
+        cluster.nodes['control-plane'].call(components.reconfigure_components, components=['kubelet'])
+
+
+class _KubeletLogLimitsPatch(RegularPatch):
+    def __init__(self) -> None:
+        super().__init__('kubelet-log-limits')
+
+    @property
+    def action(self) -> Action:
+        return _KubeletLogLimitsPatchAction()
+
+    @property
+    def description(self) -> str:
+        return ("Adds containerLogMaxSize: 5Mi and containerLogMaxFiles: 2 "
+                "to services.kubeadm_kubelet and applies the new kubelet config on all nodes.")
 
 
 class _FsmountPatchAction(Action):
@@ -77,10 +113,12 @@ class _FsmountPatch(RegularPatch):
 
     @property
     def description(self) -> str:
-        return "Sets up fsmount items (e.g. zram) with default settings on all existing cluster nodes."
+        return ("Sets up zram volume for /var/log/pods with default settings on all existing cluster nodes. "
+                "Be careful it erases all of the data inside /var/log/pods folder")
 
 
 patches: List[Patch] = [
+    _KubeletLogLimitsPatch(),
     _FsmountPatch(),
 ]
 """
