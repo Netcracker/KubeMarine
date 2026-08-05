@@ -45,6 +45,7 @@ This section provides information about the inventory, features, and steps for i
       - [thirdparties](#thirdparties)
       - [CRI](#cri)
       - [modprobe](#modprobe)
+      - [fsmount](#fsmount)
       - [sysctl](#sysctl)
       - [audit](#audit)
         - [Kubernetes Policy](#audit-kubernetes-policy)
@@ -2496,6 +2497,73 @@ The following settings are supported in the extended format:
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If changes to the hosts `modprobe` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
+
+#### fsmount
+
+*Installation task*: `prepare.system.fsmount`
+
+*Can cause reboot*: No
+
+*Can restart service*: No
+
+*Overwrite files*: Yes, the rendered systemd unit file is uploaded to the path specified in `template.destination`, backup is created
+
+*OS specific*: No
+
+The `services.fsmount` section configures filesystems to be mounted on cluster nodes via systemd units.
+Each item defines a device to format and mount, a Jinja2 template for the systemd unit that performs the setup, and an optional preparation script that runs before the unit is installed.
+
+By default, a zram-based filesystem is configured to back `/var/log/pods` on all `control-plane` and `worker` nodes:
+
+```yaml
+services:
+  fsmount:
+  - name: zram
+    size: 1G
+    type: ext4
+    device: /dev/zram0
+    path: /var/log/pods
+    template:
+      source: templates/zram-setup.service.j2
+      destination: /etc/systemd/system/zram-setup.service
+    preparation_script: resources/scripts/zram.sh
+    groups: [control-plane, worker]
+```
+
+You can add additional entries to the list or override the default item using [List Merge Strategy](#list-merge-strategy).
+
+The following parameters are supported for each item:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**name**|**yes**| |Identifier for this mount entry, used in logs and dump filenames.|
+|**device**|**yes**| |The device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`).|
+|**path**|**yes**| |The mount point path on the node.|
+|**template.source**|**yes**| |Path to the Jinja2 template for the systemd unit. Can be an internal resource path (relative to the Kubemarine package) or an external absolute path.|
+|**template.destination**|**yes**| |Absolute path on the node where the rendered unit file is placed.|
+|**size**|no| |Size of the filesystem, passed to the systemd unit template (e.g. `1G`). Required for virtual devices such as zram.|
+|**type**|no| |Filesystem type passed to the template (e.g. `ext4`, `tmpfs`).|
+|**preparation_script**|no| |Path to a shell script executed before the systemd unit is installed. If the script exits with a non-zero code, the mount entry is skipped for that node. Can be an internal resource path or an external absolute path.|
+|**groups**|no|`[control-plane, worker, balancer]`|The list of node roles where this mount should be applied.|
+|**nodes**|no| |The list of specific node names where this mount should be applied.|
+
+**Notes**:
+* You can specify `groups` and `nodes` at the same time; both are merged to determine the target nodes.
+* If neither `groups` nor `nodes` is specified, the mount is applied to all nodes.
+* If the mount path is already present in `/proc/mounts`, the entry is skipped for that node.
+* The preparation script is uploaded to the node, executed, and then removed. It is intended for operations such as loading kernel modules or installing required packages.
+
+**Warning**: The `preparation_script` failure is non-fatal. If the script fails, only that specific mount entry is skipped on the affected node; other entries continue to be processed.
+
+The template receives the following variables for rendering:
+
+|Variable|Source|
+|---|---|
+|`name`|`name` field|
+|`device`|`device` field|
+|`path`|`path` field|
+|`size`|`size` field (empty string if not set)|
+|`type`|`type` field (empty string if not set)|
 
 #### sysctl
 
