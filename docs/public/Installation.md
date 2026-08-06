@@ -2534,18 +2534,18 @@ You can add additional entries to the list or override the default item using [L
 
 The following parameters are supported for each item:
 
-|Parameter|Mandatory|Default Value|Description|
-|---|---|---|---|
-|**name**|**yes**| |Identifier for this mount entry, used in logs and dump filenames.|
-|**device**|**yes**| |The device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`).|
-|**path**|**yes**| |The mount point path on the node.|
-|**template.source**|**yes**| |Path to the Jinja2 template for the systemd unit. Can be an internal resource path (relative to the Kubemarine package) or an external absolute path.|
-|**template.destination**|**yes**| |Absolute path on the node where the rendered unit file is placed.|
-|**size**|no| |Size of the filesystem, passed to the systemd unit template (e.g. `1G`). Required for virtual devices such as zram.|
-|**type**|no| |Filesystem type passed to the template (e.g. `ext4`, `tmpfs`).|
-|**preparation_script**|no| |Path to a shell script executed before the systemd unit is installed. If the script exits with a non-zero code, the mount entry is skipped for that node. Can be an internal resource path or an external absolute path.|
-|**groups**|no|`[control-plane, worker, balancer]`|The list of node roles where this mount should be applied.|
-|**nodes**|no| |The list of specific node names where this mount should be applied.|
+|Parameter|Mandatory|Description|
+|---|---|---|
+|**name**|**yes**|Identifier for this mount entry, used in logs and dump filenames.|
+|**device**|**yes**|The device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`).|
+|**path**|**yes**|The mount point path on the node.|
+|**template.source**|**yes**|Path to the Jinja2 template for the systemd unit. Can be an internal resource path (relative to the Kubemarine package) or an external absolute path.|
+|**template.destination**|**yes**|Absolute path on the node where the rendered unit file is placed.|
+|**size**|no|Size of the filesystem, passed to the systemd unit template (e.g. `1G`). Required for virtual devices such as zram.|
+|**type**|no|Filesystem type passed to the template (e.g. `ext4`, `tmpfs`).|
+|**preparation_script**|no|Path to a shell script executed before the systemd unit is installed. If the script exits with a non-zero code, the mount entry is skipped for that node. Can be an internal resource path or an external absolute path.|
+|**groups**|no|The list of node roles where this mount should be applied.|
+|**nodes**|no|The list of specific node names where this mount should be applied.|
 
 **Notes**:
 * You can specify `groups` and `nodes` at the same time; both are merged to determine the target nodes.
