@@ -1,0 +1,15 @@
+[Unit]
+Description=Create zram device
+DefaultDependencies=no
+Before=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/modprobe zram
+ExecStart=/usr/sbin/zramctl {{ device }} --size {{ size }} --algorithm zstd
+ExecStart=/usr/sbin/mkfs.{{ type }} -m 0 -O ^has_journal -F {{ device }}
+ExecStart=/usr/bin/mount {{ device }} {{ path }}
+
+[Install]
+WantedBy=local-fs.target

@@ -67,6 +67,7 @@ This section provides information about the Kubecheck functionality.
     - [215 Firewalld Status](#215-firewalld-status)
     - [216 Swap State](#216-swap-state)
     - [217 Modprobe Rules](#217-modprobe-rules)
+    - [236 Filesystem Mounts](#236-filesystem-mounts)
     - [218 Time Difference](#218-time-difference)
     - [219 Health Status ETCD](#219-health-status-etcd)
     - [220 Control Plane Configuration Status](#220-control-plane-configuration-status)
@@ -656,6 +657,20 @@ The test verifies that swap is disabled on all nodes in the cluster, otherwise t
 
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.
+
+##### 236 Filesystem Mounts
+
+*Task*: `services.system.fsmount.mounts`
+
+The test verifies that all filesystem mounts defined in `services.fsmount` are correctly configured on `control-plane` and `worker` nodes. For each item the following is checked:
+
+- The mount point defined in `path` is present in `/proc/mounts`.
+- The filesystem type in `/proc/mounts` matches the `type` field specified in the inventory.
+- For zram-backed devices (device path starts with `/dev/zram`), the mount point is also present in the output of `zramctl --output-all`.
+
+If any check fails, the test reports each individual issue with the affected node name and mount path.
+
+**Note**: If no `services.fsmount` items are applicable to a node, that node is silently skipped.
 
 ##### 218 Time Difference
 

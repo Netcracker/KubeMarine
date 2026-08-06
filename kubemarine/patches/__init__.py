@@ -21,9 +21,105 @@ The whole directory is automatically cleared and reset after new version of Kube
 
 from typing import List
 
-from kubemarine.core.patch import Patch
+from kubemarine import fsmount, kubernetes, system
+from kubemarine.core.action import Action
+from kubemarine.core.patch import Patch, RegularPatch
+from kubemarine.core.resources import DynamicResources
+from kubemarine.kubernetes import components
+
+
+class _KubeletLogLimitsPatchAction(Action):
+    def __init__(self) -> None:
+        super().__init__('kubelet-log-limits', recreate_inventory=True)
+
+    def run(self, res: DynamicResources) -> None:
+        inventory = res.inventory()
+        kubelet = inventory.setdefault('services', {}).setdefault('kubeadm_kubelet', {})
+        changed = False
+        for key, value in (('containerLogMaxSize', '5Mi'), ('containerLogMaxFiles', 2)):
+            if key not in kubelet:
+                kubelet[key] = value
+                changed = True
+
+        if not changed:
+            res.logger().info("containerLogMaxSize/containerLogMaxFiles already set, skipping.")
+            return
+
+        cluster = res.cluster()
+        cluster.nodes['control-plane'].call(components.reconfigure_components, components=['kubelet'])
+
+
+class _KubeletLogLimitsPatch(RegularPatch):
+    def __init__(self) -> None:
+        super().__init__('kubelet-log-limits')
+
+    @property
+    def action(self) -> Action:
+        return _KubeletLogLimitsPatchAction()
+
+    @property
+    def description(self) -> str:
+        return ("Adds containerLogMaxSize: 5Mi and containerLogMaxFiles: 2 "
+                "to services.kubeadm_kubelet and applies the new kubelet config on all nodes.")
+
+
+class _FsmountPatchAction(Action):
+    def __init__(self) -> None:
+        super().__init__('fsmount')
+
+    def run(self, res: DynamicResources) -> None:
+        cluster = res.cluster()
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            node_name = node.get_node_name()
+            node_config = node.get_config()
+            is_k8s_node = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
+
+            if is_k8s_node:
+                cluster.log.debug(f"Draining node {node_name!r} before fsmount setup")
+                first_control_plane.sudo(
+                    kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
+                    warn=True, pty=True)
+
+            applicable = fsmount.get_applicable_items(cluster, node)
+            for item in applicable:
+                mount_path = item['path'].rstrip('/')
+                cluster.log.debug(f"Removing files in {mount_path!r} on {node_name!r}")
+                node.sudo(f"rm -rf {mount_path}/*")
+
+            node.call(fsmount.setup_fsmount)
+
+            cluster.log.debug(f"Rebooting node {node_name!r} after fsmount setup")
+            system.perform_group_reboot(node)
+
+            if is_k8s_node:
+                cluster.log.debug(f"Uncordoning node {node_name!r} after reboot")
+                first_control_plane.wait_command_successful(
+                    f"kubectl uncordon {node_name}",
+                    hide=False, pty=True,
+                    timeout=timeout_config['timeout'],
+                    retries=timeout_config['retries'])
+
+
+class _FsmountPatch(RegularPatch):
+    def __init__(self) -> None:
+        super().__init__('fsmount')
+
+    @property
+    def action(self) -> Action:
+        return _FsmountPatchAction()
+
+    @property
+    def description(self) -> str:
+        return ("Sets up zram volume for /var/log/pods with default settings on all existing cluster nodes. "
+                "Be careful it erases all of the data inside /var/log/pods folder")
+
 
 patches: List[Patch] = [
+    _KubeletLogLimitsPatch(),
+    _FsmountPatch(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
