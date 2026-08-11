@@ -106,9 +106,13 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
     # We apply CRDs separately from chart, because Helm does not support CRD upgrade.
     # We also use server-side apply to avoid issues with annotation size.
     # We use --force-conflicts to be able to apply CRDs which were previously managed by another SSA manager (e.g. helm).
-    crds_directory = utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/charts/crds/crds")
+    crds_directory = utils.get_internal_resource_path(
+        f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/charts/crds/crds"
+    )
     if chart_version == "2.2.0":
-        crds_directory = utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/crds")
+        crds_directory = utils.get_internal_resource_path(
+            f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/crds"
+        )
     for dirpath, _, filenames in os.walk(crds_directory):
         for file in filenames:
             plugins.apply_source(cluster=cluster, config={
