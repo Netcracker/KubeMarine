@@ -1,0 +1,8 @@
+gatewayClasses.internal.envoyDeployment.resources.requests.cpu: 50m
+gatewayClasses.internal.envoyDeployment.resources.requests.memory: 64Mi
+gatewayClasses.internal.envoyDeployment.resources.limits.cpu: 100m
+gatewayClasses.internal.envoyDeployment.resources.limits.memory: 128Mi
+gatewayClasses.external.envoyDeployment.resources.requests.cpu: 50m
+gatewayClasses.external.envoyDeployment.resources.requests.memory: 64Mi
+gatewayClasses.external.envoyDeployment.resources.limits.cpu: 100m
+gatewayClasses.external.envoyDeployment.resources.limits.memory: 128Mi

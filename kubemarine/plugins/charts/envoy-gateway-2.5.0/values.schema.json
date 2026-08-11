@@ -1,0 +1,678 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "APPLICATION_NAME": {
+            "type": "string",
+            "description": "Application name applied as app.kubernetes.io/part-of label on all resources"
+        },
+        "MANAGED_BY": {
+            "type": "string",
+            "description": "Value for the app.kubernetes.io/managed-by label"
+        },
+        "SERVICE_NAME": {
+            "type": "string",
+            "description": "Service name used in resource labels and metadata"
+        },
+        "global": {
+            "type": "object",
+            "description": "Global image references shared with the envoy-gateway-cr chart",
+            "properties": {
+                "images": {
+                    "type": "object",
+                    "properties": {
+                        "envoy": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full envoy proxy image reference (registry/repo:tag)"
+                                }
+                            }
+                        },
+                        "envoyGateway": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full Envoy Gateway controller image reference"
+                                }
+                            }
+                        },
+                        "ratelimit": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full rate-limit sidecar image reference"
+                                }
+                            }
+                        },
+                        "kubectl": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "kubectl image used by the pre-upgrade Job"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "defaultGateways": {
+            "type": "object",
+            "description": "Gateway and ClientTrafficPolicy names referenced by the pre-upgrade Job",
+            "properties": {
+                "internal": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the default internal Gateway resource"
+                        }
+                    }
+                },
+                "external": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the default external Gateway resource"
+                        },
+                        "ctpName": {
+                            "type": "string",
+                            "description": "Name of the ClientTrafficPolicy resource"
+                        }
+                    }
+                }
+            }
+        },
+        "upgradeJob": {
+            "type": "object",
+            "description": "Pre-upgrade Job that deletes hook-managed resources so they can be recreated without hooks",
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "description": "kubectl image used by the upgrade job; overrides global.images.kubectl.image"
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "description": "Image pull policy for the kubectl container",
+                    "enum": ["Always", "IfNotPresent", "Never"]
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Compute resource requests for the upgrade job",
+                    "properties": {
+                        "requests": {
+                            "type": "object",
+                            "properties": {
+                                "cpu": {
+                                    "type": "string"
+                                },
+                                "memory": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node selector for the upgrade job pod"
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for the upgrade job pod"
+                },
+                "securityContext": {
+                    "$ref": "#/$defs/containerSecurityContext"
+                }
+            }
+        },
+        "gateway-helm": {
+            "type": "object",
+            "description": "Values passed through to the upstream envoyproxy/gateway-helm subchart",
+            "properties": {
+                "certgen": {
+                    "type": "object",
+                    "description": "Certificate generation job that produces TLS credentials for the gateway controller",
+                    "properties": {
+                        "job": {
+                            "type": "object",
+                            "properties": {
+                                "affinity": {
+                                    "type": "object",
+                                    "description": "Pod affinity rules for the certgen job"
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations added to the certgen job"
+                                },
+                                "args": {
+                                    "type": "array",
+                                    "description": "Extra arguments passed to the certgen container",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "pod": {
+                                    "type": "object",
+                                    "description": "Pod-level metadata for the certgen job",
+                                    "properties": {
+                                        "annotations": {
+                                            "type": "object"
+                                        },
+                                        "labels": {
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "nodeSelector": {
+                                    "type": "object",
+                                    "description": "Node selector for the certgen job pod"
+                                },
+                                "resources": {
+                                    "type": "object",
+                                    "description": "Compute resource requests for the certgen job",
+                                    "properties": {
+                                        "requests": {
+                                            "type": "object",
+                                            "properties": {
+                                                "cpu": {
+                                                    "type": "string",
+                                                    "description": "CPU request (e.g. 100m)"
+                                                },
+                                                "memory": {
+                                                    "type": "string",
+                                                    "description": "Memory request (e.g. 256Mi)"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "securityContext": {
+                                    "$ref": "#/$defs/containerSecurityContext",
+                                    "description": "Security context for the certgen job container"
+                                },
+                                "tolerations": {
+                                    "type": "array",
+                                    "description": "Tolerations for the certgen job pod"
+                                },
+                                "ttlSecondsAfterFinished": {
+                                    "type": "integer",
+                                    "description": "Seconds to retain the Job object after it completes",
+                                    "minimum": 0
+                                }
+                            }
+                        },
+                        "rbac": {
+                            "type": "object",
+                            "properties": {
+                                "annotations": {
+                                    "type": "object"
+                                },
+                                "labels": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "commonLabels": {
+                    "type": "object",
+                    "description": "Labels applied to all resources created by the subchart"
+                },
+                "config": {
+                    "type": "object",
+                    "description": "Envoy Gateway controller configuration",
+                    "properties": {
+                        "envoyGateway": {
+                            "type": "object",
+                            "properties": {
+                                "gateway": {
+                                    "type": "object",
+                                    "properties": {
+                                        "controllerName": {
+                                            "type": "string",
+                                            "description": "Controller name used to reconcile GatewayClass resources"
+                                        }
+                                    }
+                                },
+                                "logging": {
+                                    "type": "object",
+                                    "properties": {
+                                        "level": {
+                                            "type": "object",
+                                            "properties": {
+                                                "default": {
+                                                    "type": "string",
+                                                    "description": "Default log level for the gateway controller",
+                                                    "enum": ["debug", "info", "warn", "error"]
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "provider": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "description": "Infrastructure provider type",
+                                            "enum": ["Kubernetes"]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "createNamespace": {
+                    "type": "boolean",
+                    "description": "Whether the subchart should create the gateway namespace"
+                },
+                "namespaceOverride": {
+                    "type": "string",
+                    "description": "Override the namespace for all resources; defaults to the release namespace"
+                },
+                "crds": {
+                    "type": "object",
+                    "description": "CRD sub-chart configuration",
+                    "properties": {
+                        "gatewayAPI": {
+                            "type": "object",
+                            "properties": {
+                                "safeUpgradePolicy": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean",
+                                            "description": "Install the Gateway API safe-upgrade ValidatingAdmissionPolicy and binding"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "deployment": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations added to the gateway controller Deployment"
+                        },
+                        "envoyGateway": {
+                            "type": "object",
+                            "description": "Gateway controller container configuration",
+                            "properties": {
+                                "image": {
+                                    "type": "object",
+                                    "properties": {
+                                        "repository": {
+                                            "type": "string",
+                                            "description": "Image repository (overrides global.images.envoyGateway.image)"
+                                        },
+                                        "tag": {
+                                            "type": "string",
+                                            "description": "Image tag (overrides global.images.envoyGateway.image)"
+                                        }
+                                    }
+                                },
+                                "imagePullPolicy": {
+                                    "type": "string",
+                                    "description": "Image pull policy; empty string defers to Kubernetes default",
+                                    "enum": ["Always", "IfNotPresent", "Never", ""]
+                                },
+                                "imagePullSecrets": {
+                                    "type": "array",
+                                    "description": "Image pull secrets for the gateway controller container"
+                                },
+                                "extraEnv": {
+                                    "type": "array",
+                                    "description": "Additional environment variables injected into the gateway controller container",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                },
+                                "resources": {
+                                    "type": "object",
+                                    "description": "Compute resource requests and limits for the gateway controller",
+                                    "properties": {
+                                        "limits": {
+                                            "type": "object",
+                                            "properties": {
+                                                "cpu": {
+                                                    "type": "string"
+                                                },
+                                                "memory": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "requests": {
+                                            "type": "object",
+                                            "properties": {
+                                                "cpu": {
+                                                    "type": "string"
+                                                },
+                                                "memory": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "securityContext": {
+                                    "$ref": "#/$defs/containerSecurityContext",
+                                    "description": "Security context for the gateway controller container"
+                                }
+                            }
+                        },
+                        "pod": {
+                            "type": "object",
+                            "description": "Pod-level configuration for the gateway controller",
+                            "properties": {
+                                "affinity": {
+                                    "type": "object",
+                                    "description": "Pod affinity and anti-affinity rules"
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations added to the gateway controller pod"
+                                },
+                                "labels": {
+                                    "type": "object",
+                                    "description": "Additional labels added to the gateway controller pod"
+                                },
+                                "nodeSelector": {
+                                    "type": "object",
+                                    "description": "Node selector for the gateway controller pod"
+                                },
+                                "tolerations": {
+                                    "type": "array",
+                                    "description": "Tolerations for the gateway controller pod"
+                                },
+                                "topologySpreadConstraints": {
+                                    "type": "array",
+                                    "description": "Topology spread constraints for the gateway controller pod"
+                                },
+                                "extraVolumeMounts": {
+                                    "type": "array",
+                                    "description": "Additional volume mounts for the gateway controller container",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                },
+                                "extraVolumes": {
+                                    "type": "array",
+                                    "description": "Additional volumes added to the gateway controller pod",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        },
+                        "ports": {
+                            "type": "array",
+                            "description": "Service ports exposed by the gateway controller",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "port", "targetPort"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "port": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    },
+                                    "targetPort": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    }
+                                }
+                            }
+                        },
+                        "priorityClassName": {
+                            "type": ["string", "null"],
+                            "description": "Priority class name for the gateway controller pod"
+                        },
+                        "replicas": {
+                            "type": "integer",
+                            "description": "Number of gateway controller replicas",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "global": {
+                    "type": "object",
+                    "description": "Subchart-level image and RBAC configuration",
+                    "properties": {
+                        "imageRegistry": {
+                            "type": "string",
+                            "description": "Global registry prefix overriding all image references"
+                        },
+                        "imagePullSecrets": {
+                            "type": "array",
+                            "description": "Global image pull secrets applied to all pods",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        "images": {
+                            "type": "object",
+                            "properties": {
+                                "envoyGateway": {
+                                    "type": "object",
+                                    "properties": {
+                                        "image": {
+                                            "type": "string"
+                                        },
+                                        "pullPolicy": {
+                                            "type": "string",
+                                            "description": "Image pull policy for the gateway controller",
+                                            "enum": ["Always", "IfNotPresent", "Never"]
+                                        },
+                                        "pullSecrets": {
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "ratelimit": {
+                                    "type": "object",
+                                    "properties": {
+                                        "image": {
+                                            "type": "string"
+                                        },
+                                        "pullPolicy": {
+                                            "type": "string",
+                                            "description": "Image pull policy for the rate-limit sidecar",
+                                            "enum": ["Always", "IfNotPresent", "Never"]
+                                        },
+                                        "pullSecrets": {
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "envoyProxy": {
+                                    "type": "object",
+                                    "description": "Image override for Envoy proxy instances managed by the controller",
+                                    "properties": {
+                                        "image": {
+                                            "type": "string",
+                                            "description": "Full envoy proxy image reference; overrides the default used by managed EnvoyProxy resources"
+                                        },
+                                        "pullPolicy": {
+                                            "type": "string",
+                                            "description": "Image pull policy for envoy proxy instances",
+                                            "enum": ["Always", "IfNotPresent", "Never", ""]
+                                        },
+                                        "pullSecrets": {
+                                            "type": "array"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "rbac": {
+                            "type": "object",
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Whether to create ClusterRole and ClusterRoleBinding resources"
+                                }
+                            }
+                        }
+                    }
+                },
+                "hpa": {
+                    "type": "object",
+                    "description": "HorizontalPodAutoscaler for the gateway controller Deployment",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable HPA; when true, deployment.replicas is ignored"
+                        },
+                        "minReplicas": {
+                            "type": "integer",
+                            "description": "Minimum replica count",
+                            "minimum": 1
+                        },
+                        "maxReplicas": {
+                            "type": "integer",
+                            "description": "Maximum replica count",
+                            "minimum": 1
+                        },
+                        "metrics": {
+                            "type": "array",
+                            "description": "HPA metric sources",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        "behavior": {
+                            "type": "object",
+                            "description": "HPA scaling behavior policy"
+                        }
+                    }
+                },
+                "kubernetesClusterDomain": {
+                    "type": "string",
+                    "description": "Kubernetes cluster domain used for internal DNS (default: cluster.local)"
+                },
+                "podDisruptionBudget": {
+                    "type": "object",
+                    "description": "PodDisruptionBudget for the gateway controller",
+                    "properties": {
+                        "minAvailable": {
+                            "type": "integer",
+                            "description": "Minimum number of available pods during disruptions",
+                            "minimum": 0
+                        },
+                        "maxUnavailable": {
+                            "type": "integer",
+                            "description": "Maximum number of unavailable pods during disruptions",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "description": "Service configuration for the gateway controller",
+                    "properties": {
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations added to the gateway controller Service"
+                        },
+                        "type": {
+                            "type": "string",
+                            "description": "Service type for the gateway controller",
+                            "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+                        },
+                        "trafficDistribution": {
+                            "type": "string",
+                            "description": "Traffic distribution hint (e.g. PreferClose)"
+                        }
+                    }
+                },
+                "topologyInjector": {
+                    "type": "object",
+                    "description": "Topology-aware proxy scheduling webhook",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable the topology injector MutatingWebhook"
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations added to the MutatingWebhookConfiguration"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "$defs": {
+        "containerSecurityContext": {
+            "type": "object",
+            "description": "Kubernetes container security context",
+            "properties": {
+                "allowPrivilegeEscalation": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "object",
+                    "properties": {
+                        "drop": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "add": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                },
+                "runAsNonRoot": {
+                    "type": "boolean"
+                },
+                "runAsUser": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "runAsGroup": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "seccompProfile": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["RuntimeDefault", "Localhost", "Unconfined"]
+                        },
+                        "localhostProfile": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
