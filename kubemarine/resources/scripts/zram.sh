@@ -8,5 +8,4 @@ elif command -v yum &>/dev/null; then
     yum install -y kernel-modules-extra
 fi
 
-modprobe zram
 mkdir -p /var/log/pods
