@@ -64,10 +64,13 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
     
     envoy_gateway_image = chart_values["global"]["images"]["envoyGateway"]["image"]
     ratelimit_image = chart_values["global"]["images"]["ratelimit"]["image"]
+    kubectl_image = chart_values["global"]["images"].get("kubectl", {}).get("image", "")
     if "registry" in envoy_plugin["installation"]:
         registry = envoy_plugin["installation"]["registry"]
         envoy_gateway_image = f"{registry}/{envoy_gateway_image}"
         ratelimit_image = f"{registry}/{ratelimit_image}"
+    if envoy_plugin["kubectlRegistry"] != "":
+        kubectl_image = kubectl_image.replace("ghcr.io", envoy_plugin["kubectlRegistry"])
 
     helm_plugin_config = {
         "chart_path": utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-{chart_version}"),
@@ -89,23 +92,34 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
                     },
                     "ratelimit": {
                         "image": ratelimit_image,
+                    },
+                    "kubectl": {
+                        "image": kubectl_image,
                     }
                 },
             },
         },
         "namespace": envoy_plugin["namespace"],
         "release": envoy_plugin["releaseName"],
+        "take_ownership": True,
     }
 
     # We apply CRDs separately from chart, because Helm does not support CRD upgrade.
     # We also use server-side apply to avoid issues with annotation size.
-    crds_directory = utils.get_internal_resource_path(f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/crds")
+    # We use --force-conflicts to be able to apply CRDs which were previously managed by another SSA manager (e.g. helm).
+    crds_directory = utils.get_internal_resource_path(
+        f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/charts/crds/crds"
+    )
+    if chart_version == "2.2.0":
+        crds_directory = utils.get_internal_resource_path(
+            f"plugins/charts/envoy-gateway-{chart_version}/charts/gateway-helm/crds"
+        )
     for dirpath, _, filenames in os.walk(crds_directory):
         for file in filenames:
             plugins.apply_source(cluster=cluster, config={
                 "source": os.path.join(dirpath, file),
                 "destination": f"/tmp/envoy-gateway-crds/{file}",
-                "apply_command": f"kubectl apply --server-side -f /tmp/envoy-gateway-crds/{file}",
+                "apply_command": f"kubectl apply --force-conflicts --server-side -f /tmp/envoy-gateway-crds/{file}",
             })
 
     helm_plugin_config["values"] = default_merger.merge(helm_plugin_config["values"], envoy_plugin["valuesOverride"])
@@ -184,6 +198,7 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         },
         "namespace": envoy_plugin["namespace"],
         "release": envoy_plugin["crReleaseName"],
+        "take_ownership": True,
     }
 
     if envoy_plugin["externalGateway"]["certificate"]["cert"] != "" \

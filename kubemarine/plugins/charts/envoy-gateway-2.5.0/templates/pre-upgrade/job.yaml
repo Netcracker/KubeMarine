@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pre-upgrade
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: pre-upgrade
+spec:
+  template:
+    metadata:
+      name: pre-upgrade
+      labels:
+        app.kubernetes.io/component: pre-upgrade
+    spec:
+      containers:
+        - name: create
+          image: {{ template "find_image" (dict "deployName" "kubectl" "SERVICE_NAME" "kubectl" "vals" .Values "default" (include "kubectl.image" . )) }}
+          imagePullPolicy: {{ .Values.upgradeJob.pullPolicy }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: CTP_NAME
+              value: {{ .Values.defaultGateways.external.ctpName }}
+            - name: INT_NAME
+              value: {{ .Values.defaultGateways.internal.name }}
+            - name: EXT_NAME
+              value: {{ .Values.defaultGateways.external.name }}
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -euo pipefail
+
+              cd /tmp
+
+              echo "$(date +%FT%H:%M:%S%:z) The Job has been run in '${POD_NAMESPACE}' Namespace"
+
+              for GW in $(kubectl -n ${POD_NAMESPACE} get gateways.gateway.networking.k8s.io -o=jsonpath='{.items[?(@.metadata.annotations.helm\.sh/hook=="post-install, post-upgrade")].metadata.name}')
+              do
+                      # Delete hook-managed Gateways with current names so they can be recreated without the hook annotation
+                      if [[ ${GW} == ${INT_NAME} || ${GW} == ${EXT_NAME} ]]
+                      then
+                              echo "The ${GW} Gateway must be deleted"
+                              kubectl -n ${POD_NAMESPACE} delete gateways.gateway.networking.k8s.io ${GW}
+                      fi
+              done
+
+              for CTP in $(kubectl -n ${POD_NAMESPACE} get clienttrafficpolicies.gateway.envoyproxy.io -o=jsonpath='{.items[?(@.metadata.annotations.helm\.sh/hook=="post-install, post-upgrade")].metadata.name}')
+              do
+                      # Delete hook-managed ClientTrafficPolicy with current name so it can be recreated without the hook annotation
+                      if [[ ${CTP} == ${CTP_NAME} ]]
+                      then
+                              echo "The ${CTP} ClientTrafficPolicy must be deleted"
+                              kubectl -n ${POD_NAMESPACE} delete clienttrafficpolicies.gateway.envoyproxy.io ${CTP}
+                      fi
+              done
+
+              echo "$(date +%FT%H:%M:%S%:z) The Job is done"
+          {{- if .Values.upgradeJob.resources }}
+          resources: {{ toYaml .Values.upgradeJob.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.upgradeJob.securityContext }}
+          securityContext: {{ toYaml .Values.upgradeJob.securityContext | nindent 12 }}
+          {{- end }}
+      restartPolicy: OnFailure
+      serviceAccountName: pre-upgrade
+    {{- if .Values.upgradeJob.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.upgradeJob.nodeSelector | nindent 8 }}
+    {{- end }}
+    {{- if .Values.upgradeJob.tolerations }}
+      tolerations: {{ toYaml .Values.upgradeJob.tolerations | nindent 8 }}
+    {{- end }}

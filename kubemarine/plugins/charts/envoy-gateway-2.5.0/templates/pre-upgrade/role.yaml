@@ -1,0 +1,36 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pre-upgrade
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: pre-upgrade
+rules:
+- apiGroups:
+    - "apps"
+  resources:
+    - deployments
+    - deployments/scale
+  verbs:
+    - "*"
+- apiGroups:
+    - gateway.envoyproxy.io
+  resources:
+    - clienttrafficpolicies
+  verbs:
+    - get
+    - list
+    - watch
+    - delete
+- apiGroups:
+    - gateway.networking.k8s.io
+  resources:
+    - gateways
+  verbs:
+    - get
+    - list
+    - watch
+    - delete
