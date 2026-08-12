@@ -101,6 +101,7 @@ def apply_envoy_chart(cluster: KubernetesCluster) -> None:
         },
         "namespace": envoy_plugin["namespace"],
         "release": envoy_plugin["releaseName"],
+        "take_ownership": True,
     }
 
     # We apply CRDs separately from chart, because Helm does not support CRD upgrade.
@@ -197,6 +198,7 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         },
         "namespace": envoy_plugin["namespace"],
         "release": envoy_plugin["crReleaseName"],
+        "take_ownership": True,
     }
 
     if envoy_plugin["externalGateway"]["certificate"]["cert"] != "" \
