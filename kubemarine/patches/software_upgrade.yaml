@@ -36,12 +36,6 @@ plugins:
   nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
-  envoy-gateway:
-  - v1.33.0
-  - v1.33.6
-  - v1.34.1
-  - v1.34.2
-  - v1.35.0
-  - v1.36.0
+  envoy-gateway: []
   openstack-cinder-csi: []
   csi-snapshot-controller: []
