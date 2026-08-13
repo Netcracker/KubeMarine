@@ -823,6 +823,16 @@ def compare_manifests(cluster: KubernetesCluster, *, with_inventory: bool) \
             stored = stored_manifest_results[i].stdout
             generated = generated_manifest_results[i].stdout
             if component == 'etcd':
+                # In some cases kubeadm puts ETCD options in non alphabetical order
+                # if `snapshot-count` options in stored version and generated are equal
+                # they should deleted to the following matching
+                # Watching the first overlap only
+                pattern = r"- --snapshot-count=\d+"
+                snapshot_count_st = re.search(pattern, stored)
+                snapshot_count_gen = re.search(pattern, generated)
+                if snapshot_count_st.group() == snapshot_count_gen.group():
+                    stored = re.sub(pattern, "", stored, count=1)
+                    generated = re.sub(pattern, "", generated, count=1)
                 stored = _filter_etcd_initial_cluster_args(stored)
                 generated = _filter_etcd_initial_cluster_args(generated)
 
