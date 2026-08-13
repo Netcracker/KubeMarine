@@ -830,9 +830,18 @@ def compare_manifests(cluster: KubernetesCluster, *, with_inventory: bool) \
                 pattern = r"- --snapshot-count=\d+"
                 snapshot_count_st = re.search(pattern, stored)
                 snapshot_count_gen = re.search(pattern, generated)
-                if snapshot_count_st.group(0) == snapshot_count_gen.group(0):
-                    stored = re.sub(pattern, "", stored, count=1)
-                    generated = re.sub(pattern, "", generated, count=1)
+                if snapshot_count_st:
+                    result_st = snapshot_count_st.group(0)
+                else:
+                    result_st = ""
+                if snapshot_count_gen:
+                    result_gen = snapshot_count_gen.group(0)
+                else:
+                    result_gen = ""
+                if result_st and result_gen:
+                    if result_st == result_gen:
+                        stored = re.sub(pattern, "", stored, count=1)
+                        generated = re.sub(pattern, "", generated, count=1)
                 stored = _filter_etcd_initial_cluster_args(stored)
                 generated = _filter_etcd_initial_cluster_args(generated)
 
