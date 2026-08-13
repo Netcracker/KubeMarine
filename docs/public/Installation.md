@@ -2588,18 +2588,34 @@ The following settings are supported in the extended format:
 
 *Installation task*: `prepare.system.fsmount`
 
-*Can cause reboot*: No
+*Can cause a reboot*: **No**
 
-*Can restart service*: No
+*Can restart a service*: **No**
 
-*Overwrite files*: Yes, the rendered systemd unit file is uploaded to the path specified in `template.destination`, backup is created
+*Overwrites files*: Yes – the rendered systemd unit file is uploaded to the location defined in `template.destination`. A backup of the previous file is kept.
 
-*OS specific*: No
+*OS‑specific*: No
 
-The `services.fsmount` section configures filesystems to be mounted on cluster nodes via systemd units.
-Each item defines a device to format and mount, a Jinja2 template for the systemd unit that performs the setup, and an optional preparation script that runs before the unit is installed.
+The `services.fsmount` section allows you to define additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. Each list entry describes:
 
-By default, a zram-based filesystem is configured to back `/var/log/pods` on all `control-plane` and `worker` nodes:
+- **name** – an identifier used in logs and dump file names.
+- **device** – the block device (e.g. `/dev/sdd1` or `/dev/zram0`).
+- **path** – the mount point on the node.
+- **type** – the filesystem type (`ext4`, `xfs`, `tmpfs`, …). Required for virtual devices such as *zram*.
+- **size** – the desired size (e.g. `1G`). Required for virtual devices.
+- **template.source** – path to the Jinja2 template that renders the systemd unit.
+- **template.destination** – absolute path on the target node where the rendered unit will be placed.
+- **preparation_script** – optional script that runs on the node before the unit is installed. If the script exits with a non‑zero status the corresponding mount entry is skipped for that node.
+- **groups** – optional list of node roles (`control-plane`, `worker`, `balancer`, …) this entry applies to.
+- **nodes** – optional list of specific node names this entry applies to.
+
+If both `groups` and `nodes` are supplied they are merged; if neither is provided the mount is applied to **all** nodes.
+
+The mount is skipped on a node when the target path already appears in `/proc/mounts`.
+
+**Warning** – a failure of the `preparation_script` is non‑fatal; only the affected mount entry is omitted while the rest of the configuration continues.
+
+**Default configuration**
 
 ```yaml
 services:
@@ -2616,7 +2632,7 @@ services:
     groups: [control-plane, worker]
 ```
 
-You can add additional entries to the list or override the default item using [List Merge Strategy](#list-merge-strategy).
+You can add further entries to the list or replace the default one using the **list‑merge strategy** described earlier.
 
 The following parameters are supported for each item:
 
