@@ -48,6 +48,7 @@ ERROR_UPGRADE_UNEXPECTED_PROPERTY='Unexpected %s properties in the procedure inv
 
 ERROR_AMBIGUOUS_CONNTRACK_MAX = "Detected ambiguous 'net.netfilter.nf_conntrack_max' value: {values}"
 
+WATCH_PROGRESS_NOTIFY_ARG_VERSION = "1.34"
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
 def enrich_upgrade_inventory(cluster: KubernetesCluster) -> None:
@@ -188,6 +189,22 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
     enrich_kube_proxy(cluster)
+    _enrich_etcd_watch_progress(cluster)
+
+
+def _enrich_etcd_watch_progress(cluster: KubernetesCluster) -> None:
+    kubernetes_version = get_kubernetes_version(cluster.inventory)
+    etcd_extra_args = cluster.inventory['services']['kubeadm']['etcd']['local']['extraArgs']
+
+    if utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key(f"v{WATCH_PROGRESS_NOTIFY_ARG_VERSION}"):
+        arg_name = "watch-progress-notify-interval"
+    else:
+        arg_name = "experimental-watch-progress-notify-interval"
+
+    # Set the default if the option has not explicitly provided
+    if "watch-progress-notify-interval" not in etcd_extra_args \
+            and "experimental-watch-progress-notify-interval" not in etcd_extra_args:
+        etcd_extra_args[arg_name] = "5m"
 
 
 @enrichment(EnrichmentStage.FULL)
