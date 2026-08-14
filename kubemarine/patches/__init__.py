@@ -19,92 +19,11 @@ and relate to the current Kubemarine version.
 The whole directory is automatically cleared and reset after new version of Kubemarine is released.
 """
 
-from textwrap import dedent
-from typing import List, Dict
+from typing import List
 
-from kubemarine.core.action import Action
-from kubemarine.core.patch import Patch, RegularPatch
-from kubemarine.core.resources import DynamicResources
-from kubemarine.core import utils
-from kubemarine.kubernetes import components, get_kubernetes_version
-
-_NEW_ARG = "watch-progress-notify-interval"
-_OLD_ARG = "experimental-watch-progress-notify-interval"
-_RENAME_VERSION = "1.34"
-
-class _EtcdReconfigurationAction(Action):
-    def __init__(self) -> None:
-        super().__init__("Add default etcd options")
-
-    def run(self, res: DynamicResources) -> None:
-        cluster = res.cluster()
-        kubernetes_version = get_kubernetes_version(cluster.inventory)
-
-        if utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key(_RENAME_VERSION):
-            target_arg = _NEW_ARG
-            stale_arg = _OLD_ARG
-        else:
-            target_arg = _OLD_ARG
-            stale_arg = _NEW_ARG
-
-        def edit_etcd_args(cluster_config: dict) -> dict:
-            # Get the config from the kubeadm-config ConfigMap.
-            etcd_local: dict = (cluster_config
-                                .setdefault("etcd", {})
-                                .setdefault("local", {}))
-            etcd_args = etcd_local.setdefault("extraArgs", [])
-        
-            existing_names = {entry["name"] for entry in etcd_args}
-    
-            # Check if the options must be set
-            if _NEW_ARG not in existing_names and _OLD_ARG not in existing_names:
-                etcd_local["extraArgs"] = [e for e in etcd_args if e["name"] != stale_arg]
-                etcd_local["extraArgs"].append({"name": target_arg, "value": "5m"})
-            else:
-                cluster.log.info(
-                    "etcd watch-progress-notify-interval is already configured on the cluster, skipping.")
-
-            options_dict: Dict[str, str] = {
-                    "auto-compaction-mode": "periodic",
-                    "auto-compaction-retention": "1h",
-                    "snapshot-count": "100000"}
-            for name, value in options_dict.items():
-                if name not in existing_names:
-                    etcd_local["extraArgs"].append({"name": name, "value": value})
-                else:
-                    cluster.log.info(
-                        f"etcd {name} is already configured on the cluster, skipping.")
-
-            return cluster_config
-
-        control_plane = cluster.nodes['control-plane']
-        control_plane.call(
-            components.reconfigure_components,
-            components=['etcd'],
-            edit_functions={'kubeadm-config': edit_etcd_args},
-        )
-
-
-class EtcdReconfigurationPatch(RegularPatch):
-    def __init__(self) -> None:
-        super().__init__("etcd_reconfiguration")
-
-    @property
-    def action(self) -> Action:
-        return _EtcdReconfigurationAction()
-
-    @property
-    def description(self) -> str:
-        return dedent("""\
-            Add auto-compaction-mode, auto-compaction-retention, snapshot-count, and
-            watch-progress-notify-interval (or its experimental predecessor) to etcd extraArgs.
-            For Kubernetes >= 1.34: sets --watch-progress-notify-interval=5m
-            For Kubernetes <= 1.33: sets --experimental-watch-progress-notify-interval=5m
-            The existing args in the inventory are skipped.
-            """.rstrip())
+from kubemarine.core.patch import Patch
 
 patches: List[Patch] = [
-    EtcdReconfigurationPatch(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
