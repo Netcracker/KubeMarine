@@ -40,8 +40,6 @@ services:
     cgroupDriver: systemd
     serializeImagePulls: false
     tlsCipherSuites: [TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256]
-    containerLogMaxSize: 5Mi
-    containerLogMaxFiles: 2
   kubeadm_kube-proxy:
     apiVersion: kubeproxy.config.k8s.io/v1alpha1
     kind: KubeProxyConfiguration
@@ -165,17 +163,7 @@ services:
     debian: *modprobe-default-modules
     ubuntu26.04: *modprobe-default-modules
 
-  fsmount:
-  - name: zram
-    size: 1G
-    type: ext4
-    device: /dev/zram0
-    path: /var/log/pods
-    template:
-      source: templates/zram-setup.service.j2
-      destination: /etc/systemd/system/zram-setup.service
-    preparation_script: resources/scripts/zram.sh 
-    groups: [control-plane, worker]
+  fsmount: []
 
   sysctl:
     net.ipv4.ip_nonlocal_bind:

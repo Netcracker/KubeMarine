@@ -2596,43 +2596,7 @@ The following settings are supported in the extended format:
 
 *OS‑specific*: No
 
-The `services.fsmount` section allows you to define additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. Each list entry describes:
-
-- **name** – an identifier used in logs and dump file names.
-- **device** – the block device (e.g. `/dev/sdd1` or `/dev/zram0`).
-- **path** – the mount point on the node.
-- **type** – the filesystem type (`ext4`, `xfs`, `tmpfs`, …). Required for virtual devices such as *zram*.
-- **size** – the desired size (e.g. `1G`). Required for virtual devices.
-- **template.source** – path to the Jinja2 template that renders the systemd unit.
-- **template.destination** – absolute path on the target node where the rendered unit will be placed.
-- **preparation_script** – optional script that runs on the node before the unit is installed. If the script exits with a non‑zero status the corresponding mount entry is skipped for that node.
-- **groups** – optional list of node roles (`control-plane`, `worker`, `balancer`, …) this entry applies to.
-- **nodes** – optional list of specific node names this entry applies to.
-
-If both `groups` and `nodes` are supplied they are merged; if neither is provided the mount is applied to **all** nodes.
-
-The mount is skipped on a node when the target path already appears in `/proc/mounts`.
-
-**Warning** – a failure of the `preparation_script` is non‑fatal; only the affected mount entry is omitted while the rest of the configuration continues.
-
-**Default configuration**
-
-```yaml
-services:
-  fsmount:
-  - name: zram
-    size: 1G
-    type: ext4
-    device: /dev/zram0
-    path: /var/log/pods
-    template:
-      source: templates/zram-setup.service.j2
-      destination: /etc/systemd/system/zram-setup.service
-    preparation_script: resources/scripts/zram.sh
-    groups: [control-plane, worker]
-```
-
-You can add further entries to the list or replace the default one using the **list‑merge strategy** described earlier.
+The `services.fsmount` section allows you to define additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. The default configuration is empty.
 
 The following parameters are supported for each item:
 
@@ -2667,35 +2631,22 @@ The template receives the following variables for rendering:
 |`size`|`size` field (empty string if not set)|
 |`type`|`type` field (empty string if not set)|
 
-There is an example how to mount particular disk on some cluster node. The cluster.yaml part:
+There is an example how to mount ZRAM disk on all cluster nodes. The cluster.yaml part:
 
 ```yaml
 services:
   fsmount:
-  - name: mydisk
+  - name: zram
+    enabled: false
+    size: 1G
     type: ext4
-    device: /dev/disk/by-uuid/f05934af-6699-49d1-bd1c-01bebf3e586f
-    path: /mnt/data
+    device: /dev/zram0
+    path: /var/log/pods
     template:
-      source: templates/mnt-data.mount.j2
-      destination: /etc/systemd/system/mnt-data.mount
-    nodes: ['worker-1']
-```
-
-The template file:
-
-```conf
-[Unit]
-Description=Mount My Disk
-
-[Mount]
-What={{ device }}
-Where={{ path }}
-Type={{ type }}
-Options=defaults
-
-[Install]
-WantedBy=multi-user.target
+      source: templates/zram-setup.service.j2
+      destination: /etc/systemd/system/zram-setup.service
+    preparation_script: resources/scripts/zram.sh
+    groups: [control-plane, worker]
 ```
 
 #### audit
