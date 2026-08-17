@@ -21,6 +21,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 
 from typing import List
 
+from kubemarine.core.patch import Patch
 
 patches: List[Patch] = [
 ]
