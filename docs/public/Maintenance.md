@@ -14,6 +14,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Reconfigure Procedure](#reconfigure-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
+    - [Mount Filesystems Procedure](#mount-filesystems-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Etcd Member Reunion](#etcd-member-reunion)
 - [Procedure Execution](#procedure-execution)
@@ -1356,6 +1357,56 @@ nodes:
   - name: control-plane-3
 ```
 
+
+## Mount Filesystems Procedure
+
+The `mount_fs` procedure sets up filesystems on cluster nodes according to a required `procedure.yaml`.
+The format of `procedure.yaml` is the same as the `services.fsmount` list in `cluster.yaml` — an array of fsmount items specifying which filesystems to mount and on which nodes.
+
+For each node that has at least one applicable fsmount item, the procedure:
+
+1. Drains the node (if it is a `control-plane` or `worker` node) to safely evacuate workloads.
+2. Removes existing data from each configured mount path to ensure a clean state.
+3. Installs and enables the corresponding systemd mount units.
+4. Reboots the node so that the new mounts are activated at the OS level.
+5. Uncordons the node (if it is a `control-plane` or `worker` node) to make it schedulable again.
+
+Nodes that have no applicable items are skipped entirely.
+
+**Note**: Data inside the configured mount paths is erased before the mount is set up. Back up any important data before running this procedure.
+
+### Mount Filesystems Procedure Parameters
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+
+The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/mount_fs.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+The procedure inventory has the same structure as the `services.fsmount` section in `cluster.yaml`.
+For a description of the available fields, refer to the [fsmount](Installation.md#fsmount) section in _Kubemarine Installation Procedure_.
+
+Example:
+
+```yaml
+- name: zram-pods
+  device: /dev/zram0
+  path: /var/log/pods
+  type: zram
+  size: 1G
+  template:
+    source: templates/zram.mount.j2
+    destination: /etc/systemd/system/var-log-pods.mount
+  groups:
+    - control-plane
+    - worker
+```
+
+### Mount Filesystems Procedure Tasks Tree
+
+The `mount_fs` procedure executes the following sequence of tasks:
+
+* mount_filesystems
+* overview
 
 ## Certificate Renew Procedure
 

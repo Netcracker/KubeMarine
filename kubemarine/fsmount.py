@@ -23,6 +23,24 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 from kubemarine.core.group import NodeGroup, CollectorCallback
 
 
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['mount_fs'])
+def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
+    proc_items: List[dict] = cluster.procedure_inventory  # type: ignore[assignment]
+    if not proc_items:
+        return
+
+    existing: List[dict] = cluster.inventory.setdefault('services', {}).setdefault('fsmount', [])
+    existing_by_name = {item['name']: i for i, item in enumerate(existing)}
+
+    for item in proc_items:
+        idx = existing_by_name.get(item['name'])
+        if idx is not None:
+            existing[idx] = utils.deepcopy_yaml(item)
+        else:
+            existing.append(utils.deepcopy_yaml(item))
+            existing_by_name[item['name']] = len(existing) - 1
+
+
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     fsmount_list: List[dict] = cluster.inventory.get('services', {}).get('fsmount', [])
@@ -49,8 +67,10 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                     f"provided for fsmount item {item['name']!r}.")
 
 
-def get_applicable_items(cluster: KubernetesCluster, node: NodeGroup) -> List[dict]:
-    fsmount_list: List[dict] = cluster.inventory.get('services', {}).get('fsmount', [])
+def get_applicable_items(cluster: KubernetesCluster, node: NodeGroup,
+                         fsmount_list: List[dict] = None) -> List[dict]:
+    if fsmount_list is None:
+        fsmount_list = cluster.inventory.get('services', {}).get('fsmount', [])
     applicable = []
     for item in fsmount_list:
         groups: Union[List[str], None] = item.get('groups')
@@ -88,12 +108,12 @@ def _parse_mounts(mounts_output: str) -> dict:
     return result
 
 
-def is_mounted(group: NodeGroup) -> bool:
+def is_mounted(group: NodeGroup, fsmount_list: List[dict] = None) -> bool:
     cluster: KubernetesCluster = group.cluster
     results = group.sudo("cat /proc/mounts")
 
     for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node, fsmount_list)
         if not applicable:
             continue
         host = node.get_host()
@@ -106,7 +126,7 @@ def is_mounted(group: NodeGroup) -> bool:
     return True
 
 
-def check_mounts(group: NodeGroup) -> List[str]:
+def check_mounts(group: NodeGroup, fsmount_list: List[dict] = None) -> List[str]:
     """Return a list of human-readable error strings for missing or wrong-type mounts."""
     cluster: KubernetesCluster = group.cluster
 
@@ -120,7 +140,7 @@ def check_mounts(group: NodeGroup) -> List[str]:
     errors = []
 
     for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node, fsmount_list)
         if not applicable:
             continue
         host = node.get_host()
@@ -143,17 +163,17 @@ def check_mounts(group: NodeGroup) -> List[str]:
     return errors
 
 
-def setup_fsmount(group: NodeGroup) -> bool:
+def setup_fsmount(group: NodeGroup, fsmount_list: List[dict] = None) -> bool:
     cluster: KubernetesCluster = group.cluster
     logger = cluster.log
 
-    if is_mounted(group):
+    if is_mounted(group, fsmount_list):
         logger.debug("Skipped - all required filesystems are already mounted")
         return False
 
     changed = False
     for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node)
+        applicable = get_applicable_items(cluster, node, fsmount_list)
         if not applicable:
             continue
 

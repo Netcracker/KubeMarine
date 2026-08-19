@@ -409,6 +409,7 @@ class DynamicResources:
             kubemarine.cri.enrich_upgrade_inventory,
             kubemarine.plugins.nginx_ingress.cert_renew_enrichment,
             kubemarine.plugins.envoy_gateway.cert_renew_enrichment,
+            kubemarine.fsmount.enrich_procedure_inventory,
             kubemarine.sysctl.enrich_reconfigure_inventory,
             kubemarine.core.inventory.enrich_reconfigure_inventory,
             # Enrichment of procedure inventory should be finished at this step.
