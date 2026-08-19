@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from collections import OrderedDict
-from typing import List, Any
+from typing import List
 
 from kubemarine import fsmount, kubernetes, system
 from kubemarine.core import flow
