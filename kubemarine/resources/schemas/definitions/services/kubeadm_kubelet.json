@@ -10,6 +10,8 @@
     "cgroupDriver": {"type": "string", "default": "systemd"},
     "maxPods": {"$ref": "#/definitions/MaxPods"},
     "serializeImagePulls": {"$ref": "#/definitions/SerializeImagePulls"},
+    "containerLogMaxSize": {"$ref": "#/definitions/ContainerLogMaxSize"},
+    "containerLogMaxFiles": {"$ref": "#/definitions/ContainerLogMaxFiles"},
     "apiVersion": {"type": ["string"], "default": "kubelet.config.k8s.io/v1beta1"},
     "kind": {"enum": ["KubeletConfiguration"], "default": "KubeletConfiguration"}
   },
@@ -17,6 +19,8 @@
     "ProtectKernelDefaults": {"type": "boolean", "default": true},
     "PodPidsLimit": {"type": "integer", "default": 4096},
     "MaxPods": {"type": "integer", "default": 110},
-    "SerializeImagePulls": {"type": "boolean", "default": false}
+    "SerializeImagePulls": {"type": "boolean", "default": false},
+    "ContainerLogMaxSize": {"type": "string", "default": "10Mi"},
+    "ContainerLogMaxFiles": {"type": "integer", "minimum": 2, "default": 5}
   }
 }

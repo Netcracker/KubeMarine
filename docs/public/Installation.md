@@ -2634,7 +2634,7 @@ The following variables are made available to the Jinja2 template:
 | `size`   | `size` field (empty string if omitted) |
 | `type`   | `type` field (empty string if omitted) |
 
-There is an example how to mount ZRAM disk on all cluster nodes. The cluster.yaml part:
+This functionality could be used to mount ZRAM volume on all cluster nodes for pods logs. The cluster.yaml part is the following:
 
 ```yaml
 services:
@@ -2650,6 +2650,15 @@ services:
       destination: /etc/systemd/system/zram-setup.service
     preparation_script: resources/scripts/zram.sh
     groups: [control-plane, worker]
+```
+
+The `size` of the ZRAM volume must be chosen according to the kubelet configuration (`containerLogMax` options). For the current case the recommended numbers are the following. They must be set in `kubeadm_kubelet` section:
+
+```yaml
+services:
+  kubeadm_kubelet:
+    containerLogMaxSize: 5Mi
+    containerLogMaxFiles: 2
 ```
 
 #### audit
