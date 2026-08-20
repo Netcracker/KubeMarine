@@ -22,13 +22,20 @@ from kubemarine.procedures import install
 
 
 def mount_filesystems(cluster: KubernetesCluster) -> None:
-    # procedure_inventory is the raw fsmount list from procedure.yaml
-    fsmount_list: List[dict] = cluster.procedure_inventory  # type: ignore[assignment]
+    proc_inv = cluster.procedure_inventory
+    fsmount_list: List[dict] = proc_inv.get('fsmount', [])
+    do_reboot: bool = proc_inv.get('reboot', True)
 
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
 
-    for node in cluster.nodes['all'].get_ordered_members_list():
+    target_nodes = cluster.make_group([])
+    for item in fsmount_list:
+        target_nodes = target_nodes.include_group(
+            cluster.create_group_from_groups_nodes_names(
+                item.get('groups') or [], item.get('nodes') or []))
+
+    for node in target_nodes.get_ordered_members_list():
         node_name = node.get_node_name()
         node_config = node.get_config()
         is_k8s_node = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
@@ -37,7 +44,7 @@ def mount_filesystems(cluster: KubernetesCluster) -> None:
         if not applicable:
             continue
 
-        if is_k8s_node:
+        if do_reboot and is_k8s_node:
             cluster.log.debug(f"Draining node {node_name!r} before fsmount setup")
             first_control_plane.sudo(
                 kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
@@ -50,16 +57,17 @@ def mount_filesystems(cluster: KubernetesCluster) -> None:
 
         node.call(fsmount.setup_fsmount, fsmount_list=fsmount_list)
 
-        cluster.log.debug(f"Rebooting node {node_name!r} after fsmount setup")
-        system.perform_group_reboot(node)
+        if do_reboot:
+            cluster.log.debug(f"Rebooting node {node_name!r} after fsmount setup")
+            system.perform_group_reboot(node)
 
-        if is_k8s_node:
-            cluster.log.debug(f"Uncordoning node {node_name!r} after reboot")
-            first_control_plane.wait_command_successful(
-                f"kubectl uncordon {node_name}",
-                hide=False, pty=True,
-                timeout=timeout_config['timeout'],
-                retries=timeout_config['retries'])
+            if is_k8s_node:
+                cluster.log.debug(f"Uncordoning node {node_name!r} after reboot")
+                first_control_plane.wait_command_successful(
+                    f"kubectl uncordon {node_name}",
+                    hide=False, pty=True,
+                    timeout=timeout_config['timeout'],
+                    retries=timeout_config['retries'])
 
 
 tasks = OrderedDict({

@@ -25,7 +25,7 @@ from kubemarine.core.group import NodeGroup, CollectorCallback
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['mount_fs'])
 def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
-    proc_items: List[dict] = cluster.procedure_inventory  # type: ignore[assignment]
+    proc_items: List[dict] = cluster.procedure_inventory.get('fsmount', [])
     if not proc_items:
         return
 
