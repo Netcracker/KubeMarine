@@ -1357,28 +1357,29 @@ nodes:
   - name: control-plane-3
 ```
 
+
 ## Mount Filesystems Procedure
 
-The `mount_fs` procedure configures filesystems on cluster nodes based on the supplied `procedure.yaml` inventory.
+The `mount_fs` procedure configures filesystems on cluster nodes based on the supplied `procedure.yaml`.
 
-For each node that contains at least one applicable **fsmount** entry, the behaviour depends on the ``reboot`` option:
+For each node that contains at least one applicable **fsmount** entry, the behaviour depends on the value of the
+``reboot`` option:
 
 **When ``reboot: true`` (the default):**
-1. **Drain** the node (if it is a ``control-plane`` or ``worker``) to safely evacuate workloads.
-2. **Remove** any existing data from each configured mount path, ensuring a clean state.
-3. **Install and enable** the corresponding systemd mount units.
-4. **Reboot** the node so the new mounts become active at the operating‑system level.
-5. **Uncordon** the node (again, for ``control-plane`` or ``worker``) to make it schedulable.
+1. Drains the node (if it is a ``control-plane`` or ``worker``) to safely evacuate workloads.
+2. Removes any existing data from each configured mount path, ensuring a clean state.
+3. Installs and enables the corresponding systemd mount units.
+4. Reboots the node so the new mounts become active at the operating‑system level.
+5. Uncordons the node (again, for ``control-plane`` or ``worker``) to make it schedulable.
 
 **When ``reboot: false``:**
-1. **Remove** existing data from each configured mount path.
-2. **Install and enable** the systemd mount units immediately, without a reboot.
+1. Removes existing data from each configured mount path.
+2. Installs and enables the systemd mount units immediately, without performing a reboot.
 
-Nodes that have no applicable items are skipped entirely. After a successful execution, ``cluster.yaml`` is updated with the fsmount items defined in the procedure file.
+Nodes that have no applicable items are skipped entirely. After a successful execution, ``cluster.yaml`` is updated
+with the fsmount items defined in the procedure file.
 
-**Note:** Data inside the configured mount paths is erased before the mounts are created. Back up any important data prior to running this procedure.
-
-**Note:** Data inside the configured mount paths is erased before the mounts are created. Back up any important data
+**Note:** Data inside the configured mount paths is erased before the mount is set up. Back up any important data
 prior to running this procedure.
 
 ### Mount Filesystems Procedure Parameters
