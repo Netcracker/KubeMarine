@@ -662,15 +662,17 @@ rules does not match, the test will fail.
 
 *Task*: `services.system.fsmount.mounts`
 
-This check validates that every filesystem mount defined in `services.fsmount` is correctly configured on `control‑plane` and `worker` nodes. For each entry the following conditions are verified:
+This check validates that every **enabled** filesystem mount defined in ``services.fsmount`` is correctly configured on ``control‑plane`` and ``worker`` nodes. Entries with ``enabled: false`` are ignored.
 
-- The mount point specified by `path` appears in `/proc/mounts`.
-- The filesystem type reported in `/proc/mounts` matches the `type` declared in the inventory.
-- For ZRAM‑backed devices (i.e., the `device` value begins with `/dev/zram`), the mount point is also listed in the output of `zramctl --output‑all`.
+For each applicable entry the following conditions are verified:
+
+* The mount point specified by ``path`` appears in ``/proc/mounts``.
+* If the ``type`` field is defined in the inventory, the filesystem type reported in ``/proc/mounts`` must match it. When ``type`` is omitted only the presence of the mount point is checked.
+* For ZRAM‑backed devices (i.e., the ``device`` value starts with ``/dev/zram``), the mount point must also be listed in the output of ``zramctl --output‑all``.
 
 If any validation fails, the test reports the affected node and mount path with a detailed error message.
 
-**Note**: Nodes that have no applicable `services.fsmount` entries are skipped silently.
+**Note**: Nodes that have no applicable ``services.fsmount`` entries are skipped silently.
 
 ##### 218 Time Difference
 

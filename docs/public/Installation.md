@@ -2592,44 +2592,47 @@ The following settings are supported in the extended format:
 
 *Can restart a service*: **No**
 
-*Overwrites files*: Yes – the rendered systemd unit file is uploaded to the location defined in `template.destination`. A backup of the previous file is kept.
+*Overwrites files*: **Yes** – the rendered systemd unit file is uploaded to the location defined by `template.destination`. A backup of any existing file is retained.
 
-*OS‑specific*: No
+*OS‑specific*: **No**
 
-The `services.fsmount` section allows you to define additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. The default configuration is empty.
+The `services.fsmount` section allows you to declare additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. By default the section is empty.
 
-The following parameters are supported for each item:
+Each entry may contain the following keys:
 
-|Parameter|Mandatory|Description|
-|---|---|---|
-|**name**|**yes**|Identifier for this mount entry, used in logs and dump filenames.|
-|**device**|**yes**|The device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`).|
-|**path**|**yes**|The mount point path on the node.|
-|**template.source**|**yes**|Path to the Jinja2 template for the systemd unit. Can be an internal resource path (relative to the Kubemarine package) or an external absolute path.|
-|**template.destination**|**yes**|Absolute path on the node where the rendered unit file is placed.|
-|**size**|no|Size of the filesystem, passed to the systemd unit template (e.g. `1G`). Required for virtual devices such as zram.|
-|**type**|no|Filesystem type passed to the template (e.g. `ext4`, `tmpfs`).|
-|**preparation_script**|no|Path to a shell script executed before the systemd unit is installed. If the script exits with a non-zero code, the mount entry is skipped for that node. Can be an internal resource path or an external absolute path.|
-|**groups**|no|The list of node roles where this mount should be applied.|
-|**nodes**|no|The list of specific node names where this mount should be applied.|
+| Parameter               | Mandatory | Description |
+|------------------------|-----------|-------------|
+| **name**               | **yes**   | Identifier for the mount entry; used in logs and dump filenames. |
+| **enabled**            | no        | Whether the entry is processed. Defaults to **true**. |
+| **device**             | **yes**   | Device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`). |
+| **path**               | **yes**   | Target mount point on the node. |
+| **template.source**    | **yes**   | Path to the Jinja2 template that generates the systemd unit. Can be an internal resource (relative to the Kubemarine package) or an absolute external path. |
+| **template.destination**| **yes**   | Absolute path on the node where the rendered unit file will be placed. |
+| **size**               | no        | Desired filesystem size (e.g. `1G`). Required for virtual devices such as zram. |
+| **type**               | no        | Filesystem type (e.g. `ext4`, `tmpfs`). |
+| **preparation_script** | no        | Path to a shell script that runs before the systemd unit is installed. If the script exits with a non‑zero status, the mount entry is skipped on that node. The script may be an internal resource or an absolute external path. |
+| **groups**             | no        | List of node roles (e.g. `control-plane`, `worker`) to which the mount should be applied. |
+| **nodes**              | no        | List of specific node names to which the mount should be applied. |
 
-**Notes**:
-* You can specify `groups` and `nodes` at the same time; both are merged to determine the target nodes.
-* If neither `groups` nor `nodes` is specified, the mount is applied to all nodes.
-* If the mount path is already present in `/proc/mounts`, the entry is skipped for that node.
-* The preparation script is uploaded to the node, executed, and then removed. It is intended for operations such as loading kernel modules or installing required packages.
+**Notes**
 
-**Warning**: The `preparation_script` failure is non-fatal. If the script fails, only that specific mount entry is skipped on the affected node; other entries continue to be processed.
+* You may specify both `groups` and `nodes`; the resulting node set is the union of both selectors.
+* If neither `groups` nor `nodes` is provided, the mount is applied to **all** nodes.
+* If the mount point already appears in `/proc/mounts`, the entry is skipped for that node.
+ * The preparation script is uploaded, executed, and then removed. It is useful for loading kernel modules or installing prerequisite packages.
+ * If `enabled` is set to **false**, the mount entry is ignored entirely.
 
-The template receives the following variables for rendering:
+**Warning**: Failure of the `preparation_script` is non‑fatal. Only the mount entry for the affected node is omitted; other entries continue to be processed.
 
-|Variable|Source|
-|---|---|
-|`name`|`name` field|
-|`device`|`device` field|
-|`path`|`path` field|
-|`size`|`size` field (empty string if not set)|
-|`type`|`type` field (empty string if not set)|
+The following variables are made available to the Jinja2 template:
+
+| Variable | Source |
+|----------|--------|
+| `name`   | `name` field |
+| `device` | `device` field |
+| `path`   | `path` field |
+| `size`   | `size` field (empty string if omitted) |
+| `type`   | `type` field (empty string if omitted) |
 
 There is an example how to mount ZRAM disk on all cluster nodes. The cluster.yaml part:
 

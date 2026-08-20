@@ -1357,49 +1357,52 @@ nodes:
   - name: control-plane-3
 ```
 
-
 ## Mount Filesystems Procedure
 
-The `mount_fs` procedure sets up filesystems on cluster nodes according to a required `procedure.yaml`.
+The `mount_fs` procedure configures filesystems on cluster nodes based on the supplied `procedure.yaml` inventory.
 
-For each node that has at least one applicable fsmount item, the procedure behaves differently depending on the `reboot` option:
+For each node that contains at least one applicable **fsmount** entry, the behaviour depends on the ``reboot`` option:
 
-**With `reboot: true` (default)**:
-1. Drains the node (if it is a `control-plane` or `worker` node) to safely evacuate workloads.
-2. Removes existing data from each configured mount path to ensure a clean state.
-3. Installs and enables the corresponding systemd mount units.
-4. Reboots the node so that the new mounts are activated at the OS level.
-5. Uncordons the node (if it is a `control-plane` or `worker` node) to make it schedulable again.
+**When ``reboot: true`` (the default):**
+1. **Drain** the node (if it is a ``control-plane`` or ``worker``) to safely evacuate workloads.
+2. **Remove** any existing data from each configured mount path, ensuring a clean state.
+3. **Install and enable** the corresponding systemd mount units.
+4. **Reboot** the node so the new mounts become active at the operating‑system level.
+5. **Uncordon** the node (again, for ``control-plane`` or ``worker``) to make it schedulable.
 
-**With `reboot: false`**:
-1. Removes existing data from each configured mount path.
-2. Installs and enables the corresponding systemd mount units immediately without a reboot.
+**When ``reboot: false``:**
+1. **Remove** existing data from each configured mount path.
+2. **Install and enable** the systemd mount units immediately, without a reboot.
 
-Nodes that have no applicable items are skipped entirely.
-After a successful run, `cluster.yaml` is updated with the fsmount items from `procedure.yaml`.
+Nodes that have no applicable items are skipped entirely. After a successful execution, ``cluster.yaml`` is updated with the fsmount items defined in the procedure file.
 
-**Note**: Data inside the configured mount paths is erased before the mount is set up. Back up any important data before running this procedure.
+**Note:** Data inside the configured mount paths is erased before the mounts are created. Back up any important data prior to running this procedure.
+
+**Note:** Data inside the configured mount paths is erased before the mounts are created. Back up any important data
+prior to running this procedure.
 
 ### Mount Filesystems Procedure Parameters
 
-The procedure accepts required positional argument with the path to the procedure inventory file.
+The procedure requires a positional argument that points to the procedure inventory file.
 
-The JSON schema for procedure inventory is available by [URL](/kubemarine/resources/schemas/mount_fs.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+The JSON schema for the inventory is available at
+[URL](/kubemarine/resources/schemas/mount_fs.json?raw=1). See
+[Validation by JSON Schemas](Installation.md#inventory-validation) for further details.
 
-#### reboot Parameter
+#### ``reboot`` Parameter
 
 Controls whether each node is drained and rebooted after the mount units are installed.
 
-* `true` (default) — drain, install, reboot, uncordon. Use this when the filesystem must be cleanly initialized before any workloads run on the node.
-* `false` — install and enable the units in-place without a reboot. Use this when the filesystem can be activated live.
+* ``true`` (default) – drain, install, reboot, then uncordon. Use this when the filesystem must be cleanly initialised before any
+  workloads run on the node.
+* ``false`` – install and enable the units in‑place without a reboot. Use this when the filesystem can be activated live.
 
-#### fsmount Parameter
+#### ``fsmount`` Parameter
 
-The list of filesystem mount items to apply. The structure is identical to the `services.fsmount` section in `cluster.yaml`.
-For a description of the available fields, refer to the [fsmount](Installation.md#fsmount) section in _Kubemarine Installation Procedure_.
+The list of filesystem mount items to apply. Its structure is identical to the ``services.fsmount`` section in ``cluster.yaml``.
+For a description of the available fields, refer to the [fsmount](Installation.md#fsmount) section in the _Kubemarine Installation Procedure_.
 
-Example:
+**Example:**
 
 ```yaml
 reboot: true
@@ -1419,10 +1422,10 @@ fsmount:
 
 ### Mount Filesystems Procedure Tasks Tree
 
-The `mount_fs` procedure executes the following sequence of tasks:
+The ``mount_fs`` procedure executes the following sequence of tasks:
 
-* mount_filesystems
-* overview
+* ``mount_filesystems``
+* ``overview``
 
 ## Certificate Renew Procedure
 
