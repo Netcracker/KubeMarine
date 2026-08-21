@@ -1379,10 +1379,10 @@ For each node that contains at least one applicable **fsmount** entry, the behav
 Nodes that have no applicable items are skipped entirely. After a successful execution, ``cluster.yaml`` is updated
 with the fsmount items defined in the procedure file.
 
-**Note:** Data inside the configured mount paths is erased before the mount is set up. Back up any important data
+**Note**: Data inside the configured mount paths is erased before the mount is set up. Back up any important data
 prior to running this procedure.
-**Note:** For the case when ZRAM volume is monted to `/var/log/pods` the kubelet service must be reconfigured
-with the recomended parameters. The procedure.yaml is the following:
+**Note**: For the case when ZRAM volume is mounted to `/var/log/pods`, the kubelet service must be reconfigured
+with the recomended parameters. The `procedure.yaml` is as follows:
 
 ```yaml
 services:

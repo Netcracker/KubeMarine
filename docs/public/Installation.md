@@ -2652,7 +2652,7 @@ services:
     groups: [control-plane, worker]
 ```
 
-The `size` of the ZRAM volume must be chosen according to the kubelet configuration (`containerLogMax` options). For the current case the recommended numbers are the following. They must be set in `kubeadm_kubelet` section:
+The `size` of the ZRAM volume must be selected according to the kubelet configuration (`containerLogMax` options). For the current case, the following values are recommended and they must be set in the `kubeadm_kubelet` section:
 
 ```yaml
 services:
