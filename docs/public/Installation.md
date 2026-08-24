@@ -2661,6 +2661,8 @@ services:
     containerLogMaxFiles: 2
 ```
 
+**Warning**: Pay attention, the OS must provide `zram` module.
+
 #### audit
 
 ##### Audit Kubernetes Policy

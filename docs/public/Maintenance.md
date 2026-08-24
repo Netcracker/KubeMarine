@@ -1391,6 +1391,8 @@ services:
     containerLogMaxFiles: 2
 ```
 
+**Warning**: Pay attention, the OS must provide `zram` module.
+
 ### Mount Filesystems Procedure Parameters
 
 The procedure requires a positional argument that points to the procedure inventory file.
