@@ -1420,7 +1420,6 @@ For a description of the available fields, refer to the [fsmount](Installation.m
 reboot: true
 fsmount:
   - name: zram
-    enabled: false
     size: 1G
     type: ext4
     device: /dev/zram0

@@ -2640,7 +2640,6 @@ This functionality could be used to mount ZRAM volume on all cluster nodes for p
 services:
   fsmount:
   - name: zram
-    enabled: false
     size: 1G
     type: ext4
     device: /dev/zram0
