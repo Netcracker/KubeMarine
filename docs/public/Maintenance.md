@@ -1419,17 +1419,17 @@ For a description of the available fields, refer to the [fsmount](Installation.m
 ```yaml
 reboot: true
 fsmount:
-  - name: zram-pods
+  - name: zram
+    enabled: false
+    size: 1G
+    type: ext4
     device: /dev/zram0
     path: /var/log/pods
-    type: zram
-    size: 1G
     template:
-      source: templates/zram.mount.j2
-      destination: /etc/systemd/system/var-log-pods.mount
-    groups:
-      - control-plane
-      - worker
+      source: templates/zram-setup.service.j2
+      destination: /etc/systemd/system/zram-setup.service
+    preparation_script: resources/scripts/zram.sh
+    groups: [control-plane, worker]
 ```
 
 ### Mount Filesystems Procedure Tasks Tree
