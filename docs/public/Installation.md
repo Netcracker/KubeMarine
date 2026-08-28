@@ -2610,7 +2610,7 @@ Each entry may contain the following keys:
 | **template.destination**| **yes**   | Absolute path on the node where the rendered unit file will be placed. |
 | **size**               | no        | Desired filesystem size (e.g. `1G`). Required for virtual devices such as zram. |
 | **type**               | no        | Filesystem type (e.g. `ext4`, `tmpfs`). |
-| **preparation_scripts** | no        | Ordered list of shell scripts that run before the systemd unit is installed. Each script may be an internal resource (relative to the Kubemarine package) or an absolute external path. A node reboot is performed between consecutive scripts. If any script exits with a non‑zero status, the procedure fails. For items with `type: zram`, defaults to `[resources/scripts/upgrade_kernel.sh, resources/scripts/zram.sh]`. |
+| **preparation_scripts** | no        | Ordered list of shell scripts that run before the systemd unit is installed. Each script may be an internal resource (relative to the Kubemarine package) or an absolute external path. A node reboot is performed between consecutive scripts. If any script exits with a non‑zero status, the procedure fails. |
 | **groups**             | no        | List of node roles (e.g. `control-plane`, `worker`) to which the mount should be applied. |
 | **nodes**              | no        | List of specific node names to which the mount should be applied. |
 
