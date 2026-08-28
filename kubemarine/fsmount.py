@@ -205,8 +205,10 @@ def setup_fsmount(group: NodeGroup, fsmount_list: List[dict] = None) -> bool:
 
                 if idx < len(preparation_scripts) - 1:
                     logger.debug(f"Rebooting {node.get_node_name()!r} between preparation scripts")
-                    from kubemarine import system as _system  # lazy import to avoid circular dependency
-                    _system.perform_group_reboot(node)
+                    initial_boot_history = node.sudo('uptime -s')
+                    node.sudo(cluster.globals['nodes']['boot']['reboot_command'], warn=True)
+                    logger.debug("Waiting for boot up...")
+                    node.wait_for_reboot(initial_boot_history)
 
             unit_content = _render_unit(item)
             unit_destination = item['template']['destination']
