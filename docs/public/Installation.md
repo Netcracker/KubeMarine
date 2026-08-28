@@ -2588,7 +2588,7 @@ The following settings are supported in the extended format:
 
 *Installation task*: `prepare.system.fsmount`
 
-*Can cause a reboot*: **No**
+*Can cause a reboot*: **Yes** – when `preparation_scripts` contains more than one entry, the node is rebooted between consecutive scripts.
 
 *Can restart a service*: **No**
 
@@ -2610,7 +2610,7 @@ Each entry may contain the following keys:
 | **template.destination**| **yes**   | Absolute path on the node where the rendered unit file will be placed. |
 | **size**               | no        | Desired filesystem size (e.g. `1G`). Required for virtual devices such as zram. |
 | **type**               | no        | Filesystem type (e.g. `ext4`, `tmpfs`). |
-| **preparation_script** | no        | Path to a shell script that runs before the systemd unit is installed. If the script exits with a non‑zero status, the mount entry is skipped on that node. The script may be an internal resource or an absolute external path. |
+| **preparation_scripts** | no        | Ordered list of shell scripts that run before the systemd unit is installed. Each script may be an internal resource (relative to the Kubemarine package) or an absolute external path. A node reboot is performed between consecutive scripts. If any script exits with a non‑zero status, the procedure fails. For items with `type: zram`, defaults to `[resources/scripts/upgrade_kernel.sh, resources/scripts/zram.sh]`. |
 | **groups**             | no        | List of node roles (e.g. `control-plane`, `worker`) to which the mount should be applied. |
 | **nodes**              | no        | List of specific node names to which the mount should be applied. |
 
@@ -2619,10 +2619,11 @@ Each entry may contain the following keys:
 * You may specify both `groups` and `nodes`; the resulting node set is the union of both selectors.
 * If neither `groups` nor `nodes` is provided, the mount is applied to **all** nodes.
 * If the mount point already appears in `/proc/mounts`, the entry is skipped for that node.
- * The preparation script is uploaded, executed, and then removed. It is useful for loading kernel modules or installing prerequisite packages.
+ * Each preparation script is uploaded to the node, executed, and then removed. Scripts are useful for loading kernel modules, upgrading the kernel, or installing prerequisite packages.
+ * When more than one preparation script is specified, the node is rebooted between consecutive scripts so that kernel or module changes take effect before the next script runs.
  * If `enabled` is set to **false**, the mount entry is ignored entirely.
 
-**Warning**: Failure of the `preparation_script` is non‑fatal. Only the mount entry for the affected node is omitted; other entries continue to be processed.
+**Warning**: Failure of any `preparation_scripts` entry is fatal — the whole procedure stops immediately.
 
 The following variables are made available to the Jinja2 template:
 
@@ -2647,9 +2648,13 @@ services:
     template:
       source: templates/zram-setup.service.j2
       destination: /etc/systemd/system/zram-setup.service
-    preparation_script: resources/scripts/zram.sh
+    preparation_scripts:
+      - resources/scripts/upgrade_kernel.sh
+      - resources/scripts/zram.sh
     groups: [control-plane, worker]
 ```
+
+The node is rebooted between the two scripts so the upgraded kernel is running before `zram.sh` executes.
 
 The `size` of the ZRAM volume must be selected according to the kubelet configuration (`containerLogMax` options). For the current case, the following values are recommended and they must be set in the `kubeadm_kubelet` section:
 

@@ -48,9 +48,10 @@
           "required": ["source", "destination"],
           "additionalProperties": false
         },
-        "preparation_script": {
-          "type": "string",
-          "description": "Path to a shell script run before creating the filesystem. If it fails, this item is skipped."
+        "preparation_scripts": {
+          "type": "array",
+          "description": "Ordered list of shell scripts run before creating the filesystem. A reboot is performed between consecutive scripts. If any script fails, the procedure fails.",
+          "items": {"type": "string"}
         },
         "groups": {
           "$ref": "../common/node_ref.json#/definitions/Roles",

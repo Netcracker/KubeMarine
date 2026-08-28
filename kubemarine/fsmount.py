@@ -50,12 +50,11 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         if item.get('groups') is None and item.get('nodes') is None:
             continue
 
-        preparation_script = item.get('preparation_script')
-        if preparation_script is not None:
-            ext_path = utils.get_external_resource_path(preparation_script)
-            if not os.path.isfile(ext_path) and not os.path.isfile(utils.get_internal_resource_path(preparation_script)):
+        for j, script in enumerate(item.get('preparation_scripts') or []):
+            ext_path = utils.get_external_resource_path(script)
+            if not os.path.isfile(ext_path) and not os.path.isfile(utils.get_internal_resource_path(script)):
                 raise Exception(
-                    f"'preparation_script' file {preparation_script!r} not found "
+                    f"'preparation_scripts[{j}]' file {script!r} not found "
                     f"for fsmount item at {utils.pretty_path(path)}")
 
         if item.get('nodes') is not None:
@@ -185,25 +184,29 @@ def setup_fsmount(group: NodeGroup, fsmount_list: List[dict] = None) -> bool:
                 logger.debug(f"Skipping fsmount item {item['name']!r} on {node.get_node_name()}: already mounted")
                 continue
 
-            preparation_script = item.get('preparation_script')
-            if preparation_script:
-                logger.debug(f"Running preparation script for fsmount item {item['name']!r} on {node.get_node_name()}")
-                ext_path = utils.get_external_resource_path(preparation_script)
+            preparation_scripts = item.get('preparation_scripts') or []
+            for idx, script_path in enumerate(preparation_scripts):
+                logger.debug(f"Running preparation script [{idx}] {script_path!r} "
+                             f"for fsmount item {item['name']!r} on {node.get_node_name()}")
+                ext_path = utils.get_external_resource_path(script_path)
                 if os.path.isfile(ext_path):
-                    script_content = utils.read_external(preparation_script)
+                    script_content = utils.read_external(script_path)
                 else:
-                    script_content = utils.read_internal(preparation_script)
-                remote_path = f"/tmp/fsmount_{item['name']}_prep.sh"
+                    script_content = utils.read_internal(script_path)
+                remote_path = f"/tmp/fsmount_{item['name']}_prep_{idx}.sh"
                 node.put(io.StringIO(script_content), remote_path, sudo=True)
                 node.sudo(f"chmod +x {remote_path}")
                 prep_result = node.sudo(f"bash {remote_path}", warn=True)
                 node.sudo(f"rm -f {remote_path}")
                 if prep_result[host].return_code != 0:
-                    logger.warning(
-                        f"Preparation script for fsmount item {item['name']!r} "
-                        f"failed on {node.get_node_name()}, skipping."
-                        f"The output is: {prep_result[host]}")
-                    continue
+                    raise Exception(
+                        f"Preparation script [{idx}] {script_path!r} for fsmount item {item['name']!r} "
+                        f"failed on {node.get_node_name()}. Output: {prep_result[host]}")
+
+                if idx < len(preparation_scripts) - 1:
+                    logger.debug(f"Rebooting {node.get_node_name()!r} between preparation scripts")
+                    from kubemarine import system as _system  # lazy import to avoid circular dependency
+                    _system.perform_group_reboot(node)
 
             unit_content = _render_unit(item)
             unit_destination = item['template']['destination']

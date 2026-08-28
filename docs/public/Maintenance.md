@@ -1427,9 +1427,13 @@ fsmount:
     template:
       source: templates/zram-setup.service.j2
       destination: /etc/systemd/system/zram-setup.service
-    preparation_script: resources/scripts/zram.sh
+    preparation_scripts:
+      - resources/scripts/upgrade_kernel.sh
+      - resources/scripts/zram.sh
     groups: [control-plane, worker]
 ```
+
+The node is rebooted between `upgrade_kernel.sh` and `zram.sh` so the new kernel is active before the zram module is loaded.
 
 ### Mount Filesystems Procedure Tasks Tree
 
