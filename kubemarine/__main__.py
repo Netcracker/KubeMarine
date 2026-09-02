@@ -50,8 +50,8 @@ for ir in ruamel.yaml.resolver.implicit_resolvers:
     if (1, 1) in ir[0] and 'tag:yaml.org,2002:float' in ir[1]:
         float_patched_resolver = (ir[1], ir[2], ir[3])
         # Globally change behaviour of yaml.safe_load and yaml.dump
-        yaml.Dumper.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call]
-        yaml.SafeLoader.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call]
+        yaml.Dumper.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call, unused-ignore]
+        yaml.SafeLoader.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call, unused-ignore]
         break
 
 
