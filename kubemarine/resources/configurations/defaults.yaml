@@ -166,6 +166,8 @@ services:
     debian: *modprobe-default-modules
     ubuntu26.04: *modprobe-default-modules
 
+  fsmount: []
+
   sysctl:
     net.ipv4.ip_nonlocal_bind:
       value: 1

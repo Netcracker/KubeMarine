@@ -33,6 +33,7 @@ import kubemarine.k8s_certs
 import kubemarine.keepalived
 import kubemarine.kubernetes
 import kubemarine.kubernetes_accounts
+import kubemarine.fsmount
 import kubemarine.modprobe
 import kubemarine.packages
 import kubemarine.plugins
@@ -408,6 +409,7 @@ class DynamicResources:
             kubemarine.cri.enrich_upgrade_inventory,
             kubemarine.plugins.nginx_ingress.cert_renew_enrichment,
             kubemarine.plugins.envoy_gateway.cert_renew_enrichment,
+            kubemarine.fsmount.enrich_procedure_inventory,
             kubemarine.sysctl.enrich_reconfigure_inventory,
             kubemarine.core.inventory.enrich_reconfigure_inventory,
             # Enrichment of procedure inventory should be finished at this step.
@@ -485,6 +487,7 @@ class DynamicResources:
             kubemarine.system.verify_inventory,
             kubemarine.system.enrich_etc_hosts,
             kubemarine.modprobe.enrich_kernel_modules,
+            kubemarine.fsmount.enrich_inventory,
 
             # Calculate some differences between previous and new inventory
             # Depends on kubemarine.packages.enrich_inventory

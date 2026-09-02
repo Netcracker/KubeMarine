@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "array",
+  "description": "List of filesystem mount configurations to be set up on cluster nodes via systemd units.",
+  "items": {
+    "oneOf": [
+      {"$ref": "#/definitions/FsmountItem"},
+      {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+    ]
+  },
+  "definitions": {
+    "FsmountItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the fsmount item, used for identification"
+        },
+        "device": {
+          "type": "string",
+          "description": "The device file to mount (e.g. /dev/sdd1, /dev/zram0)"
+        },
+        "path": {
+          "type": "string",
+          "description": "The mount point path on the node"
+        },
+        "size": {
+          "type": "string",
+          "description": "Size of the filesystem (optional, e.g. 1G)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Filesystem type (e.g. ext4, tmpfs)"
+        },
+        "template": {
+          "type": "object",
+          "description": "Systemd unit template configuration",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "Path to the Jinja2 template for the systemd unit"
+            },
+            "destination": {
+              "type": "string",
+              "description": "Absolute path on the node where the rendered unit file is placed"
+            }
+          },
+          "required": ["source", "destination"],
+          "additionalProperties": false
+        },
+        "preparation_scripts": {
+          "type": "array",
+          "description": "Ordered list of shell scripts run before creating the filesystem. A reboot is performed between consecutive scripts. If any script fails, the procedure fails.",
+          "items": {"type": "string"}
+        },
+        "groups": {
+          "$ref": "../common/node_ref.json#/definitions/Roles",
+          "default": ["worker", "control-plane", "balancer"],
+          "description": "The list of node roles where this mount should be applied"
+        },
+        "nodes": {
+          "$ref": "../common/node_ref.json#/definitions/Names",
+          "description": "The list of node names where this mount should be applied"
+        }
+      },
+      "required": ["name", "device", "path", "template"],
+      "additionalProperties": false
+    }
+  }
+}

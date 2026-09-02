@@ -14,6 +14,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Reconfigure Procedure](#reconfigure-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
+    - [Mount Filesystems Procedure](#mount-filesystems-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Etcd Member Reunion](#etcd-member-reunion)
 - [Procedure Execution](#procedure-execution)
@@ -1356,6 +1357,90 @@ nodes:
   - name: control-plane-3
 ```
 
+
+## Mount Filesystems Procedure
+
+The `mount_fs` procedure configures filesystems on cluster nodes based on the supplied `procedure.yaml`.
+
+For each node that contains at least one applicable **fsmount** entry, the behaviour depends on the value of the
+``reboot`` option:
+
+**When ``reboot: true`` (the default):**
+1. Drains the node (if it is a ``control-plane`` or ``worker``) to safely evacuate workloads.
+2. Removes any existing data from each configured mount path, ensuring a clean state.
+3. Installs and enables the corresponding systemd mount units.
+4. Reboots the node so the new mounts become active at the operating‑system level.
+5. Uncordons the node (again, for ``control-plane`` or ``worker``) to make it schedulable.
+
+**When ``reboot: false``:**
+1. Removes existing data from each configured mount path.
+2. Installs and enables the systemd mount units immediately, without performing a reboot.
+
+Nodes that have no applicable items are skipped entirely. After a successful execution, ``cluster.yaml`` is updated
+with the fsmount items defined in the procedure file.
+
+**Note**: Data inside the configured mount paths is erased before the mount is set up. Back up any important data
+prior to running this procedure.
+**Note**: For the case when ZRAM volume is mounted to `/var/log/pods`, the kubelet service must be reconfigured
+with the recomended parameters. The `procedure.yaml` is as follows:
+
+```yaml
+services:
+  kubeadm_kubelet:
+    containerLogMaxSize: 5Mi
+    containerLogMaxFiles: 2
+```
+
+**Warning**: Pay attention, the OS must provide `zram` module.
+
+### Mount Filesystems Procedure Parameters
+
+The procedure requires a positional argument that points to the procedure inventory file.
+
+The JSON schema for the inventory is available at
+[URL](/kubemarine/resources/schemas/mount_fs.json?raw=1). See
+[Validation by JSON Schemas](Installation.md#inventory-validation) for further details.
+
+#### ``reboot`` Parameter
+
+Controls whether each node is drained and rebooted after the mount units are installed.
+
+* ``true`` (default) – drain, install, reboot, then uncordon. Use this when the filesystem must be cleanly initialised before any
+  workloads run on the node.
+* ``false`` – install and enable the units in‑place without a reboot. Use this when the filesystem can be activated live.
+
+#### ``fsmount`` Parameter
+
+The list of filesystem mount items to apply. Its structure is identical to the ``services.fsmount`` section in ``cluster.yaml``.
+For a description of the available fields, refer to the [fsmount](Installation.md#fsmount) section in the _Kubemarine Installation Procedure_.
+
+**Example:**
+
+```yaml
+reboot: true
+fsmount:
+  - name: zram
+    size: 1G
+    type: ext4
+    device: /dev/zram0
+    path: /var/log/pods
+    template:
+      source: templates/zram-setup.service.j2
+      destination: /etc/systemd/system/zram-setup.service
+    preparation_scripts:
+      - resources/scripts/upgrade_kernel.sh
+      - resources/scripts/zram.sh
+    groups: [control-plane, worker]
+```
+
+The node is rebooted between `upgrade_kernel.sh` and `zram.sh` so the new kernel is active before the zram module is loaded.
+
+### Mount Filesystems Procedure Tasks Tree
+
+The ``mount_fs`` procedure executes the following sequence of tasks:
+
+* ``mount_filesystems``
+* ``overview``
 
 ## Certificate Renew Procedure
 

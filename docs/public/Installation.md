@@ -46,6 +46,7 @@ This section provides information about the inventory, features, and steps for i
       - [CRI](#cri)
       - [modprobe](#modprobe)
       - [sysctl](#sysctl)
+      - [fsmount](#fsmount)
       - [audit](#audit)
         - [Kubernetes Policy](#audit-kubernetes-policy)
         - [Daemon](#audit-daemon)
@@ -2587,6 +2588,89 @@ The following settings are supported in the extended format:
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
+
+#### fsmount
+
+*Installation task*: `prepare.system.fsmount`
+
+*Can cause a reboot*: **Yes** – when `preparation_scripts` contains more than one entry, the node is rebooted between consecutive scripts.
+
+*Can restart a service*: **No**
+
+*Overwrites files*: **Yes** – the rendered systemd unit file is uploaded to the location defined by `template.destination`. A backup of any existing file is retained.
+
+*OS‑specific*: **No**
+
+The `services.fsmount` section allows you to declare additional filesystems that should be formatted and mounted on cluster nodes using **systemd** unit files. By default the section is empty.
+
+Each entry may contain the following keys:
+
+| Parameter               | Mandatory | Description |
+|------------------------|-----------|-------------|
+| **name**               | **yes**   | Identifier for the mount entry; used in logs and dump filenames. |
+| **enabled**            | no        | Whether the entry is processed. Defaults to **true**. |
+| **device**             | **yes**   | Device file to mount (e.g. `/dev/sdd1`, `/dev/zram0`). |
+| **path**               | **yes**   | Target mount point on the node. |
+| **template.source**    | **yes**   | Path to the Jinja2 template that generates the systemd unit. Can be an internal resource (relative to the Kubemarine package) or an absolute external path. |
+| **template.destination**| **yes**   | Absolute path on the node where the rendered unit file will be placed. |
+| **size**               | no        | Desired filesystem size (e.g. `1G`). Required for virtual devices such as zram. |
+| **type**               | no        | Filesystem type (e.g. `ext4`, `tmpfs`). |
+| **preparation_scripts** | no        | Ordered list of shell scripts that run before the systemd unit is installed. Each script may be an internal resource (relative to the Kubemarine package) or an absolute external path. A node reboot is performed between consecutive scripts. If any script exits with a non‑zero status, the procedure fails. |
+| **groups**             | no        | List of node roles (e.g. `control-plane`, `worker`) to which the mount should be applied. |
+| **nodes**              | no        | List of specific node names to which the mount should be applied. |
+
+**Notes**
+
+* You may specify both `groups` and `nodes`; the resulting node set is the union of both selectors.
+* If neither `groups` nor `nodes` is provided, the mount is applied to **all** nodes.
+* If the mount point already appears in `/proc/mounts`, the entry is skipped for that node.
+ * Each preparation script is uploaded to the node, executed, and then removed. Scripts are useful for loading kernel modules, upgrading the kernel, or installing prerequisite packages.
+ * When more than one preparation script is specified, the node is rebooted between consecutive scripts so that kernel or module changes take effect before the next script runs.
+ * If `enabled` is set to **false**, the mount entry is ignored entirely.
+
+**Warning**: Failure of any `preparation_scripts` entry is fatal — the whole procedure stops immediately.
+
+The following variables are made available to the Jinja2 template:
+
+| Variable | Source |
+|----------|--------|
+| `name`   | `name` field |
+| `device` | `device` field |
+| `path`   | `path` field |
+| `size`   | `size` field (empty string if omitted) |
+| `type`   | `type` field (empty string if omitted) |
+
+This functionality could be used to mount ZRAM volume on all cluster nodes for pods logs. The cluster.yaml part is the following:
+
+```yaml
+services:
+  fsmount:
+  - name: zram
+    size: 1G
+    type: ext4
+    device: /dev/zram0
+    path: /var/log/pods
+    template:
+      source: templates/zram-setup.service.j2
+      destination: /etc/systemd/system/zram-setup.service
+    preparation_scripts:
+      - resources/scripts/upgrade_kernel.sh
+      - resources/scripts/zram.sh
+    groups: [control-plane, worker]
+```
+
+The node is rebooted between the two scripts so the upgraded kernel is running before `zram.sh` executes.
+
+The `size` of the ZRAM volume must be selected according to the kubelet configuration (`containerLogMax` options). For the current case, the following values are recommended and they must be set in the `kubeadm_kubelet` section:
+
+```yaml
+services:
+  kubeadm_kubelet:
+    containerLogMaxSize: 5Mi
+    containerLogMaxFiles: 2
+```
+
+**Warning**: Pay attention, the OS must provide `zram` module.
 
 #### audit
 
