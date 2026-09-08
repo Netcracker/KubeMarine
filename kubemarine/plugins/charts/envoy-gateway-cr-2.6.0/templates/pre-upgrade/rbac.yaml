@@ -1,0 +1,53 @@
+{{ if .Values.defaultGateways.external.hostPorts }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ns-patch 
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: ns-patch
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - namespaces
+    verbs:
+      - patch
+      - get
+    resourceNames:
+      - {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ns-patch 
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: ns-patch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ns-patch 
+subjects:
+  - kind: ServiceAccount
+    name: ns-patch 
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ns-patch 
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: ns-patch
+automountServiceAccountToken: true
+{{- end }}

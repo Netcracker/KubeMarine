@@ -1,0 +1,700 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "APPLICATION_NAME": {
+            "type": "string",
+            "description": "Application name applied as app.kubernetes.io/part-of label on all resources"
+        },
+        "MANAGED_BY": {
+            "type": "string",
+            "description": "Value for the app.kubernetes.io/managed-by label"
+        },
+        "SERVICE_NAME": {
+            "type": "string",
+            "description": "Service name used in resource labels and metadata"
+        },
+        "global": {
+            "type": "object",
+            "description": "Global image references shared across both charts",
+            "properties": {
+                "images": {
+                    "type": "object",
+                    "properties": {
+                        "envoy": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full envoy proxy image reference (registry/repo:tag)"
+                                }
+                            }
+                        },
+                        "envoyGateway": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full Envoy Gateway controller image reference"
+                                }
+                            }
+                        },
+                        "ratelimit": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "Full rate-limit sidecar image reference"
+                                }
+                            }
+                        },
+                        "kubectl": {
+                            "type": "object",
+                            "properties": {
+                                "image": {
+                                    "type": "string",
+                                    "description": "kubectl image used by the pre-upgrade Job"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "config": {
+            "type": "object",
+            "description": "Must match the config section in the envoy-gateway chart",
+            "properties": {
+                "envoyGateway": {
+                    "type": "object",
+                    "properties": {
+                        "gateway": {
+                            "type": "object",
+                            "properties": {
+                                "controllerName": {
+                                    "type": "string",
+                                    "description": "Controller name used to reconcile GatewayClass resources"
+                                }
+                            }
+                        },
+                        "provider": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Infrastructure provider type",
+                                    "enum": ["Kubernetes"]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "gatewayClasses": {
+            "type": "object",
+            "description": "GatewayClass, EnvoyProxy and associated Deployment/Service definitions",
+            "properties": {
+                "internal": {
+                    "type": "object",
+                    "description": "Internal gateway class using a ClusterIP service",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the GatewayClass resource"
+                        },
+                        "envoyProxy": {
+                            "type": "object",
+                            "description": "EnvoyProxy custom resource settings",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the EnvoyProxy resource"
+                                },
+                                "logging": {
+                                    "type": "string",
+                                    "description": "Default log level for envoy proxy instances",
+                                    "enum": ["debug", "info", "warn", "error", "trace"]
+                                }
+                            }
+                        },
+                        "envoyDeployment": {
+                            "type": "object",
+                            "description": "Envoy proxy Deployment/DaemonSet configuration",
+                            "properties": {
+                                "daemonset": {
+                                    "type": "boolean",
+                                    "description": "Switch EnvoyProxy from Deployment to DaemonSet"
+                                },
+                                "replicas": {
+                                    "type": "integer",
+                                    "description": "Number of envoy proxy replicas (ignored when daemonset=true)",
+                                    "minimum": 0
+                                },
+                                "resources": {
+                                    "$ref": "#/$defs/resourceRequirements"
+                                },
+                                "securityContext": {
+                                    "$ref": "#/$defs/containerSecurityContext"
+                                },
+                                "tmpSizeLimit": {
+                                    "type": "string",
+                                    "description": "Size limit for the /tmp emptyDir volume (e.g. 100Mi)"
+                                }
+                            }
+                        },
+                        "envoyService": {
+                            "type": "object",
+                            "description": "Kubernetes Service created for the envoy proxy",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Service type",
+                                    "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Optional fixed name for the Service; empty allows auto-naming"
+                                },
+                                "externalTrafficPolicy": {
+                                    "type": "string",
+                                    "description": "External traffic policy for NodePort/LoadBalancer services",
+                                    "enum": ["Cluster", "Local"]
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations added to the Service"
+                                }
+                            }
+                        }
+                    }
+                },
+                "external": {
+                    "type": "object",
+                    "description": "External gateway class using a LoadBalancer service",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the GatewayClass resource"
+                        },
+                        "envoyProxy": {
+                            "type": "object",
+                            "description": "EnvoyProxy custom resource settings",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the EnvoyProxy resource"
+                                },
+                                "logging": {
+                                    "type": "string",
+                                    "description": "Default log level for envoy proxy instances",
+                                    "enum": ["debug", "info", "warn", "error", "trace"]
+                                }
+                            }
+                        },
+                        "envoyDeployment": {
+                            "type": "object",
+                            "description": "Envoy proxy Deployment/DaemonSet configuration",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Optional custom name for the Deployment/DaemonSet"
+                                },
+                                "daemonset": {
+                                    "type": "boolean",
+                                    "description": "Switch EnvoyProxy from Deployment to DaemonSet"
+                                },
+                                "replicas": {
+                                    "type": "integer",
+                                    "description": "Number of envoy proxy replicas (ignored when daemonset=true)",
+                                    "minimum": 0
+                                },
+                                "resources": {
+                                    "$ref": "#/$defs/resourceRequirements"
+                                },
+                                "securityContext": {
+                                    "$ref": "#/$defs/containerSecurityContext"
+                                },
+                                "tmpSizeLimit": {
+                                    "type": "string",
+                                    "description": "Size limit for the /tmp emptyDir volume (e.g. 100Mi)"
+                                },
+                                "tolerations": {
+                                    "type": "array",
+                                    "description": "Tolerations for envoy proxy pods",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                },
+                                "nodeSelector": {
+                                    "type": "object",
+                                    "description": "Node selector for envoy proxy pods"
+                                }
+                            }
+                        },
+                        "envoyService": {
+                            "type": "object",
+                            "description": "Kubernetes Service created for the envoy proxy",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Service type; use ClusterIP for AWS ALB integration",
+                                    "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Optional fixed name; required when using AWS ALB Ingress"
+                                },
+                                "externalTrafficPolicy": {
+                                    "type": "string",
+                                    "description": "External traffic policy for NodePort/LoadBalancer services",
+                                    "enum": ["Cluster", "Local"]
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations added to the Service"
+                                }
+                            }
+                        },
+                        "ingress": {
+                            "type": "object",
+                            "description": "AWS ALB Ingress resource (only applicable when service.type=ClusterIP)",
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Whether to create an Ingress resource for AWS ALB"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the Ingress resource"
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations for the Ingress resource (ALB-specific annotations go here)"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "defaultGateways": {
+            "type": "object",
+            "description": "Default Gateway resources created for each gateway class",
+            "properties": {
+                "internal": {
+                    "type": "object",
+                    "description": "Default Gateway for the internal GatewayClass",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Set to false to skip creating the internal Gateway"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the Gateway resource"
+                        },
+                        "httpPort": {
+                            "type": "integer",
+                            "description": "Port for the HTTP listener",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "httpsPort": {
+                            "type": ["integer", "string"],
+                            "description": "Port for the HTTPS listener; leave empty to disable"
+                        },
+                        "secret": {
+                            "type": "object",
+                            "description": "TLS certificate secret for the HTTPS listener",
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Whether to create the TLS Secret (requires httpsPort to be set)"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the TLS Secret referenced by the HTTPS listener"
+                                },
+                                "crt": {
+                                    "type": "string",
+                                    "description": "Base64-encoded TLS certificate (required when create=true)"
+                                },
+                                "key": {
+                                    "type": "string",
+                                    "description": "Base64-encoded TLS private key (required when create=true)"
+                                }
+                            }
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations added to the Gateway resource"
+                        },
+                        "labels": {
+                            "type": "object",
+                            "description": "Additional labels added to the Gateway resource"
+                        }
+                    }
+                },
+                "external": {
+                    "type": "object",
+                    "description": "Default Gateway for the external GatewayClass",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the Gateway resource"
+                        },
+                        "proxyProtocol": {
+                            "type": "boolean",
+                            "description": "Enable PROXY protocol on all listeners; set to false for AWS ALB"
+                        },
+                        "underscoresAction": {
+                            "type": "string",
+                            "description": "Action taken when an HTTP header with underscores is received",
+                            "enum": ["Allow", "RejectRequest", "DropHeader"]
+                        },
+                        "ctpName": {
+                            "type": "string",
+                            "description": "Name of the ClientTrafficPolicy resource"
+                        },
+                        "ctpSpec": {
+                            "type": "object",
+                            "description": "Extra fields merged into the ClientTrafficPolicy spec; same keys override proxyProtocol/underscoresAction defaults"
+                        },
+                        "httpPort": {
+                            "type": "integer",
+                            "description": "Port for the HTTP listener",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "httpsPort": {
+                            "type": ["integer", "string"],
+                            "description": "Port for the HTTPS listener; leave empty to disable"
+                        },
+                        "httpHostPort": {
+                            "type": ["integer", "string"],
+                            "description": "Override the hostPort for the HTTP listener when hostPorts=true"
+                        },
+                        "httpsHostPort": {
+                            "type": ["integer", "string"],
+                            "description": "Override the hostPort for the HTTPS listener when hostPorts=true"
+                        },
+                        "hostPorts": {
+                            "type": "boolean",
+                            "description": "Expose listeners as hostPorts on envoy pods; does not apply to TLS passthrough listeners"
+                        },
+                        "secret": {
+                            "type": "object",
+                            "description": "TLS certificate secret for the HTTPS listener",
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Whether to create the TLS Secret (requires httpsPort to be set)"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the TLS Secret referenced by the HTTPS listener"
+                                },
+                                "crt": {
+                                    "type": "string",
+                                    "description": "Base64-encoded TLS certificate (required when create=true)"
+                                },
+                                "key": {
+                                    "type": "string",
+                                    "description": "Base64-encoded TLS private key (required when create=true)"
+                                }
+                            }
+                        },
+                        "tcp": {
+                            "type": "array",
+                            "description": "Additional TCP listeners",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "port"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Listener name (must be unique within the Gateway)"
+                                    },
+                                    "port": {
+                                        "type": "integer",
+                                        "description": "TCP listener port",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    },
+                                    "namespaceLabel": {
+                                        "description": "Namespace selector: use 'All' (string) to allow routes from all namespaces, or a key-value map for label-based selection",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": ["All"]
+                                            },
+                                            {
+                                                "type": "object"
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "udp": {
+                            "type": "array",
+                            "description": "Additional UDP listeners",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "port"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Listener name (must be unique within the Gateway)"
+                                    },
+                                    "port": {
+                                        "type": "integer",
+                                        "description": "UDP listener port",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    },
+                                    "namespaceLabel": {
+                                        "description": "Namespace selector: use 'All' (string) to allow routes from all namespaces, or a key-value map for label-based selection",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": ["All"]
+                                            },
+                                            {
+                                                "type": "object"
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "tls": {
+                            "type": "array",
+                            "description": "TLS passthrough listeners; hostPorts is not supported for these",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "port", "hostname"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Listener name (must be unique within the Gateway)"
+                                    },
+                                    "port": {
+                                        "type": "integer",
+                                        "description": "TLS listener port; must not conflict with httpsPort",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    },
+                                    "hostname": {
+                                        "type": "string",
+                                        "description": "Hostname used for SNI-based TLS passthrough routing"
+                                    },
+                                    "namespaceLabel": {
+                                        "description": "Namespace selector: use 'All' (string) to allow routes from all namespaces, or a key-value map for label-based selection",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": ["All"]
+                                            },
+                                            {
+                                                "type": "object"
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations added to the Gateway resource"
+                        },
+                        "labels": {
+                            "type": "object",
+                            "description": "Additional labels added to the Gateway resource"
+                        },
+                        "btpName": {
+                            "type": "string",
+                            "description": "Name of the BackendTrafficPolicy resource"
+                        },
+                        "btpSpec": {
+                            "type": "object",
+                            "description": "BackendTrafficPolicy spec section; rendered verbatim into the resource spec"
+                        }
+                    }
+                }
+            }
+        },
+        "upgradeJob": {
+            "type": "object",
+            "description": "Pre-upgrade Job that patches the gateway namespace when hostPorts are enabled",
+            "properties": {
+                "pullPolicy": {
+                    "type": "string",
+                    "description": "Image pull policy for the kubectl container",
+                    "enum": ["Always", "IfNotPresent", "Never"]
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Compute resource requests for the upgrade job",
+                    "properties": {
+                        "requests": {
+                            "type": "object",
+                            "properties": {
+                                "cpu": {
+                                    "type": "string"
+                                },
+                                "memory": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node selector for the upgrade job pod"
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for the upgrade job pod"
+                },
+                "securityContext": {
+                    "$ref": "#/$defs/containerSecurityContext"
+                }
+            }
+        },
+        "fixJob": {
+            "type": "object",
+            "description": "Pre-upgrade Job (ArgoCD only) that deletes orphaned hook-managed Gateways and ClientTrafficPolicies",
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "description": "kubectl image used by the fix job; overrides global.images.kubectl.image"
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "description": "Image pull policy for the kubectl container",
+                    "enum": ["Always", "IfNotPresent", "Never"]
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Compute resource requests for the fix job",
+                    "properties": {
+                        "requests": {
+                            "type": "object",
+                            "properties": {
+                                "cpu": {
+                                    "type": "string"
+                                },
+                                "memory": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node selector for the fix job pod"
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for the fix job pod"
+                },
+                "securityContext": {
+                    "$ref": "#/$defs/containerSecurityContext"
+                }
+            }
+        }
+    },
+    "$defs": {
+        "resourceRequirements": {
+            "type": "object",
+            "description": "Kubernetes resource requests and limits",
+            "properties": {
+                "requests": {
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "type": "string",
+                            "description": "CPU request (e.g. 150m)"
+                        },
+                        "memory": {
+                            "type": "string",
+                            "description": "Memory request (e.g. 640Mi)"
+                        }
+                    }
+                },
+                "limits": {
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "type": "string",
+                            "description": "CPU limit (e.g. 500m)"
+                        },
+                        "memory": {
+                            "type": "string",
+                            "description": "Memory limit (e.g. 1Gi)"
+                        }
+                    }
+                }
+            }
+        },
+        "containerSecurityContext": {
+            "type": "object",
+            "description": "Kubernetes container security context",
+            "properties": {
+                "allowPrivilegeEscalation": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "object",
+                    "properties": {
+                        "drop": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "add": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                },
+                "runAsNonRoot": {
+                    "type": "boolean"
+                },
+                "runAsUser": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "runAsGroup": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "seccompProfile": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["RuntimeDefault", "Localhost", "Unconfined"]
+                        },
+                        "localhostProfile": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
