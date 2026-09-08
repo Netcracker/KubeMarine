@@ -1294,7 +1294,10 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                         failed_messages.append(f"failed to load {service_name}: {stderr}")
                         continue
 
-                    if properties["version"] not in k8s_object.obj["spec"]["template"]["spec"]["containers"][0].get("image", ""):
+                    for container in k8s_object.obj["spec"]["template"]["spec"]["containers"]:
+                        if properties["version"] in container.get("image", ""):
+                            break
+                    else:
                         failed_messages.append(f"{service_name} has outdated image version")
 
         if failed_messages:
