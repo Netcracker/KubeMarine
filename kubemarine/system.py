@@ -23,7 +23,7 @@ import paramiko
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, apparmor, sysctl, modprobe, fsmount
+from kubemarine import selinux, apparmor, sysctl, modprobe, zram
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -573,7 +573,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
     if cluster.is_task_completed('prepare.system.fsmount'):
         log.debug("Verifying fsmount...")
-        fsmount_ok = fsmount.is_mounted(group)
+        fsmount_ok = zram.is_mounted(group)
         if not fsmount_ok:
             raise Exception("Required filesystem mounts are not configured")
         log.debug("Required filesystem mounts are configured")

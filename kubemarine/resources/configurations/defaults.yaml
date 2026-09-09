@@ -163,7 +163,7 @@ services:
     debian: *modprobe-default-modules
     ubuntu26.04: *modprobe-default-modules
 
-  fsmount: []
+  zram: []
 
   sysctl:
     net.ipv4.ip_nonlocal_bind:

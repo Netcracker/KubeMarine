@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "array",
+  "description": "List of zram mount configurations to be set up on cluster nodes",
+  "items": {
+    "oneOf": [
+      {"$ref": "#/definitions/zramItems"}
+    ]
+  },
+  "definitions": {
+    "zramItems": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The mount point path"
+        },
+        "state": {
+          "type": "string",
+          "description": "The state of the mount - present or absent"
+        },
+        "size": {
+          "type": "string",
+          "description": "Size of the filesystem (optional, e.g. 1G)"
+        },
+        "groups": {
+          "$ref": "../common/node_ref.json#/definitions/Roles",
+          "default": ["worker", "control-plane"],
+          "description": "The list of node roles where this mount should be applied"
+        },
+        "nodes": {
+          "$ref": "../common/node_ref.json#/definitions/Names",
+          "description": "The list of node names where this mount should be applied"
+        }
+      },
+      "required": ["path", "state"],
+      "additionalProperties": false
+    }
+  }
+}

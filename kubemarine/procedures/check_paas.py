@@ -29,7 +29,7 @@ from ordered_set import OrderedSet
 
 from kubemarine import (
     packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit,
-    plugins, modprobe, admission, fsmount
+    plugins, modprobe, admission, zram
 )
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, CollectorCallback, GroupResultException
@@ -1035,8 +1035,9 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
 
 def verify_fsmount(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '236', "System", "Filesystem mounts") as tc:
+        # TODO: fix groups
         group = cluster.make_group_from_roles(['control-plane', 'worker'])
-        errors = fsmount.check_mounts(group)
+        errors = zram.check_mounts(group)
         if not errors:
             tc.success(results='mounted')
         else:

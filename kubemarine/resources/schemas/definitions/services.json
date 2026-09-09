@@ -42,8 +42,8 @@
     "modprobe": {
       "$ref": "services/modprobe.json"
     },
-    "fsmount": {
-      "$ref": "services/fsmount.json"
+    "zram": {
+      "$ref": "services/zram.json"
     },
     "sysctl": {
       "$ref": "services/sysctl.json"
