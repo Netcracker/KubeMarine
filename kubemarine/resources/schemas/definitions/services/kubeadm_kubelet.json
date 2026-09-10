@@ -12,10 +12,24 @@
     "serializeImagePulls": {"$ref": "#/definitions/SerializeImagePulls"},
     "containerLogMaxSize": {"$ref": "#/definitions/ContainerLogMaxSize"},
     "containerLogMaxFiles": {"$ref": "#/definitions/ContainerLogMaxFiles"},
+    "systemReserved": {"$ref": "#/definitions/ReservedResources"},
+    "kubeReserved": {"$ref": "#/definitions/ReservedResources"},
     "apiVersion": {"type": ["string"], "default": "kubelet.config.k8s.io/v1beta1"},
     "kind": {"enum": ["KubeletConfiguration"], "default": "KubeletConfiguration"}
   },
   "definitions": {
+    "ReservedResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "memory": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "string"
+        }
+      }
+    },
     "ProtectKernelDefaults": {"type": "boolean", "default": true},
     "PodPidsLimit": {"type": "integer", "default": 4096},
     "MaxPods": {"type": "integer", "default": 110},

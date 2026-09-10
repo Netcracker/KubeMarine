@@ -21,8 +21,8 @@
           "description": "The state of the mount - present or absent"
         },
         "size": {
-          "type": "string",
-          "description": "Size of the filesystem (optional, e.g. 1G)"
+          "type": "integer",
+          "description": "Size of the filesystem in MiB (optional, e.g. 1024)"
         },
         "groups": {
           "$ref": "../common/node_ref.json#/definitions/Roles",

@@ -1033,17 +1033,15 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
                                    f"the differences manually and make changes on the appropriate nodes.")
 
 
-def verify_fsmount(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '236', "System", "Filesystem mounts") as tc:
-        # TODO: fix groups
-        group = cluster.make_group_from_roles(['control-plane', 'worker'])
-        errors = zram.check_mounts(group)
+def verify_zram(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '236', "System", "ZRAM mounts") as tc:
+        errors = zram.check_zram(cluster.nodes['all'])
         if not errors:
             tc.success(results='mounted')
         else:
             raise TestFailure('invalid',
-                              hint="Filesystem mount issues found:\n" + "\n".join(f"  - {e}" for e in errors) +
-                                   "\nRun the fsmount task in the installation procedure to set them up.")
+                              hint="ZRAM issues found:\n" + "\n".join(f"  - {e}" for e in errors) +
+                                   "\nRun the prepare.system.zram task in the installation procedure to set them up.")
 
 
 def verify_sysctl_config(cluster: KubernetesCluster) -> None:
@@ -1776,9 +1774,7 @@ tasks = OrderedDict({
             'modprobe': {
                 'rules': verify_modprobe_rules
             },
-            'fsmount': {
-                'mounts': verify_fsmount
-            },
+            'zram': verify_zram,
             'sysctl': {
                 'config': verify_sysctl_config
             },

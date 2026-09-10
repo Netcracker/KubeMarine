@@ -13,24 +13,33 @@
 # limitations under the License.
 
 import io
-from typing import List, Union
+from typing import List
 
 from jinja2 import Template
 
-from kubemarine import system
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine.core.group import NodeGroup, CollectorCallback
+from kubemarine.core.group import NodeGroup
 
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     zram_list: List[dict] = cluster.inventory.get('services', {}).get('zram', [])
+    if not zram_list:
+        return
+
+    need_zram_module = set()
     for item in zram_list:
         if "size" not in item:
-            item["size"] = "1G"
+            item["size"] = 1024
         if "groups" not in item and "nodes" not in item:
             item["groups"] = ["control-plane", "worker"]
             item["nodes"] = []
+
+        group = cluster.create_group_from_groups_nodes_names(item.get('groups') or [], item.get('nodes') or [])
+        if item["state"] == "present":
+            need_zram_module.update(group.get_nodes_names())
+        else:
+            need_zram_module.difference_update(group.get_nodes_names())
 
         all_nodes_names = cluster.nodes['all'].get_nodes_names()
         unknown_nodes = set(item['nodes']) - set(all_nodes_names)
@@ -39,19 +48,80 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                 f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
                 f"provided for zram path {item['path']!r}.")
 
+    if need_zram_module:
+        for _, os_modules in cluster.inventory["services"]["modprobe"].items():
+            to_add_zram = True
+            for module in os_modules:
+                if module == "zram" or ("modulename" in module and module["modulename"] == "zram"):
+                    to_add_zram = False
+                    break
+            if to_add_zram:
+                os_modules.append({
+                    "modulename": "zram",
+                    "nodes": list(need_zram_module), 
+                })
 
-def get_applicable_items(cluster: KubernetesCluster, node: NodeGroup,
-                         zram_list: List[dict] = None) -> List[dict]:
-    if zram_list is None:
-        zram_list = cluster.inventory.get('services', {}).get('zram', [])
-    applicable = []
-    for item in zram_list:
-        groups: Union[List[str], None] = item.get('groups')
-        nodes: Union[List[str], None] = item.get('nodes')
-        group = cluster.create_group_from_groups_nodes_names(groups or [], nodes or [])
-        if group.has_node(node.get_node_name()):
-            applicable.append(item)
-    return applicable
+
+def check_zram(group: NodeGroup) -> List[str]:
+    """
+    Return a list of human-readable error strings for ZRAM mount issues.
+    """
+    cluster: KubernetesCluster = group.cluster
+    if not cluster.inventory.get('services', {}).get('zram'):
+        cluster.log.debug("Skipped - no zram items defined in config file")
+        return []
+    
+    errors = []
+    zram_output = group.sudo("zramctl -n -o MOUNTPOINT,DISKSIZE --bytes", warn=True)
+    for node in group.get_ordered_members_list():
+        expected_mounts = _get_expected_mounts(cluster, node)
+        if not expected_mounts:
+            continue
+
+        actual_mounts = _get_actual_mounts(zram_output[node.get_host()].stdout)
+        for path, cfg in expected_mounts.items():
+            if cfg["state"] == "absent":
+                if path in actual_mounts:
+                    errors.append(f"{node.get_node_name()}: {path!r} is still mounted")
+            else:
+                if path not in actual_mounts:
+                    errors.append(f"{node.get_node_name()}: {path!r} is not mounted")
+                elif cfg["size"] != actual_mounts[path]:
+                    errors.append(f"{node.get_node_name()}: {path!r} expected size {cfg['size']}, "
+                                f"but got {actual_mounts[path]}")
+    return errors
+
+
+def setup_zram(group: NodeGroup) -> bool:
+    """
+    Configures ZRAM on nodes and returns true if nodes reboot is required.
+    """
+
+    cluster: KubernetesCluster = group.cluster
+    logger = cluster.log
+    is_changed = False
+    zram_list = cluster.inventory.get('services', {}).get('zram', [])
+    for idx, zram_item in enumerate(zram_list):
+        group = cluster.create_group_from_groups_nodes_names(zram_item.get('groups') or [], zram_item.get('nodes') or [])
+        unit_name = f'zram-setup-{zram_item["path"].strip("/").replace("/", "-")}.service'
+        unit_destination = f'/etc/systemd/system/{unit_name}'
+
+        if zram_item["state"] == "present":
+            logger.debug(f"Setting up zram for path {zram_item['path']} on {group.get_nodes_names()}")
+            unit_content = _render_unit(zram_item)
+            group.put(io.StringIO(unit_content), unit_destination, sudo=True)
+            utils.dump_file(cluster, unit_content, f'zram/{idx}-{unit_name}')
+            logger.debug(group.sudo("systemctl daemon-reload"))
+            # do not enable immediately, since it may not work without reboot
+            logger.debug(group.sudo(f"systemctl enable {unit_name}"))
+        elif zram_item["state"] == "absent":
+            logger.debug(f"Removing zram for path {zram_item['path']} on {group.get_nodes_names()}")
+            logger.debug(group.sudo(f"systemctl disable {unit_name}", warn=True))
+            logger.debug(group.sudo(f"rm -f {unit_destination}"))
+            logger.debug(group.sudo("systemctl daemon-reload"))
+        is_changed = True
+
+    return is_changed
 
 
 def _render_unit(item: dict) -> str:
@@ -62,97 +132,29 @@ def _render_unit(item: dict) -> str:
         size=item.get('size', ''),
     )
 
+def _get_expected_mounts(cluster: KubernetesCluster, node: NodeGroup) -> dict:
+    """
+    Returns dict {path: {state, sizeMiB}} with expected ZRAM mounts
+    """
+    zram_list = cluster.inventory.get('services', {}).get('zram', [])
+    expected = {}
+    for item in zram_list:
+        groups = item.get('groups')
+        nodes = item.get('nodes')
+        group = cluster.create_group_from_groups_nodes_names(groups or [], nodes or [])
+        if group.has_node(node.get_node_name()):
+            expected[item["path"]] = {
+                "state": item["state"],
+                "size": item["size"]
+            }
+    return expected
 
-def _parse_mounts(mounts_output: str) -> dict:
-    """Parse /proc/mounts into {mountpoint: fstype}."""
-    result = {}
-    for line in mounts_output.splitlines():
-        parts = line.split()
-        if len(parts) >= 3:
-            result[parts[1]] = parts[2]
-    return result
-
-
-def is_zram_configured(group: NodeGroup, zram_list: List[dict] = None) -> bool:
-    cluster: KubernetesCluster = group.cluster
-    results = group.sudo("cat /proc/mounts")
-
-    # TODO: rework
-    for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node, zram_list)
-        if not applicable:
-            continue
-        host = node.get_host()
-        mounts = _parse_mounts(results[host].stdout)
-        for item in applicable:
-            if item['state'] == "present" and item['path'].rstrip('/') not in mounts:
-                cluster.log.debug(f"Mount path {item['path']!r} not found in /proc/mounts on {host}")
-                return False
-            if item['state'] == "absent" and item['path'].rstrip('/') in mounts:
-                cluster.log.debug(f"Mount path {item['path']!r} is still present in /proc/mounts on {host}")
-                return False
-
-    return True
-
-
-def check_mounts(group: NodeGroup, zram_list: List[dict] = None) -> List[str]:
-    """Return a list of human-readable error strings for missing or wrong-type mounts."""
-    cluster: KubernetesCluster = group.cluster
-
-    mounts_collector = CollectorCallback(cluster)
-    zramctl_collector = CollectorCallback(cluster)
-    defer = group.new_defer()
-    # TODO: fix
-    defer.sudo("cat /proc/mounts", callback=mounts_collector)
-    defer.sudo("zramctl --output-all", warn=True, callback=zramctl_collector)
-    defer.flush()
-
-    errors = []
-
-    for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node, zram_list)
-        if not applicable:
-            continue
-        host = node.get_host()
-        node_name = node.get_node_name()
-        mounts = _parse_mounts(mounts_collector.result[host].stdout)
-        zramctl_output = zramctl_collector.result[host].stdout
-
-        for item in applicable:
-            mount_path = item['path'].rstrip('/')
-            expected_type = item.get('type', '')
-            if mount_path not in mounts:
-                errors.append(f"{node_name}: {mount_path!r} is not mounted")
-            elif expected_type and mounts[mount_path] != expected_type:
-                errors.append(
-                    f"{node_name}: {mount_path!r} has fstype {mounts[mount_path]!r}, expected {expected_type!r}")
-
-            if item['device'].startswith('/dev/zram') and mount_path not in zramctl_output:
-                errors.append(f"{node_name}: {mount_path!r} not found in zramctl output")
-
-    return errors
-
-
-def setup_zram(group: NodeGroup, zram_list: List[dict] = None):
-    cluster: KubernetesCluster = group.cluster
-    logger = cluster.log
-
-    for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node, zram_list)
-        if not applicable:
-            continue
-
-        for item in applicable:
-            unit_name = f'zram-setup{item["path"].replace("/", "-")}'
-            unit_destination = f'/etc/systemd/system/{unit_name}.service'
-            if item["state"] == "present":
-                unit_content = _render_unit(item)
-                logger.debug(f"Setting up zram for path {item['path']} on {node.get_node_name()}")
-                node.put(io.StringIO(unit_content), unit_destination, backup=True, sudo=True)
-                utils.dump_file(cluster, unit_content, f'zram/{unit_name}_{node.get_node_name()}')
-                node.sudo("systemctl daemon-reload")
-                node.sudo(f"systemctl enable {unit_name}")
-            elif item["state"] == "absent":
-                node.sudo(f"systemctl disable {unit_name}")
-                node.sudo(f"rm -f {unit_destination}")
-                node.sudo("systemctl daemon-reload")
+def _get_actual_mounts(stdout: str) -> dict:
+    """
+    Returns dict {path: sizeMiB} with actual ZRAM mounts paths and their sizes
+    """
+    actual = {}
+    for line in stdout.splitlines():
+        words = line.split()
+        actual[words[0]] = int(int(words[1])/(1024*1024))
+    return actual

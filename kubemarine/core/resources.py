@@ -485,8 +485,8 @@ class DynamicResources:
             kubemarine.audit.verify_inventory,
             kubemarine.system.verify_inventory,
             kubemarine.system.enrich_etc_hosts,
-            kubemarine.modprobe.enrich_kernel_modules,
             kubemarine.zram.enrich_inventory,
+            kubemarine.modprobe.enrich_kernel_modules,
 
             # Calculate some differences between previous and new inventory
             # Depends on kubemarine.packages.enrich_inventory

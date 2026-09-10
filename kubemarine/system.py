@@ -572,13 +572,13 @@ def verify_system(cluster: KubernetesCluster) -> None:
         log.debug('Kernel parameters verification skipped - origin setup task was not completed')
 
     if cluster.is_task_completed('prepare.system.zram'):
-        log.debug("Verifying zram...")
-        zram_ok = zram.is_zram_configured(group)
-        if not zram_ok:
-            raise Exception("ZRAM configuration is not applied correctly")
-        log.debug("Required filesystem mounts are configured")
+        log.debug("Verifying ZRAM...")
+        errors = zram.check_zram(group)
+        if errors:
+            raise Exception(f"ZRAM configuration is not applied correctly\n" + "\n".join(f"  - {e}" for e in errors))
+        log.debug("Required ZRAM configuration is applied correcty")
     else:
-        log.debug('Fsmount verification skipped - origin setup task was not completed')
+        log.debug('ZRAM verification skipped - origin setup task was not completed')
 
 
 def verify_sysctl(group: NodeGroup) -> None:

@@ -146,8 +146,7 @@ def system_prepare_system_zram(group: NodeGroup) -> None:
     if not cluster.inventory.get('services', {}).get('zram'):
         cluster.log.debug("Skipped - no zram items defined in config file")
         return
-    group.call(zram.setup_zram)
-    cluster.schedule_cumulative_point(system.reboot_nodes)      
+    system.configure_sensitive_service(group, zram.setup_zram)
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
@@ -587,11 +586,9 @@ cumulative_points = {
     # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
         "prepare.system.modprobe",
-        "prepare.system.zram",
         "prepare.system.audit"
     ],
     system.verify_system: [
-        "prepare.system.zram",
         "prepare.system.audit"
     ],
     # Some checks can be done only at the end when the necessary services are configured.
