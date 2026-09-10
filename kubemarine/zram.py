@@ -85,10 +85,10 @@ def is_zram_configured(group: NodeGroup, zram_list: List[dict] = None) -> bool:
         host = node.get_host()
         mounts = _parse_mounts(results[host].stdout)
         for item in applicable:
-            if item['state'] is "present" and item['path'].rstrip('/') not in mounts:
+            if item['state'] == "present" and item['path'].rstrip('/') not in mounts:
                 cluster.log.debug(f"Mount path {item['path']!r} not found in /proc/mounts on {host}")
                 return False
-            if item['state'] is "absent" and item['path'].rstrip('/') in mounts:
+            if item['state'] == "absent" and item['path'].rstrip('/') in mounts:
                 cluster.log.debug(f"Mount path {item['path']!r} is still present in /proc/mounts on {host}")
                 return False
 
@@ -133,7 +133,7 @@ def check_mounts(group: NodeGroup, zram_list: List[dict] = None) -> List[str]:
     return errors
 
 
-def setup_zram(group: NodeGroup, zram_list: List[dict] = None) -> bool:
+def setup_zram(group: NodeGroup, zram_list: List[dict] = None):
     cluster: KubernetesCluster = group.cluster
     logger = cluster.log
 
@@ -147,14 +147,12 @@ def setup_zram(group: NodeGroup, zram_list: List[dict] = None) -> bool:
             unit_destination = f'/etc/systemd/system/{unit_name}.service'
             if item["state"] == "present":
                 unit_content = _render_unit(item)
-                logger.debug(f"Setting up zram for path {item["path"]} on {node.get_node_name()}")
+                logger.debug(f"Setting up zram for path {item['path']} on {node.get_node_name()}")
                 node.put(io.StringIO(unit_content), unit_destination, backup=True, sudo=True)
-                utils.dump_file(cluster, unit_content, f'fsmount/{unit_name}_{node.get_node_name()}')
+                utils.dump_file(cluster, unit_content, f'zram/{unit_name}_{node.get_node_name()}')
                 node.sudo("systemctl daemon-reload")
                 node.sudo(f"systemctl enable {unit_name}")
             elif item["state"] == "absent":
                 node.sudo(f"systemctl disable {unit_name}")
                 node.sudo(f"rm -f {unit_destination}")
                 node.sudo("systemctl daemon-reload")
-
-    cluster.schedule_cumulative_point(system.reboot_nodes)      

@@ -147,7 +147,7 @@ def system_prepare_system_zram(group: NodeGroup) -> None:
         cluster.log.debug("Skipped - no zram items defined in config file")
         return
     group.call(zram.setup_zram)
-
+    cluster.schedule_cumulative_point(system.reboot_nodes)      
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
