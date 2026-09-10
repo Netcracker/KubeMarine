@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import io
-import os
 from typing import List, Union
 
 from jinja2 import Template
@@ -26,19 +25,19 @@ from kubemarine.core.group import NodeGroup, CollectorCallback
 @enrichment(EnrichmentStage.FULL)
 def enrich_inventory(cluster: KubernetesCluster) -> None:
     zram_list: List[dict] = cluster.inventory.get('services', {}).get('zram', [])
-    for i, item in enumerate(zram_list):
-        path: List[Union[str, int]] = ['services', 'zram', i]
+    for item in zram_list:
+        if "size" not in item:
+            item["size"] = "1G"
+        if "groups" not in item and "nodes" not in item:
+            item["groups"] = ["control-plane", "worker"]
+            item["nodes"] = []
 
-        if item.get('groups') is None and item.get('nodes') is None:
-            continue
-
-        if item.get('nodes') is not None:
-            all_nodes_names = cluster.nodes['all'].get_nodes_names()
-            unknown_nodes = set(item['nodes']) - set(all_nodes_names)
-            if unknown_nodes:
-                cluster.log.warning(
-                    f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
-                    f"provided for fsmount item {item['name']!r}.")
+        all_nodes_names = cluster.nodes['all'].get_nodes_names()
+        unknown_nodes = set(item['nodes']) - set(all_nodes_names)
+        if unknown_nodes:
+            cluster.log.warning(
+                f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
+                f"provided for zram path {item['path']!r}.")
 
 
 def get_applicable_items(cluster: KubernetesCluster, node: NodeGroup,
@@ -74,19 +73,23 @@ def _parse_mounts(mounts_output: str) -> dict:
     return result
 
 
-def is_mounted(group: NodeGroup, fsmount_list: List[dict] = None) -> bool:
+def is_zram_configured(group: NodeGroup, zram_list: List[dict] = None) -> bool:
     cluster: KubernetesCluster = group.cluster
     results = group.sudo("cat /proc/mounts")
 
+    # TODO: rework
     for node in group.get_ordered_members_list():
-        applicable = get_applicable_items(cluster, node, fsmount_list)
+        applicable = get_applicable_items(cluster, node, zram_list)
         if not applicable:
             continue
         host = node.get_host()
         mounts = _parse_mounts(results[host].stdout)
         for item in applicable:
-            if item['path'].rstrip('/') not in mounts:
+            if item['state'] is "present" and item['path'].rstrip('/') not in mounts:
                 cluster.log.debug(f"Mount path {item['path']!r} not found in /proc/mounts on {host}")
+                return False
+            if item['state'] is "absent" and item['path'].rstrip('/') in mounts:
+                cluster.log.debug(f"Mount path {item['path']!r} is still present in /proc/mounts on {host}")
                 return False
 
     return True

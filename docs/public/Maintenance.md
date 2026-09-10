@@ -14,7 +14,6 @@ This section describes the features and steps for performing maintenance procedu
     - [Reconfigure Procedure](#reconfigure-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
-    - [Mount Filesystems Procedure](#mount-filesystems-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Etcd Member Reunion](#etcd-member-reunion)
 - [Procedure Execution](#procedure-execution)
@@ -1356,6 +1355,7 @@ nodes:
   - name: control-plane-2
   - name: control-plane-3
 ```
+
 
 ## Certificate Renew Procedure
 

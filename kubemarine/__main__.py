@@ -97,10 +97,6 @@ procedures = OrderedDict({
         'description': "Renew certificates on Kubernetes cluster",
         'group': 'maintenance'
     },
-    'mount_fs': {
-        'description': "Mount filesystems described in the fsmount inventory section",
-        'group': 'maintenance'
-    },
     'reboot': {
         'description': "Reboot Kubernetes nodes",
         'group': 'maintenance'

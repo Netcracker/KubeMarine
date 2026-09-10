@@ -17,6 +17,7 @@
         },
         "state": {
           "type": "string",
+          "enum": ["present", "absent"],
           "description": "The state of the mount - present or absent"
         },
         "size": {
