@@ -101,9 +101,13 @@
       "type": "object",
       "properties": {
         "protectKernelDefaults": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ProtectKernelDefaults"},
+        "systemReserved": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ReservedResources"},
+        "kubeReserved": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ReservedResources"},
         "podPidsLimit": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/PodPidsLimit"},
         "maxPods": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/MaxPods"},
-        "serializeImagePulls": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/SerializeImagePulls"}
+        "serializeImagePulls": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/SerializeImagePulls"},
+        "containerLogMaxSize": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ContainerLogMaxSize"},
+        "containerLogMaxFiles": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ContainerLogMaxFiles"}
       },
       "additionalProperties": false
     },

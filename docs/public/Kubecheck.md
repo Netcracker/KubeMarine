@@ -67,6 +67,7 @@ This section provides information about the Kubecheck functionality.
     - [215 Firewalld Status](#215-firewalld-status)
     - [216 Swap State](#216-swap-state)
     - [217 Modprobe Rules](#217-modprobe-rules)
+    - [236 ZRAM Mounts](#236-zram-mounts)
     - [218 Time Difference](#218-time-difference)
     - [219 Health Status ETCD](#219-health-status-etcd)
     - [220 Control Plane Configuration Status](#220-control-plane-configuration-status)
@@ -656,6 +657,19 @@ The test verifies that swap is disabled on all nodes in the cluster, otherwise t
 
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.
+
+##### 236 ZRAM Mounts
+
+*Task*: `services.system.zram`
+
+This check validates that every ZRAM mount defined in `services.zram` is correctly configured on all nodes.
+
+For each applicable entry the following conditions are verified:
+* If state is `present`, the mount point specified by `path` should appear in `zamctl` output.
+* If state is `present`, the mount point specified by `path` should have correct size in `zamctl` output.
+* If state is `absent`, the mount point specified by `path` should NOT appear in `zamctl` output.
+
+If any validation fails, the test reports the affected node and mount path with a detailed error message.
 
 ##### 218 Time Difference
 

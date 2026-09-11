@@ -29,7 +29,7 @@ from ordered_set import OrderedSet
 
 from kubemarine import (
     packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit,
-    plugins, modprobe, admission
+    plugins, modprobe, admission, zram
 )
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, CollectorCallback, GroupResultException
@@ -1025,6 +1025,17 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
                                    f"the differences manually and make changes on the appropriate nodes.")
 
 
+def verify_zram(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '236', "System", "ZRAM mounts") as tc:
+        errors = zram.check_zram(cluster.nodes['all'])
+        if not errors:
+            tc.success(results='mounted')
+        else:
+            raise TestFailure('invalid',
+                              hint="ZRAM issues found:\n" + "\n".join(f"  - {e}" for e in errors) +
+                                   "\nRun the prepare.system.zram task in the installation procedure to set them up.")
+
+
 def verify_sysctl_config(cluster: KubernetesCluster) -> None:
     """
     This test compares the kernel parameters on the nodes
@@ -1585,7 +1596,7 @@ def verify_kubernetes_version(cluster: KubernetesCluster) -> None:
     """
     The method checks if used kubernetes version is deprecated in kubemarine
     """
-    with TestCase(cluster, '225', "Kubernetes", "Version") as tc:
+    with TestCase(cluster, '235', "Kubernetes", "Version") as tc:
         target_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
         if not kubernetes.verify_supported_version(target_version, cluster.log):
             raise TestWarn(f"Kubernetes version {target_version} is deprecated",
@@ -1755,6 +1766,7 @@ tasks = OrderedDict({
             'modprobe': {
                 'rules': verify_modprobe_rules
             },
+            'zram': verify_zram,
             'sysctl': {
                 'config': verify_sysctl_config
             },

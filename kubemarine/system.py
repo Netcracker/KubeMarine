@@ -23,7 +23,7 @@ import paramiko
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, apparmor, sysctl, modprobe
+from kubemarine import selinux, apparmor, sysctl, modprobe, zram
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -570,6 +570,15 @@ def verify_system(cluster: KubernetesCluster) -> None:
         verify_sysctl(group)
     else:
         log.debug('Kernel parameters verification skipped - origin setup task was not completed')
+
+    if cluster.is_task_completed('prepare.system.zram'):
+        log.debug("Verifying ZRAM...")
+        errors = zram.check_zram(group)
+        if errors:
+            raise Exception(f"ZRAM configuration is not applied correctly\n" + "\n".join(f"  - {e}" for e in errors))
+        log.debug("Required ZRAM configuration is applied correcty")
+    else:
+        log.debug('ZRAM verification skipped - origin setup task was not completed')
 
 
 def verify_sysctl(group: NodeGroup) -> None:

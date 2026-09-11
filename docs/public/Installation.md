@@ -46,6 +46,7 @@ This section provides information about the inventory, features, and steps for i
       - [CRI](#cri)
       - [modprobe](#modprobe)
       - [sysctl](#sysctl)
+      - [zram](#zram)
       - [audit](#audit)
         - [Kubernetes Policy](#audit-kubernetes-policy)
         - [Daemon](#audit-daemon)
@@ -2587,6 +2588,106 @@ The following settings are supported in the extended format:
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
+
+#### zram
+
+*Installation task*: `prepare.system.zram`
+
+*Can cause a reboot*: **Yes**
+
+*Can restart a service*: **No**
+
+*Overwrites files*: **Yes**
+
+*OS‑specific*: **No**
+
+The `services.zram` section allows you to declare mount points where ZRAM filesystem should be mounted (or un-mounted).
+
+**Warning**: Pay attention, the OS must provide `zram` module. On Ubuntu VMs you can install `zram` by installing following package:
+```yaml
+services:
+  packages:
+    install:
+    - linux-image-extra-virtual
+```
+
+Following is an example which mounts ZRAM for `/var/log/pods` on all k8s nodes, except `example-node`:
+
+```yaml
+services:
+  zram:
+  - state: present
+    path: /var/log/pods
+    size: 1024
+    groups: [control-plane, worker]
+  - state: absent
+    path: /var/log/pods
+    nodes: [example-node]
+```
+
+Each entry may contain the following keys:
+
+| Parameter               | Mandatory | Description |
+|------------------------|-----------|-------------|
+| **path**               | **yes**   | Target mount point on the node. |
+| **state**              | **yes**   | Mount point state (`present` or `absent`). |
+| **size**               | no        | Desired filesystem size in MiB (e.g. `1024`), applicable if `state` is `present`. Default is `1024`. Note that this is an integer. |
+| **groups**             | no        | List of node roles (e.g. `control-plane`, `worker`) to which the mount state should be applied. |
+| **nodes**              | no         | List of specific node names to which the mount state should be applied. |
+
+**Notes**
+* You may specify both `groups` and `nodes`; the resulting node set is the union of both selectors.
+* If neither `groups` nor `nodes` is provided, the mount is applied to `control-plane` and `worker` groups.
+* All nodes are gracefully drained/rebooted after the task execution.
+
+The `size` of the ZRAM volume must be selected according to the kubelet configuration. In case size is `1024`, the following values are recommended and they must be set in the `kubeadm_kubelet` section:
+```yaml
+services:
+  kubeadm_kubelet:
+    containerLogMaxSize: 5Mi
+    containerLogMaxFiles: 2
+    systemReserved:
+      memory: 1G
+```
+
+##### Applying on the existing environment
+
+Lets assume you want to mount 1G ZRAM volume under `/var/logs/pods` on your existing cluster running on Ubuntu OS VMs. In this case it is recommended to use following steps:
+1. Run [`reconfigure` maintenance procedure](/docs/public/Maintenance.md#reconfigure-procedure) with following example kubelet settings:
+    ```yaml
+    services:
+      kubeadm_kubelet:
+        containerLogMaxSize: 5Mi
+        containerLogMaxFiles: 2
+        systemReserved:
+          memory: 1G
+    ```
+2. Update `cluster.yaml` with following settings
+    ```yaml
+    services:
+      packages:
+        install:
+        - linux-image-extra-virtual
+
+      zram:
+      - state: present
+        path: /var/log/pods
+    ```
+3. Run `install` procedure with tasks `prepare.package_manager.manage_packages,prepare.system.modprobe,prepare.system.zram`. These tasks will install package with ZRAM, activate kernel ZRAM module and configure ZRAM mount.
+
+Note that all noes will be gracefully drained/rebooted multiple times during these tasks execution. 
+
+##### Disabling ZRAM on the existing environment
+
+If you want to disable ZRAM on existing environment, just change ZRAM mount `state` to `absent` and run `install` procedure task `prepare.system.zram`. This task will re-configure ZRAM on all nodes and gracefully drain/reboot all nodes. Following is an example `cluster.yaml` configuration with disabled ZRAM:
+```yaml
+services:
+  zram:
+  - state: absent
+    path: /var/log/pods
+```
+
+Note that if you just remove ZRAM items from `cluster.yaml`, KubeMarine will simply stop managing them, but not remove. To properly remove ZRAM mount you need to set `state` to `absent`.
 
 #### audit
 
