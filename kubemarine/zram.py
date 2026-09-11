@@ -102,23 +102,24 @@ def setup_zram(group: NodeGroup) -> bool:
     is_changed = False
     zram_list = cluster.inventory.get('services', {}).get('zram', [])
     for idx, zram_item in enumerate(zram_list):
-        group = cluster.create_group_from_groups_nodes_names(zram_item.get('groups') or [], zram_item.get('nodes') or [])
+        item_group = cluster.create_group_from_groups_nodes_names(zram_item.get('groups') or [], zram_item.get('nodes') or [])
+        item_group = item_group.intersection_group(group)
         unit_name = f'zram-setup-{zram_item["path"].strip("/").replace("/", "-")}.service'
         unit_destination = f'/etc/systemd/system/{unit_name}'
 
         if zram_item["state"] == "present":
-            logger.debug(f"Setting up zram for path {zram_item['path']} on {group.get_nodes_names()}")
+            logger.debug(f"Setting up zram for path {zram_item['path']} on {item_group.get_nodes_names()}")
             unit_content = _render_unit(zram_item)
-            group.put(io.StringIO(unit_content), unit_destination, sudo=True)
+            item_group.put(io.StringIO(unit_content), unit_destination, sudo=True)
             utils.dump_file(cluster, unit_content, f'zram/{idx}-{unit_name}')
-            logger.debug(group.sudo("systemctl daemon-reload"))
+            logger.debug(item_group.sudo("systemctl daemon-reload"))
             # do not enable immediately, since it may not work without reboot
-            logger.debug(group.sudo(f"systemctl enable {unit_name}"))
+            logger.debug(item_group.sudo(f"systemctl enable {unit_name}"))
         elif zram_item["state"] == "absent":
-            logger.debug(f"Removing zram for path {zram_item['path']} on {group.get_nodes_names()}")
-            logger.debug(group.sudo(f"systemctl disable {unit_name}", warn=True))
-            logger.debug(group.sudo(f"rm -f {unit_destination}"))
-            logger.debug(group.sudo("systemctl daemon-reload"))
+            logger.debug(f"Removing zram for path {zram_item['path']} on {item_group.get_nodes_names()}")
+            logger.debug(item_group.sudo(f"systemctl disable {unit_name}", warn=True))
+            logger.debug(item_group.sudo(f"rm -f {unit_destination}"))
+            logger.debug(item_group.sudo("systemctl daemon-reload"))
         is_changed = True
 
     return is_changed
