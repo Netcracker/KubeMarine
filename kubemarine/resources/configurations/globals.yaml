@@ -361,6 +361,7 @@ compatibility_map:
       - os_family: 'rhel10'
         versions:
           - '10.1'
+          - '10.2'
     ubuntu:
       - os_family: 'debian'
         versions:
