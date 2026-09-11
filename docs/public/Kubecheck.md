@@ -662,7 +662,7 @@ rules does not match, the test will fail.
 
 *Task*: `services.system.zram`
 
-This check validates that every **enabled** ZRAM mount defined in `services.zram` is correctly configured on all nodes.
+This check validates that every ZRAM mount defined in `services.zram` is correctly configured on all nodes.
 
 For each applicable entry the following conditions are verified:
 * If state is `present`, the mount point specified by `path` should appear in `zamctl` output.
