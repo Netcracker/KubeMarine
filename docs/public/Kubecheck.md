@@ -67,7 +67,7 @@ This section provides information about the Kubecheck functionality.
     - [215 Firewalld Status](#215-firewalld-status)
     - [216 Swap State](#216-swap-state)
     - [217 Modprobe Rules](#217-modprobe-rules)
-    - [236 Filesystem Mounts](#236-filesystem-mounts)
+    - [236 ZRAM Mounts](#236-zram-mounts)
     - [218 Time Difference](#218-time-difference)
     - [219 Health Status ETCD](#219-health-status-etcd)
     - [220 Control Plane Configuration Status](#220-control-plane-configuration-status)
