@@ -2675,6 +2675,8 @@ Lets assume you want to mount 1G ZRAM volume under `/var/logs/pods` on your exis
     ```
 3. Run `install` procedure with tasks `prepare.package_manager.manage_packages,prepare.system.modprobe,prepare.system.zram`. These tasks will install package with ZRAM, activate kernel ZRAM module and configure ZRAM mount.
 
+Note that all noes will be gracefully drained/rebooted multiple times during these tasks execution. 
+
 ##### Disabling ZRAM on the existing environment
 
 If you want to disable ZRAM on existing environment, just change ZRAM mount `state` to `absent` and run `install` procedure task `prepare.system.zram`. This task will re-configure ZRAM on all nodes and gracefully drain/reboot all nodes. Following is an example `cluster.yaml` configuration with disabled ZRAM:

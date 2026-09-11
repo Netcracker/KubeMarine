@@ -658,21 +658,18 @@ The test verifies that swap is disabled on all nodes in the cluster, otherwise t
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.
 
-##### 236 Filesystem Mounts
+##### 236 ZRAM Mounts
 
-*Task*: `services.system.fsmount.mounts`
+*Task*: `services.system.zram`
 
-This check validates that every **enabled** filesystem mount defined in ``services.fsmount`` is correctly configured on ``control‑plane`` and ``worker`` nodes. Entries with ``enabled: false`` are ignored.
+This check validates that every **enabled** ZRAM mount defined in `services.zram` is correctly configured on all nodes.
 
 For each applicable entry the following conditions are verified:
-
-* The mount point specified by ``path`` appears in ``/proc/mounts``.
-* If the ``type`` field is defined in the inventory, the filesystem type reported in ``/proc/mounts`` must match it. When ``type`` is omitted only the presence of the mount point is checked.
-* For ZRAM‑backed devices (i.e., the ``device`` value starts with ``/dev/zram``), the mount point must also be listed in the output of ``zramctl --output‑all``.
+* If state is `present`, the mount point specified by `path` should appear in `zamctl` output.
+* If state is `present`, the mount point specified by `path` should have correct size in `zamctl` output.
+* If state is `absent`, the mount point specified by `path` should NOT appear in `zamctl` output.
 
 If any validation fails, the test reports the affected node and mount path with a detailed error message.
-
-**Note**: Nodes that have no applicable ``services.fsmount`` entries are skipped silently.
 
 ##### 218 Time Difference
 
