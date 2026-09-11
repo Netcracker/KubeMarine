@@ -1143,6 +1143,11 @@ By default, the installer uses the following parameters:
 | controllerManager.extraArgs.profiling                   | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.terminated-pod-gc-threshold | `1000`                                                   |                                                                                        |
 | featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes versions 1.33, 1.34 and 1.35                                               |
+| etcd.local.extraArgs.auto-compaction-mode               | `periodic`                                               |
+| etcd.local.extraArgs.auto-compaction-retention          | `1h`                               |                     |
+| etcd.local.extraArgs.snapshot-count                     | `100000`                           |                     |
+| etcd.local.extraArgs.experimental-watch-progress-notify-interval | `5m`                           | Provided for Kubernetes versions up to v1.33 |
+| etcd.local.extraArgs.watch-progress-notify-interval              | `5m`                           | Provided for Kubernetes versions from v1.34  |
 
 The following is an example of kubeadm defaults override:
 
@@ -3251,6 +3256,34 @@ The lesser the priority value, the earlier in `Corefile` config this entry appea
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
 **Warning**: It is strongly discouraged to change the configuration of the CoreDNS manually, if you need to change the configuration, you must reflect them in the `cluster.yaml` and call the installation procedure with `--tasks="deploy.coredns"` argument. This will help keep the cluster configuration consistent.
+
+##### queries logs
+
+The incomming queries could be reflected in the logs. For instance, the cluster-1.local zone queries:
+
+```yaml
+services:
+  coredns:
+    configmap:
+      Corefile:
+        'cluster-1.local':
+          log: true
+```
+
+More information could be found in [coredns documention](https://coredns.io/plugins/log/)
+
+##### errors logs
+
+Error messages are managed by [errors plugin](https://coredns.io/plugins/errors/). By default it doesn't have any additional settings:
+
+```yaml
+services:
+  coredns:
+    configmap:
+      Corefile:
+        '.:53':
+          errors: True
+```
 
 ##### deployment
 
@@ -6409,10 +6442,10 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
-|          | envoyproxy/envoy                                      | distroless-v1.37.0 | distroless-v1.37.0    | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | distroless-v1.37.0 | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | envoyproxy/gateway                                    | v1.7.0             | v1.7.0                | v1.7.0             | v1.7.0             | v1.7.0             | v1.7.0             | v1.7.0             | v1.7.0             | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | envoyproxy/ratelimit                                  | 3fb70258           | 3fb70258              | 3fb70258           | 3fb70258           | 3fb70258           | 3fb70258           | 3fb70258           | 3fb70258           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | envoyproxy/envoy                                      | distroless-v1.38.1 | distroless-v1.38.1    | distroless-v1.38.1 | distroless-v1.38.1 | distroless-v1.38.1 | distroless-v1.38.1 | distroless-v1.38.1 | distroless-v1.38.1 | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | envoyproxy/gateway                                    | v1.8.1             | v1.8.1                | v1.8.1             | v1.8.1             | v1.8.1             | v1.8.1             | v1.8.1             | v1.8.1             | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | envoyproxy/ratelimit                                  | ff287602           | ff287602              | ff287602           | ff287602           | ff287602           | ff287602           | ff287602           | ff287602           | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |

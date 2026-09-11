@@ -13,7 +13,7 @@ compatibility_map:
   v1.33.0:
     calico: v3.30.3
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.31
     crictl: v1.33.0
@@ -22,7 +22,7 @@ compatibility_map:
   v1.33.6:
     calico: v3.31.2
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.33.0
@@ -31,7 +31,7 @@ compatibility_map:
   v1.34.1:
     calico: v3.30.3
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
@@ -40,7 +40,7 @@ compatibility_map:
   v1.34.2:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.34.0
@@ -49,7 +49,7 @@ compatibility_map:
   v1.35.0:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.35.0
@@ -58,7 +58,7 @@ compatibility_map:
   v1.36.0:
     calico: v3.32.0
     nginx-ingress-controller: v1.16.0
-    envoy-gateway: 2.2.0
+    envoy-gateway: 2.5.0
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.32
     crictl: v1.36.0
