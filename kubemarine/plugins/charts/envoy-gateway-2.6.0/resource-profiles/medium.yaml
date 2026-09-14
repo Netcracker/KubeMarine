@@ -1,0 +1,3 @@
+gateway-helm.deployment.envoyGateway.resources.limits.memory: 512Mi
+gateway-helm.deployment.envoyGateway.resources.requests.cpu: 200m
+gateway-helm.deployment.envoyGateway.resources.requests.memory: 512Mi

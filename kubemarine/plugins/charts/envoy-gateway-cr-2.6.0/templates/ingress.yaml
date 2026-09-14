@@ -1,0 +1,23 @@
+{{ if .Values.gatewayClasses.external.ingress.create }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.gatewayClasses.external.ingress.name }}
+  {{- with .Values.gatewayClasses.external.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ index .Values.gatewayClasses.external.ingress.annotations "kubernetes.io/ingress.class" }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.gatewayClasses.external.envoyService.name }}
+                port:
+                  number: {{ .Values.defaultGateways.external.httpPort }}
+{{ end }}
