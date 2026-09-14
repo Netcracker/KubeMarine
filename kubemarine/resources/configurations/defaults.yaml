@@ -802,7 +802,7 @@ plugins:
             method: apply_cr_chart
         - expect:
             daemonsets:
-              retries: 150
+              retries: 1200
               list:
               - name: 'envoy-external-gateway'
                 namespace: '{{ plugins["envoy-gateway"].namespace }}'

@@ -232,6 +232,30 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         helm_plugin_config["values"]["defaultGateways"]["external"]["httpsHostPort"] = \
             envoy_plugin["externalGateway"]["hostPorts"]["https"]
 
+    is_previous_version_2_5_0 = False
+    try:
+        cluster.log.debug(f"Trying to detect if previous CR version is 2.5.0")
+        cr_chart_meta = plugins.execute_subprocess_with_logging(
+            cluster, 
+            f'helm get metadata -n {envoy_plugin["namespace"]} {envoy_plugin["crReleaseName"]} -o yaml', 
+            capture_stdout=True
+        )
+        cluster.log.debug(cr_chart_meta)
+        is_previous_version_2_5_0 = yaml.safe_load(cr_chart_meta).get("version", "") == "2.5.0"
+    except Exception as e:
+        cluster.log.debug(f"Failed to check if chart version is 2.5.0: {e}")
+
     helm_plugin_config["values"] = default_merger.merge(helm_plugin_config["values"], envoy_plugin["crValuesOverride"])
     utils.dump_file(cluster.context, yaml.dump(helm_plugin_config["values"]), "envoy-cr-values.yaml", dump_location=True)
     plugins.apply_helm(cluster=cluster, config=helm_plugin_config)
+
+    # This special handling is needed for upgrade from 2.5.0 version, because pods in 2.5.0 terminate too long.
+    # We delete the daemonset and then manually delete pods with overrode small grace-period 
+    if is_previous_version_2_5_0 and chart_version != "2.5.0":
+        cluster.log.debug(f"Deleting 2.5.0 external gateway pods")
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        first_control_plane.sudo(f'kubectl delete daemonset -n {envoy_plugin["namespace"]} '
+                                 'envoy-external-gateway --now --cascade=orphan', warn=True)
+        first_control_plane.sudo(f'kubectl delete pod -n {envoy_plugin["namespace"]} '
+                                 '-l gateway.envoyproxy.io/owning-gateway-name=default-external-gateway ' \
+                                 '--grace-period=1 --wait=false', warn=True)
