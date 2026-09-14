@@ -17,7 +17,7 @@ import os
 import yaml
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine import plugins
+from kubemarine import kubernetes, plugins
 from kubemarine.core.yaml_merger import default_merger
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for envoy gateway plugin since it is not installed"
@@ -235,9 +235,11 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
     is_previous_version_2_5_0 = False
     try:
         cluster.log.debug(f"Trying to detect if previous CR version is 2.5.0")
+        local_config_path = kubernetes.fetch_admin_config(cluster)
         cr_chart_meta = plugins.execute_subprocess_with_logging(
             cluster, 
-            f'helm get metadata -n {envoy_plugin["namespace"]} {envoy_plugin["crReleaseName"]} -o yaml', 
+            f'helm --kubeconfig {local_config_path} get metadata ' 
+            f'-n {envoy_plugin["namespace"]} {envoy_plugin["crReleaseName"]} -o yaml', 
             capture_stdout=True
         )
         cluster.log.debug(cr_chart_meta)
