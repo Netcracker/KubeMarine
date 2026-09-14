@@ -33,6 +33,7 @@ import kubemarine.k8s_certs
 import kubemarine.keepalived
 import kubemarine.kubernetes
 import kubemarine.kubernetes_accounts
+import kubemarine.zram
 import kubemarine.modprobe
 import kubemarine.packages
 import kubemarine.plugins
@@ -484,6 +485,7 @@ class DynamicResources:
             kubemarine.audit.verify_inventory,
             kubemarine.system.verify_inventory,
             kubemarine.system.enrich_etc_hosts,
+            kubemarine.zram.enrich_inventory,
             kubemarine.modprobe.enrich_kernel_modules,
 
             # Calculate some differences between previous and new inventory

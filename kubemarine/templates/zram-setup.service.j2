@@ -1,0 +1,15 @@
+[Unit]
+Description=Create zram mount for path {{ path }}
+DefaultDependencies=no
+Before=local-fs.target
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecCondition=/bin/bash -c '! zramctl -o MOUNTPOINT --noheadings | grep -x {{ path }}' 
+ExecStart=/bin/bash -c 'mkdir -p {{ path }}; device=$(zramctl --find --size {{ size*1024*1024 }} --algorithm zstd); mkfs.ext4 -m 0 -O ^has_journal -F $device; mount $device {{ path }}'
+
+[Install]
+WantedBy=local-fs.target
