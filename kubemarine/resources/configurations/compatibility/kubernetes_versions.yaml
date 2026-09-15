@@ -8,6 +8,8 @@ kubernetes_versions:
     supported: true
   v1.36:
     supported: true
+  v1.37:
+    supported: true
 compatibility_map:
 # This section should be changed manually.
   v1.33.0:
@@ -63,6 +65,15 @@ compatibility_map:
     local-path-provisioner: v0.0.32
     crictl: v1.36.0
     openstack-cinder-csi: 2.35.0
+    csi-snapshot-controller: 8.5.0
+  v1.37.0:
+    calico: v3.32.2
+    nginx-ingress-controller: v1.16.0
+    envoy-gateway: 2.6.0
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.37
+    crictl: v1.37.0
+    openstack-cinder-csi: 2.36.2
     csi-snapshot-controller: 8.5.0
 # After any change, please run scripts/thirdparties/sync.py
 

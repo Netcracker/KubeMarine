@@ -664,6 +664,8 @@ def init_workers(group: NodeGroup) -> None:
     join_dict = cluster.context.get("join_dict", get_join_dict(group))
 
     join_config = components.get_init_config(cluster, group, init=False, join_dict=join_dict)
+    if components.kubernetes_minor_release_at_least(cluster.inventory, 'v1.37'):
+        join_config = components.convert_kubeadm_config(join_config, to_wire=True)
     config = yaml.dump(join_config)
 
     utils.dump_file(cluster, config, 'join-config-workers.yaml')

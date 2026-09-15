@@ -130,6 +130,37 @@ ALL_COMPONENTS = CONTROL_PLANE_SPECIFIC_COMPONENTS + NODE_COMPONENTS
 COMPONENTS_SUPPORT_PATCHES = CONTROL_PLANE_COMPONENTS + ['kubelet']
 
 
+def convert_kubeadm_config(config: dict, *, to_wire: bool) -> dict:
+    """Translate kubeadm arguments without mutating inventory or loaded objects.
+
+    Inventory retains mappings. Duplicate wire arguments cannot be represented by
+    that model, so reject them explicitly instead of silently losing settings.
+    """
+    config = utils.deepcopy_yaml(config)
+    if config.get('kind') not in ('ClusterConfiguration', 'InitConfiguration', 'JoinConfiguration'):
+        return config
+    config['apiVersion'] = 'kubeadm.k8s.io/v1beta4'
+    paths = [('apiServer', 'extraArgs'), ('scheduler', 'extraArgs'),
+             ('controllerManager', 'extraArgs'), ('etcd', 'local', 'extraArgs'),
+             ('nodeRegistration', 'kubeletExtraArgs')]
+    for path in paths:
+        parent = config
+        for key in path[:-1]:
+            parent = parent.get(key, {})
+        key = path[-1]
+        value = parent.get(key)
+        if to_wire and isinstance(value, dict):
+            parent[key] = [{'name': name, 'value': arg} for name, arg in value.items()]
+        elif not to_wire and isinstance(value, list):
+            args = {}
+            for arg in value:
+                if arg['name'] in args:
+                    raise ValueError(f"Duplicate kubeadm argument {arg['name']!r} in {'.'.join(path)}")
+                args[arg['name']] = arg['value']
+            parent[key] = args
+    return config
+
+
 class KubeadmConfig:
     def __init__(self, cluster: KubernetesCluster):
         self.cluster = cluster
@@ -159,10 +190,18 @@ class KubeadmConfig:
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
+        use_v1beta4 = kubernetes_minor_release_at_least(self.cluster.inventory, 'v1.37')
+        if use_v1beta4:
+            config = convert_kubeadm_config(config, to_wire=False)
 
         if edit_func is not None:
             config = edit_func(config)
-            configmap_obj.obj["data"][key] = yaml.dump(config)
+            wire_config = convert_kubeadm_config(config, to_wire=True) if use_v1beta4 else config
+            # This timeout belongs to Init/JoinConfiguration in v1beta4,
+            # not to the cluster-wide ConfigMap. to_yaml transfers it there.
+            if use_v1beta4 and wire_config.get('kind') == 'ClusterConfiguration':
+                wire_config.get('apiServer', {}).pop('timeoutForControlPlane', None)
+            configmap_obj.obj["data"][key] = yaml.dump(wire_config)
 
         self.maps[configmap] = config
         return config
@@ -181,7 +220,19 @@ class KubeadmConfig:
         self.loaded_maps[configmap].apply(control_plane)
 
     def to_yaml(self, init_config: dict) -> str:
-        configs = list(self.maps.values())
+        if kubernetes_minor_release_less_than(self.cluster.inventory, 'v1.37'):
+            return yaml.dump_all(list(self.maps.values()) + [init_config])
+
+        configs = [convert_kubeadm_config(config, to_wire=True) for config in self.maps.values()]
+        init_config = convert_kubeadm_config(init_config, to_wire=True)
+        for config in configs:
+            if config.get('kind') == 'ClusterConfiguration':
+                timeout = config.get('apiServer', {}).pop('timeoutForControlPlane', None)
+                if timeout is not None:
+                    init_config.setdefault('timeouts', {})['controlPlaneComponentHealthCheck'] = timeout
+        timeout = init_config.get('discovery', {}).pop('timeout', None)
+        if timeout is not None:
+            init_config.setdefault('timeouts', {})['discovery'] = timeout
         configs.append(init_config)
         return yaml.dump_all(configs)
 
