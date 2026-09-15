@@ -39,6 +39,14 @@ def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
 
+    # Persist a configuration readable by the new kubeadm before replacing
+    # binaries. Preserve the running cluster version and all custom settings.
+    if components.kubernetes_minor_release_at_least(cluster.inventory, 'v1.37'):
+        control_plane = cluster.nodes['control-plane'].get_first_member()
+        config = components.KubeadmConfig(cluster)
+        config.load('kubeadm-config', control_plane, lambda value: value)
+        config.apply('kubeadm-config', control_plane)
+
     # We exclude kubelet from global cross-nodes thirdparties upgrade, 
     # because kubelet upgrade may be disruptive for running nodes.
     # We upgrade kubelet per-node later, after draining the node.

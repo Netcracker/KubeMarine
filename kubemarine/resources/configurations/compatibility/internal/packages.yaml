@@ -23,6 +23,9 @@ containerd:
   v1.36.0:
     version_debian: 2.2.*
     version_ubuntu26.04: 2.2.*
+  v1.37.0:
+    version_debian: 2.2.*
+    version_ubuntu26.04: 2.2.*
 containerdio:
   v1.33.0:
     version_rhel8: 1.6*
@@ -45,6 +48,10 @@ containerdio:
     version_rhel9: 1.7*
     version_rhel10: 1.7*
   v1.36.0:
+    version_rhel8: 1.6*
+    version_rhel9: 1.7*
+    version_rhel10: 1.7*
+  v1.37.0:
     version_rhel8: 1.6*
     version_rhel9: 1.7*
     version_rhel10: 1.7*

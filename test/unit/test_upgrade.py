@@ -42,6 +42,26 @@ def get_plugin_versions(plugin: str) -> List[str]:
                             for v in get_kubernetes_versions()]))
 
 
+class KubeadmAPIMigrationTest(unittest.TestCase):
+    def test_migration_precedes_binary_replacement(self):
+        for version, expected in [('v1.36.0', False), ('v1.37.0', True)]:
+            with self.subTest(version=version):
+                cluster = mock.Mock()
+                cluster.nodes = {'control-plane': mock.Mock()}
+                cluster.inventory = {'services': {'thirdparties': {'kubeadm': {}},
+                                                  'kubeadm': {'kubernetesVersion': version}}}
+                events = []
+                cluster.make_group_from_roles.return_value.call.side_effect = \
+                    lambda *a, events=events, **kw: events.append('install')
+                with mock.patch.object(components, 'KubeadmConfig') as config:
+                    config.return_value.apply.side_effect = lambda *a, events=events: events.append('apply')
+                    upgrade.system_prepare_thirdparties(cluster)
+                    self.assertEqual(['apply', 'install'] if expected else ['install'], events)
+                    if expected:
+                        old = {'kubernetesVersion': 'v1.36.0', 'custom': 'preserve'}
+                        self.assertEqual(old, config.return_value.load.call_args.args[2](deepcopy(old)))
+
+
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
     logger: log.EnhancedLogger = None
 
