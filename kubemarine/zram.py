@@ -31,9 +31,12 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     for item in zram_list:
         if "size" not in item:
             item["size"] = 1024
-        if "groups" not in item and "nodes" not in item:
-            item["groups"] = ["control-plane", "worker"]
+        if "groups" not in item:
+            item["groups"] = []
+        if "nodes" not in item:
             item["nodes"] = []
+        if not item["groups"] and not item["nodes"]:
+            item["groups"] = ["control-plane", "worker"]
 
         group = cluster.create_group_from_groups_nodes_names(item.get('groups') or [], item.get('nodes') or [])
         if item["state"] == "present":
