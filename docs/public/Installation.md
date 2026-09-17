@@ -2675,7 +2675,30 @@ Lets assume you want to mount 1G ZRAM volume under `/var/logs/pods` on your exis
     ```
 3. Run `install` procedure with tasks `prepare.package_manager.manage_packages,prepare.system.modprobe,prepare.system.zram`. These tasks will install package with ZRAM, activate kernel ZRAM module and configure ZRAM mount.
 
-Note that all noes will be gracefully drained/rebooted multiple times during these tasks execution. 
+Note that all nodes will be gracefully drained/rebooted multiple times during these tasks execution. 
+
+##### Changing ZRAM size on the existing environment
+
+Lets assume you want to change existing 1G ZRAM mount size to 2G. In this case it is recommended to use following steps:
+1. Run [`reconfigure` maintenance procedure](/docs/public/Maintenance.md#reconfigure-procedure) with new appropriate kubelet settings:
+    ```yaml
+    services:
+      kubeadm_kubelet:
+        containerLogMaxSize: 5Mi
+        containerLogMaxFiles: 2
+        systemReserved:
+          memory: 2G # Note that reserved size should be increased accordingly
+    ```
+2. Update `cluster.yaml` with new required ZRAM size
+    ```yaml
+      zram:
+      - state: present
+        path: /var/log/pods
+        size: 2048
+    ```
+3. Run `install` procedure with task `prepare.system.zram`.
+
+Note that all nodes will be gracefully drained/rebooted after this task execution. 
 
 ##### Disabling ZRAM on the existing environment
 
