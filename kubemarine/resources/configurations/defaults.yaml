@@ -139,6 +139,9 @@ services:
 
   cri:
     containerRuntime: containerd
+    containerdLimitNOFILE:
+      soft: 131072
+      hard: 524288
     containerdConfig:
       version: 2
       plugins."io.containerd.grpc.v1.cri": {}
