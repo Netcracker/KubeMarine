@@ -48,10 +48,13 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         containerd_config.setdefault('plugins."io.containerd.grpc.v1.cri".registry', {})\
             .setdefault('config_path', '/etc/containerd/certs.d')
 
-    limitNOFILE = cluster.inventory["services"]["cri"]["containerdLimitNOFILE"]
-    if limitNOFILE["soft"] > limitNOFILE["hard"]:
+    limits = cluster.inventory["services"]["cri"]["containerdLimitNOFILE"]
+    if limits["soft"] <= 0:
         raise errors.FailException(f"Invalid containerd configuration: services.cri.containerdLimitNOFILE "
-                                   f"soft={limitNOFILE['soft']} can not be larger than hard={limitNOFILE['hard']}")
+                                   f"limits can not be zero or negative, but got soft={limits['soft']} hard={limits['hard']}")
+    if limits["soft"] > limits["hard"]:
+        raise errors.FailException(f"Invalid containerd configuration: services.cri.containerdLimitNOFILE "
+                                   f"soft={limits['soft']} can not be larger than hard={limits['hard']}")
 
 def contains_old_format_properties(inventory: dict) -> Tuple[bool, Optional[str]]:
     config_toml = get_config_as_toml(inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))

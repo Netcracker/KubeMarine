@@ -2230,6 +2230,9 @@ The `services.cri` section configures container runtime used for kubernetes. By 
 services:
   cri:
     containerRuntime: containerd
+    containerdLimitNOFILE:
+      soft: 131072
+      hard: 524288
     containerdConfig:
       version: 2
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
@@ -2373,6 +2376,20 @@ services:
 **Note**: `crictl` binary is also installed and configured as required.
 
 **Note**: After applying the parameters, containerd is restarted on all nodes in the cluster.
+
+##### Configuring containerd LimitNOFILE
+
+KubeMarine applies containerd service drop-in configuration to override LimitNOFILE value.
+You can configure this value using `cluster.yaml`, following is default configuration:
+```yaml
+services:
+  cri:
+    containerdLimitNOFILE:
+      soft: 131072
+      hard: 524288
+```
+
+Soft limit should not be less than hard, both limits can not be negative.
 
 #### modprobe
 
