@@ -22,7 +22,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import (
     system, sysctl, haproxy, keepalived, kubernetes, plugins,
-    kubernetes_accounts, selinux, thirdparties, audit, coredns, cri, packages, apparmor, modprobe
+    kubernetes_accounts, selinux, thirdparties, audit, coredns, cri, packages, apparmor, modprobe, zram
 )
 from kubemarine.core import flow, utils, summary
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
@@ -139,6 +139,14 @@ def system_prepare_system_sysctl(group: NodeGroup) -> None:
     if is_updated:
         group.call(system.verify_sysctl)
 
+
+@_applicable_for_new_nodes_with_roles('all')
+def system_prepare_system_zram(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    if not cluster.inventory.get('services', {}).get('zram'):
+        cluster.log.debug("Skipped - no zram items defined in config file")
+        return
+    system.configure_sensitive_service(group, zram.setup_zram)
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
@@ -535,6 +543,7 @@ tasks = OrderedDict({
             "disable_swap": system_prepare_system_disable_swap,
             "modprobe": system_prepare_system_modprobe,
             "sysctl": system_prepare_system_sysctl,
+            "zram": system_prepare_system_zram,
             "audit": {
                 "install": system_install_audit,
                 "configure": system_prepare_audit,
