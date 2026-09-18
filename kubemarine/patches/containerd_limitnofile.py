@@ -1,7 +1,6 @@
 from textwrap import dedent
 
 from kubemarine.core.action import Action
-from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
