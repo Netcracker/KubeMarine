@@ -2391,6 +2391,8 @@ services:
 
 Soft limit should not be less than hard, both limits can not be negative.
 
+If you want to change values on existing environment, change them in `cluster.yaml` and run `install` procedure with task `prepare.cri.configure`. Note that changes propagate to pods only after pod re-creation (or node reboot).
+
 #### modprobe
 
 *Installation task*: `prepare.system.modprobe`
