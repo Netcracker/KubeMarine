@@ -42,6 +42,7 @@ local_backup = "/etc/kubemarine/backup.tar.gz"
 def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     haproxy_service = cluster.get_package_association('haproxy', 'service_name')
     keepalived_service = cluster.get_package_association('keepalived', 'service_name')
+    containerd_service = cluster.get_package_association('containerd', 'service_name')
 
     backup_files_list = [
         "/etc/resolv.conf",
@@ -58,6 +59,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
         f"/etc/systemd/system/{haproxy_service}.service.d/{haproxy_service}.conf",
         "/etc/keepalived/keepalived.conf",
         f"/etc/systemd/system/{keepalived_service}.service.d/{keepalived_service}.conf",
+        f"/etc/systemd/system/{containerd_service}.service.d/kubemarine-overrides.conf",
         "/usr/local/bin/check_haproxy.sh",
         "/etc/kubernetes",
         "/root/.kube/config",
