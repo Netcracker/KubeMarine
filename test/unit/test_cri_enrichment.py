@@ -74,7 +74,7 @@ class TestContainerdCriEnrichment(unittest.TestCase):
                                              'but got soft=-1 hard=524288')
 
 
-    def test_fail_if_limitnofile_hard_less_than_hard(self):
+    def test_fail_if_limitnofile_soft_less_than_hard(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services']['cri'] = {
             'containerdLimitNOFILE': {
@@ -87,7 +87,6 @@ class TestContainerdCriEnrichment(unittest.TestCase):
                                              'soft=100 can not be larger than hard=1')
 
     def test_fail_if_limitnofile_soft_less_than_hard(self):
-        # Fail, if registry.mirror and config_path are configured
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services']['cri'] = {
             'containerdLimitNOFILE': {
