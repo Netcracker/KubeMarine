@@ -2377,10 +2377,10 @@ services:
 
 **Note**: After applying the parameters, containerd is restarted on all nodes in the cluster.
 
-##### Configuring containerd LimitNOFILE
+##### Configuring containerd **LimitNOFILE**
 
-KubeMarine applies containerd service drop-in configuration to override LimitNOFILE value.
-You can configure this value using `cluster.yaml`, following is default configuration:
+KubeMarine creates a systemd drop‑in for the **containerd** service to set the `LimitNOFILE` limits.
+These limits can be defined in `cluster.yaml`. The default configuration is:
 ```yaml
 services:
   cri:
@@ -2389,9 +2389,12 @@ services:
       hard: 524288
 ```
 
-Soft limit should not be greater than hard, both limits can not be negative.
+* The **soft** limit must not exceed the **hard** limit.
+* Both limits must be non‑negative integers.
 
-If you want to change values on existing environment, change them in `cluster.yaml` and run `install` procedure with task `prepare.cri.configure`. Note that changes propagate to pods only after pod re-creation (or node reboot).
+To adjust the limits on an existing installation, modify the `containerdLimitNOFILE` values in `cluster.yaml` and re‑run the installation using the `prepare.cri.configure` task. 
+
+**Note**: The new limits become effective for newly created pods; existing pods will see the change only after they are recreated or after a node reboot.
 
 #### modprobe
 
