@@ -9,7 +9,7 @@
       "description": "A particular container runtime implementation used for Kubernetes"
     },
     "containerdLimitNOFILE": {
-      "$ref": "#/definitions/ContainerdConfig"
+      "$ref": "#/definitions/ContainerdLimitNOFILE"
     },
     "containerdConfig": {
       "$ref": "#/definitions/ContainerdConfig"
