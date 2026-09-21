@@ -2394,7 +2394,7 @@ services:
 
 To adjust the limits on an existing installation, modify the `containerdLimitNOFILE` values in `cluster.yaml` and re‑run the installation using the `prepare.cri.configure` task. 
 
-**Note**: The new limits become effective for newly created pods; existing pods will see the change only after they are recreated or after a node reboot.
+**Note**: The new limits become effective for newly created pods; existing pods will be updated with changes only after they are recreated or after a node reboot.
 
 #### modprobe
 
