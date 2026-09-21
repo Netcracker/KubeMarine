@@ -8,6 +8,9 @@
       "default": "containerd",
       "description": "A particular container runtime implementation used for Kubernetes"
     },
+    "containerdLimitNOFILE": {
+      "$ref": "#/definitions/ContainerdLimitNOFILE"
+    },
     "containerdConfig": {
       "$ref": "#/definitions/ContainerdConfig"
     },
@@ -17,6 +20,19 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "ContainerdLimitNOFILE": {
+      "type": "object",
+      "description": "Containerd systemd service LimitNOFILE soft/hard values",
+      "properties": {
+        "soft": {
+          "type": "integer"
+        },
+        "hard": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
     "ContainerdConfig": {
       "type": "object",
       "description": "Parameters for containerd passed to config.toml",

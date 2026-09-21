@@ -51,6 +51,41 @@ class TestContainerdCriEnrichment(unittest.TestCase):
                                              'config_path for "io.containerd.grpc.v1.cri" plugin '
                                              'in services.cri.containerdConfig is provided')
 
+    def test_fail_if_limitnofile_soft_is_zero(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['cri'] = {
+            'containerdLimitNOFILE': {
+                'soft': 0,
+            }
+        }
+        self.do_failed_enrichment(inventory, 'Invalid containerd configuration: ' \
+                                             'services.cri.containerdLimitNOFILE limits can not be zero or negative, ' \
+                                             'but got soft=0 hard=524288')
+
+    def test_fail_if_limitnofile_soft_less_than_zero(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['cri'] = {
+            'containerdLimitNOFILE': {
+                'soft': -1,
+            }
+        }
+        self.do_failed_enrichment(inventory, 'Invalid containerd configuration: ' \
+                                             'services.cri.containerdLimitNOFILE limits can not be zero or negative, ' \
+                                             'but got soft=-1 hard=524288')
+
+
+    def test_fail_if_limitnofile_soft_less_than_hard(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['cri'] = {
+            'containerdLimitNOFILE': {
+                'soft': 100,
+                'hard': 1,
+            }
+        }
+        self.do_failed_enrichment(inventory, 'Invalid containerd configuration: ' \
+                                             'services.cri.containerdLimitNOFILE ' \
+                                             'soft=100 can not be larger than hard=1')
+
     def test_fail_if_registry_configs_tls_and_config_path_are_used(self):
         # Fail, if registry.configs.tls and config_path are configured
         inventory = demo.generate_inventory(**demo.ALLINONE)

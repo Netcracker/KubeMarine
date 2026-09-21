@@ -48,6 +48,13 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         containerd_config.setdefault('plugins."io.containerd.grpc.v1.cri".registry', {})\
             .setdefault('config_path', '/etc/containerd/certs.d')
 
+    limits = cluster.inventory["services"]["cri"]["containerdLimitNOFILE"]
+    if limits["soft"] <= 0:
+        raise errors.FailException(f"Invalid containerd configuration: services.cri.containerdLimitNOFILE "
+                                   f"limits can not be zero or negative, but got soft={limits['soft']} hard={limits['hard']}")
+    if limits["soft"] > limits["hard"]:
+        raise errors.FailException(f"Invalid containerd configuration: services.cri.containerdLimitNOFILE "
+                                   f"soft={limits['soft']} can not be larger than hard={limits['hard']}")
 
 def contains_old_format_properties(inventory: dict) -> Tuple[bool, Optional[str]]:
     config_toml = get_config_as_toml(inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
@@ -309,9 +316,31 @@ def configure_containerd(group: NodeGroup, wait_restart: bool = False) -> Runner
     return collector.result
 
 
+def configure_containerd_service_dropin(group: NodeGroup) -> None:
+    cluster = group.cluster
+    log = cluster.log
+    limitNOFILE = cluster.inventory["services"]["cri"]["containerdLimitNOFILE"]
+    serviceConfig = f"""
+[Service]
+LimitNOFILE={limitNOFILE["soft"]}:{limitNOFILE["hard"]}
+"""
+
+    utils.dump_file(cluster, serviceConfig, 'containerd-service-kubemarine-overrides.conf')
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            log.debug("Uploading containerd service drop-in to %s node..." % node.get_node_name())
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
+            drop_in_path = f"/etc/systemd/system/{os_specific_associations['service_name']}.service.d/kubemarine-overrides.conf"
+            node.put(StringIO(serviceConfig), drop_in_path, sudo=True, mkdir=True)
+            # we only daemon-reload, but we assume service will be also restarted by the end of configure task
+            node.sudo(f"systemctl daemon-reload", callback=collector)
+
+
 def configure(group: NodeGroup) -> RunnersGroupResult:
     configure_crictl(group)
     configure_ctr_flags(group)
+    configure_containerd_service_dropin(group)
     return configure_containerd(group)
 
 
