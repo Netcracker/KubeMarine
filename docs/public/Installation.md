@@ -220,6 +220,7 @@ The actual information about the supported versions can be found in `compatibili
     Search for address at `services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * TCP & UDP traffic is allowed for service subnet between the nodes inside the cluster.
     Search for address at `services.kubeadm.networking.serviceSubnet`. By default, `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6.
+* It is recommended that DNS for cluster nodes is configured over DHCP. For more information see [`resolv.conf` section](#resolvconf).
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
@@ -3051,6 +3052,8 @@ If the configuration `services.ntp.timesyncd.servers` is absent, then the task` 
 
 *OS specific*: No
 
+**Note:** It is recommended that DNS is configured on cluster nodes using DHCP. If DHCP provides appropriate DNS configuration for your nodes, you should not configure `resolv.conf` section in KubeMarine. Only configure `resolv.conf` using KubeMarine if DHCP approach does not work on your infrastructure for some reason, also see [kubelet `resolvConf` configuration](#kubelet-resolvconf-configuration) to avoid warning like DNSConfigForming. If you want to disable KubeMarine existing `resolv.conf` configuration, see `reconfigure` procedure [disable resolv.conf](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management) section.
+
 The `services.resolv.conf` section allows you to configure the nameserver addresses to which cluster systems has access. By default, this section is empty in the inventory. The following parameters are supported:
 
 |Name|Type|Description|
@@ -3074,6 +3077,26 @@ services:
       - 2606:4700:4700::1111
       - 2606:4700:4700::1001
 ```
+
+##### kubelet `resolvConf` configuration
+
+If you configure `resolv.conf` in KubeMarine, you can face pod warning events like following
+```
+Warning  DNSConfigForming  23s (x5 over 5m34s)  kubelet            Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: ...
+```
+
+This could happen because systemd-resolved merges static DNS configuration provided via `/etc/resolv.conf` with DNS configuration provided over DHCP, which results in too much DNS nameservers. To suppress these warnings it is recommended to configure kubelet `resolvConf` option to explicitly use `/etc/resolv.conf` path.
+
+**Note:** Only override kubelet `resolvConf` option to `/etc/resolv.conf` path if you have `/etc/resolv.conf` statically configured. DO NOT do it if `/etc/resolv.conf` is managed by systemd-resolved, since it could contain stub-resolver which may not work inside pods.
+
+To configure kubelet `resolvConf` you can use following `cluster.yaml` configuration:
+```yaml
+services:
+  kubeadm_kubelet:
+    resolvConf: /etc/resolv.conf
+```
+
+See [`kubeadm_kubelet` section](#kubeadm_kubelet) for more information about this configuration section. On existing environment you can reconfigure this option using [`reconfigure` procedure](/docs/public/Maintenance.md#reconfigure-kubeadm) with similar configuration.
 
 #### etc_hosts
 

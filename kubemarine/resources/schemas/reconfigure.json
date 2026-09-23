@@ -6,6 +6,11 @@
       "type": "object",
       "description": "Configure settings of different services",
       "properties": {
+        "resolv.conf": {
+          "type": "object",
+          "description": "Allows to disable resolv.conf management",
+          "additionalProperties": false
+        },
         "kubeadm_kubelet": {
           "type": "object",
           "description": "Override the original settings for the kubelet",
@@ -100,6 +105,7 @@
     "KubeletReconfigureSupported": {
       "type": "object",
       "properties": {
+        "resolvConf": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ResolvConf"},
         "protectKernelDefaults": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ProtectKernelDefaults"},
         "systemReserved": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ReservedResources"},
         "kubeReserved": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ReservedResources"},

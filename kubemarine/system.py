@@ -24,7 +24,7 @@ from dateutil.parser import parse
 from ordered_set import OrderedSet
 
 from kubemarine import selinux, apparmor, sysctl, modprobe, zram
-from kubemarine.core import utils, static
+from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
 from kubemarine.core.group import (
@@ -74,6 +74,17 @@ def enrich_etc_hosts(cluster: KubernetesCluster) -> None:
             external_node_ip_names = list(OrderedSet(external_node_ip_names))
             inventory['services']['etc_hosts_generated'][node['address']] = external_node_ip_names
 
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['reconfigure'])
+def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
+    resolv_conf = cluster.procedure_inventory.get('services', {}).get('resolv.conf', None)
+    if resolv_conf is None:
+        return
+
+    if resolv_conf != {}:
+        raise errors.FailException("resolv.conf should be empty in reconfigure inventory")
+
+    if "resolv.conf" in cluster.inventory.get("services", {}):
+        del cluster.inventory["services"]["resolv.conf"]
 
 @enrichment(EnrichmentStage.LIGHT)
 def detect_nodes_context(cluster: KubernetesCluster) -> None:
@@ -181,6 +192,16 @@ def get_resolv_conf_buffer(config: dict) -> io.StringIO:
         for address in config["nameservers"]:
             buffer.write("nameserver %s\n" % address)
     return buffer
+
+
+def reset_resolv_conf(group: NodeGroup) -> None:
+    group.cluster.log.debug(f"Removing immutable attribute from /etc/resolv.conf and restoring original content on nodes: "
+                            f"{group.get_nodes_names()}")
+    group.run('[[ -L "/etc/resolv.conf" ]] || sudo chattr -i /etc/resolv.conf')
+    group.sudo("systemctl restart NetworkManager "
+                "|| (sudo systemctl status systemd-resolved "
+                "&& sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf "
+                "&& sudo systemctl restart systemd-resolved)")
 
 
 def generate_etc_hosts_config(inventory: dict, etc_hosts_part: str = 'etc_hosts_generated') -> str:
