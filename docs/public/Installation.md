@@ -3052,7 +3052,7 @@ If the configuration `services.ntp.timesyncd.servers` is absent, then the task` 
 
 *OS specific*: No
 
-**Note:** It is recommended that DNS is configured on cluster nodes using DHCP. If DHCP provides appropriate DNS configuration for your nodes, you should not configure `resolv.conf` section in KubeMarine. Only configure `resolv.conf` using KubeMarine if DHCP approach does not work on your infrastructure for some reason, also see [kubelet `resolvConf` configuration](#kubelet-resolvconf-configuration) to avoid warning like DNSConfigForming. If you want to disable KubeMarine existing `resolv.conf` configuration, see `reconfigure` procedure [disable resolv.conf](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management) section.
+**Note:** It is recommended to configure DNS on cluster nodes via **DHCP**. When DHCP supplies suitable DNS settings for your nodes, you should **not** manage the `resolv.conf` section with Kubemarine. Use Kubemarine to configure `resolv.conf` **only** if the DHCP approach is unsuitable for your environment. In such cases, also refer to the [kubelet `resolvConf` configuration](#kubelet-resolvconf-configuration) to suppress warnings like **DNSConfigForming**. If you wish to disable Kubemarine's management of `resolv.conf`, see the **reconfigure** procedure – [Disable resolv.conf management](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management).
 
 The `services.resolv.conf` section allows you to configure the nameserver addresses to which cluster systems has access. By default, this section is empty in the inventory. The following parameters are supported:
 
