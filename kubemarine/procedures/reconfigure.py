@@ -21,6 +21,14 @@ from kubemarine import kubernetes, sysctl, system
 from kubemarine.core import flow
 from kubemarine.core.cluster import KubernetesCluster
 
+def system_prepare_dns_resolv_conf(cluster: KubernetesCluster) -> None:
+    removal_detected = cluster.previous_inventory.get('services', {}).get('resolv.conf', {}) != \
+        cluster.inventory.get('services', {}).get('resolv.conf', {})
+    if removal_detected:
+        cluster.log.debug(f"Detected changes in resolv.conf configuration")
+        system.reset_resolv_conf(cluster.nodes['all'])
+    else:
+        cluster.log.debug("No resolv.conf changes detected, skipping.")
 
 def system_prepare_system_sysctl(cluster: KubernetesCluster) -> None:
     group = cluster.nodes['all']
@@ -87,6 +95,9 @@ tasks = OrderedDict({
         "system": {
             "sysctl": system_prepare_system_sysctl,
         },
+        "dns": {
+            "resolv_conf": system_prepare_dns_resolv_conf,
+        }
     },
     "deploy": {
         "kubernetes": {

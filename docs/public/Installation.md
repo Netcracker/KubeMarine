@@ -220,6 +220,7 @@ The actual information about the supported versions can be found in `compatibili
     Search for address at `services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * TCP & UDP traffic is allowed for service subnet between the nodes inside the cluster.
     Search for address at `services.kubeadm.networking.serviceSubnet`. By default, `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6.
+* It is recommended that DNS for cluster nodes is configured over DHCP. For more information see [`resolv.conf` section](#resolvconf).
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
@@ -3051,16 +3052,17 @@ If the configuration `services.ntp.timesyncd.servers` is absent, then the task` 
 
 *OS specific*: No
 
-The `services.resolv.conf` section allows you to configure the nameserver addresses to which cluster systems has access. By default, this section is empty in the inventory. The following parameters are supported:
+**Note:** It is recommended to configure DNS on cluster nodes via **DHCP**. When DHCP provides suitable DNS settings, you should **not** manage the `resolv.conf` section with Kubemarine. Use Kubemarine to configure `resolv.conf` **only** if the DHCP approach is unsuitable for your environment. In such cases, also refer to the kubelet `resolvConf` configuration to suppress warnings such as **DNSConfigForming**. If you wish to disable Kubemarine's management of `resolv.conf`, see the reconfigure procedure – [Disable resolv.conf management](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management).
+The ``services.resolv.conf`` section allows you to configure the nameserver addresses that cluster systems have access to. By default, this section is empty in the inventory. The following parameters are supported:
 
-|Name|Type|Description|
+| Name | Type | Description |
 |---|---|---|
-|search|string|The domain name to search|
-|nameservers|list|The DNS servers for usage in the OS|
+| search | string | The domain name to search |
+| nameservers | list | The DNS servers used by the operating system |
 
-**Note**: 
-* If some network resources are located in a restricted network and are not resolved through the standard DNS, be sure to configure this section and specify your custom DNS service.
-* Do not put ${cluster_name} in the `search` field, otherwise some microservices might work incorrectly.
+**Note:**
+* If some network resources reside in a restricted network and are not reachable through the standard DNS, configure this section with your custom DNS service.
+* Do not include `${cluster_name}` in the `search` field, as this may cause certain microservices to behave incorrectly.
 
 For example:
 
@@ -3074,6 +3076,26 @@ services:
       - 2606:4700:4700::1111
       - 2606:4700:4700::1001
 ```
+
+##### kubelet `resolvConf` configuration
+
+If you configure ``resolv.conf`` through Kubemarine, you may encounter pod warning events such as the following:
+```
+Warning  DNSConfigForming  23s (x5 over 5m34s)  kubelet            Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: ...
+```
+
+This occurs because **systemd‑resolved** merges the static DNS configuration from ``/etc/resolv.conf`` with the DNS settings obtained via DHCP, resulting in an excessive number of nameserver entries. To suppress these warnings, configure the kubelet ``resolvConf`` option to use the explicit path ``/etc/resolv.conf``.
+
+**Note:** Override the kubelet ``resolvConf`` option only when ``/etc/resolv.conf`` is statically configured. Do **not** set it if ``/etc/resolv.conf`` is managed by ``systemd‑resolved``, as it may contain a stub resolver that does not function correctly inside pods.
+
+To set the kubelet ``resolvConf`` parameter, add the following to your ``cluster.yaml``:
+```yaml
+services:
+  kubeadm_kubelet:
+    resolvConf: /etc/resolv.conf
+```
+
+For more details, see the [`kubeadm_kubelet`](#kubeadm_kubelet) section. In an existing cluster, you can update this option using the [reconfigure procedure](/docs/public/Maintenance.md#reconfigure-kubeadm) with a similar configuration.
 
 #### etc_hosts
 

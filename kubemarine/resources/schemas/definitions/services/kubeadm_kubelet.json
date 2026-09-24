@@ -7,6 +7,7 @@
     "enableDebuggingHandlers": {"type": "boolean", "default": true},
     "protectKernelDefaults": {"$ref": "#/definitions/ProtectKernelDefaults"},
     "podPidsLimit": {"$ref": "#/definitions/PodPidsLimit"},
+    "resolvConf": {"$ref": "#/definitions/ResolvConf"},
     "cgroupDriver": {"type": "string", "default": "systemd"},
     "maxPods": {"$ref": "#/definitions/MaxPods"},
     "serializeImagePulls": {"$ref": "#/definitions/SerializeImagePulls"},
@@ -30,6 +31,7 @@
         }
       }
     },
+    "ResolvConf": {"type": "string"},
     "ProtectKernelDefaults": {"type": "boolean", "default": true},
     "PodPidsLimit": {"type": "integer", "default": 4096},
     "MaxPods": {"type": "integer", "default": 110},
