@@ -913,7 +913,7 @@ plugins:
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
     image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
-    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["busybox-version"] }}'
+    helper-pod-image: 'library/alpine:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["alpine-version"] }}'
     # resources values are based on https://github.com/rancher/local-path-provisioner/blob/v0.0.24/deploy/chart/local-path-provisioner/values.yaml#L69
     resources:
       requests:

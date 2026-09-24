@@ -65,7 +65,7 @@ class KubernetesVersions:
         mandatory_fields = set(static.GLOBALS['plugins'])
         mandatory_fields.update(['crictl'])
         optional_fields = {
-            'webhook', 'metrics-scraper', 'busybox',
+            'webhook', 'metrics-scraper', 'alpine',
             # To support custom pause image, it is necessary to implement software upgrade patch.
             # 'pause',
         }

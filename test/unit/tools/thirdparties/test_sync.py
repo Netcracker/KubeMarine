@@ -135,9 +135,9 @@ class SynchronizationTest(unittest.TestCase):
                                  actual_mapping.get('metrics-scraper-version'),
                                  f"Metrics Scraper version for {plugin!r} and Kubernetes {ver} was not synced")
             if plugin == 'local-path-provisioner':
-                self.assertEqual(expected_mapping[plugin]['busybox-version'],
-                                 actual_mapping.get('busybox-version'),
-                                 f"Busybox version for {plugin!r} and Kubernetes {ver} was not synced")
+                self.assertEqual(expected_mapping[plugin]['alpine-version'],
+                                 actual_mapping.get('alpine-version'),
+                                 f"Alpine version for {plugin!r} and Kubernetes {ver} was not synced")
 
     def _check_added_thirdparties(self, ver: str, from_ver: str):
         for thirdparty in ('kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl'):
@@ -218,7 +218,7 @@ class SynchronizationTest(unittest.TestCase):
             if plugin == 'kubernetes-dashboard':
                 expected_mapping[plugin]['metrics-scraper-version'] = 'fake-metrics-scraper-version'
             if plugin == 'local-path-provisioner':
-                expected_mapping[plugin]['busybox-version'] = '1.34.1'
+                expected_mapping[plugin]['alpine-version'] = '3.24.2'
 
         tracker = self.run_sync()
         self._check_added_plugins_by_mapping(k8s_latest, expected_mapping)
@@ -237,7 +237,7 @@ class SynchronizationTest(unittest.TestCase):
         expected_versions = {}
         for software in (
                 'crictl',
-                'webhook', 'metrics-scraper', 'busybox',
+                'webhook', 'metrics-scraper', 'alpine',
                 # 'pause',
         ):
             new_version = mapping.get(software, 'v1.2.3')
@@ -265,8 +265,8 @@ class SynchronizationTest(unittest.TestCase):
         self.assertEqual(expected_versions['metrics-scraper'],
                          plugin_mapping['kubernetes-dashboard'][k8s_latest].get('metrics-scraper-version'),
                          f"Metrics Scraper version for 'kubernetes-dashboard' and Kubernetes {k8s_latest} was not synced")
-        self.assertEqual(expected_versions['busybox'],
-                         plugin_mapping['local-path-provisioner'][k8s_latest].get('busybox-version'),
+        self.assertEqual(expected_versions['alpine'],
+                         plugin_mapping['local-path-provisioner'][k8s_latest].get('alpine-version'),
                          f"Busybox version for 'local-path-provisioner' and Kubernetes {k8s_latest} was not synced")
 
     def test_new_unexpected_image(self):
@@ -372,7 +372,7 @@ class SynchronizationTest(unittest.TestCase):
         plugin_images = {
             'nginx-ingress-controller': 'webhook',
             'kubernetes-dashboard': 'metrics-scraper',
-            'local-path-provisioner': 'busybox'
+            'local-path-provisioner': 'alpine'
         }
         for plugin, extra_image in plugin_images.items():
             with self.subTest(plugin):
@@ -527,7 +527,7 @@ class SynchronizationTest(unittest.TestCase):
         k8s_latest = self.k8s_versions()[-1]
 
         mapping = self.compatibility_map()[k8s_latest]
-        for image_name in ('webhook', 'metrics-scraper', 'busybox'):
+        for image_name in ('webhook', 'metrics-scraper', 'alpine'):
             new_version = mapping.get(image_name, 'v1.2.3')
             while any(new_version == v.get(image_name) for v in self.compatibility_map().values()):
                 new_version = test_utils.increment_version(new_version)

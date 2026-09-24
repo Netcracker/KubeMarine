@@ -68,8 +68,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertEqual('/opt/my-local-path-provisioner', config_json['nodePathMap'][0]['paths'][0],
                          "Unexpected volume-dir")
 
-        expected_image_tag = self.expected_image_tag(k8s_version, 'busybox-version')
-        expected_image = f"example.registry/library/busybox:{expected_image_tag}"
+        expected_image_tag = self.expected_image_tag(k8s_version, 'alpine-version')
+        expected_image = f"example.registry/library/alpine:{expected_image_tag}"
         helperpod_yaml = yaml.safe_load(data['helperPod.yaml'])
         self.assertEqual(expected_image, helperpod_yaml['spec']['containers'][0]['image'],
                          "Unexpected helper pod image")

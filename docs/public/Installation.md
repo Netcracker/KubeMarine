@@ -4754,7 +4754,7 @@ plugins:
   local-path-provisioner:
     install: true
     image: rancher/local-path-provisioner:v0.0.20
-    helper-pod-image: busybox:latest
+    helper-pod-image: alpine:v3.24.2
 ```
 
 ##### openstack-cinder-csi
