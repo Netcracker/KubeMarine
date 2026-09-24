@@ -3052,18 +3052,17 @@ If the configuration `services.ntp.timesyncd.servers` is absent, then the task` 
 
 *OS specific*: No
 
-**Note:** It is recommended to configure DNS on cluster nodes via **DHCP**. When DHCP supplies suitable DNS settings for your nodes, you should **not** manage the `resolv.conf` section with Kubemarine. Use Kubemarine to configure `resolv.conf` **only** if the DHCP approach is unsuitable for your environment. In such cases, also refer to the [kubelet `resolvConf` configuration](#kubelet-resolvconf-configuration) to suppress warnings like **DNSConfigForming**. If you wish to disable Kubemarine's management of `resolv.conf`, see the **reconfigure** procedure – [Disable resolv.conf management](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management).
+**Note:** It is recommended to configure DNS on cluster nodes via **DHCP**. When DHCP provides suitable DNS settings, you should **not** manage the `resolv.conf` section with Kubemarine. Use Kubemarine to configure `resolv.conf` **only** if the DHCP approach is unsuitable for your environment. In such cases, also refer to the kubelet `resolvConf` configuration to suppress warnings such as **DNSConfigForming**. If you wish to disable Kubemarine's management of `resolv.conf`, see the reconfigure procedure – [Disable resolv.conf management](/docs/public/Maintenance.md#disable-resolvconf-kubemarine-management).
+The ``services.resolv.conf`` section allows you to configure the nameserver addresses that cluster systems have access to. By default, this section is empty in the inventory. The following parameters are supported:
 
-The `services.resolv.conf` section allows you to configure the nameserver addresses to which cluster systems has access. By default, this section is empty in the inventory. The following parameters are supported:
-
-|Name|Type|Description|
+| Name | Type | Description |
 |---|---|---|
-|search|string|The domain name to search|
-|nameservers|list|The DNS servers for usage in the OS|
+| search | string | The domain name to search |
+| nameservers | list | The DNS servers used by the operating system |
 
-**Note**: 
-* If some network resources are located in a restricted network and are not resolved through the standard DNS, be sure to configure this section and specify your custom DNS service.
-* Do not put ${cluster_name} in the `search` field, otherwise some microservices might work incorrectly.
+**Note:**
+* If some network resources reside in a restricted network and are not reachable through the standard DNS, configure this section with your custom DNS service.
+* Do not include `${cluster_name}` in the `search` field, as this may cause certain microservices to behave incorrectly.
 
 For example:
 
@@ -3080,23 +3079,23 @@ services:
 
 ##### kubelet `resolvConf` configuration
 
-If you configure `resolv.conf` in KubeMarine, you can face pod warning events like following
+If you configure ``resolv.conf`` through Kubemarine, you may encounter pod warning events such as the following:
 ```
 Warning  DNSConfigForming  23s (x5 over 5m34s)  kubelet            Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: ...
 ```
 
-This could happen because systemd-resolved merges static DNS configuration provided via `/etc/resolv.conf` with DNS configuration provided over DHCP, which results in too much DNS nameservers. To suppress these warnings it is recommended to configure kubelet `resolvConf` option to explicitly use `/etc/resolv.conf` path.
+This occurs because **systemd‑resolved** merges the static DNS configuration from ``/etc/resolv.conf`` with the DNS settings obtained via DHCP, resulting in an excessive number of nameserver entries. To suppress these warnings, configure the kubelet ``resolvConf`` option to use the explicit path ``/etc/resolv.conf``.
 
-**Note:** Only override kubelet `resolvConf` option to `/etc/resolv.conf` path if you have `/etc/resolv.conf` statically configured. DO NOT do it if `/etc/resolv.conf` is managed by systemd-resolved, since it could contain stub-resolver which may not work inside pods.
+**Note:** Override the kubelet ``resolvConf`` option only when ``/etc/resolv.conf`` is statically configured. Do **not** set it if ``/etc/resolv.conf`` is managed by ``systemd‑resolved``, as it may contain a stub resolver that does not function correctly inside pods.
 
-To configure kubelet `resolvConf` you can use following `cluster.yaml` configuration:
+To set the kubelet ``resolvConf`` parameter, add the following to your ``cluster.yaml``:
 ```yaml
 services:
   kubeadm_kubelet:
     resolvConf: /etc/resolv.conf
 ```
 
-See [`kubeadm_kubelet` section](#kubeadm_kubelet) for more information about this configuration section. On existing environment you can reconfigure this option using [`reconfigure` procedure](/docs/public/Maintenance.md#reconfigure-kubeadm) with similar configuration.
+For more details, see the [`kubeadm_kubelet`](#kubeadm_kubelet) section. In an existing cluster, you can update this option using the [reconfigure procedure](/docs/public/Maintenance.md#reconfigure-kubeadm) with a similar configuration.
 
 #### etc_hosts
 
