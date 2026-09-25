@@ -120,7 +120,7 @@ class EnrichmentAndFinalization(unittest.TestCase):
                                 context=self.context)
 
     def test_enrich_and_finalize_admission_configuration(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
         self.inventory['rbac']['pss'] = {
             'exemptions': {
                 'namespaces': ['a', 'b'],
@@ -170,22 +170,22 @@ class EnrichmentAndFinalization(unittest.TestCase):
         apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
 
         self.assertEqual('disabled', cluster.inventory['rbac']['pss']['pod-security'])
-        self.assertEqual(None, apiserver_extra_args.get('feature-gates'))
-        self.assertEqual(None, apiserver_extra_args.get('admission-control-config-file'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'feature-gates'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'admission-control-config-file'))
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
 
         self.assertEqual('disabled', finalized_inventory['rbac']['pss']['pod-security'])
-        self.assertEqual(None, apiserver_extra_args.get('feature-gates'))
-        self.assertEqual(None, apiserver_extra_args.get('admission-control-config-file'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'feature-gates'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'admission-control-config-file'))
 
         final_inventory = cluster.formatted_inventory
-        apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
+        apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', [])
 
         self.assertEqual('disabled', final_inventory['rbac']['pss']['pod-security'])
-        self.assertEqual(None, apiserver_extra_args.get('feature-gates'))
-        self.assertEqual(None, apiserver_extra_args.get('admission-control-config-file'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'feature-gates'))
+        self.assertEqual(None, components.get_arg(apiserver_extra_args, 'admission-control-config-file'))
 
 class RunTasks(unittest.TestCase):
     def setUp(self):
@@ -209,7 +209,7 @@ class RunTasks(unittest.TestCase):
         return resources
 
     def test_manage_pss_enable_pss(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
         self.inventory['rbac']['pss']['pod-security'] = 'disabled'
         self.manage_pss['pss']['pod-security'] = 'enabled'
         with utils.mock_call(admission.label_namespace_pss), \
@@ -223,10 +223,10 @@ class RunTasks(unittest.TestCase):
 
             apiserver_extra_args = res.working_inventory['services']['kubeadm']['apiServer']['extraArgs']
 
-            self.assertNotIn('feature-gates', apiserver_extra_args,
+            self.assertIsNone(components.get_arg(apiserver_extra_args, 'feature-gates'),
                             "feature-gates should not be set in v1.28+")
 
-            self.assertIn('admission-control-config-file', apiserver_extra_args,
+            self.assertIsNotNone(components.get_arg(apiserver_extra_args, 'admission-control-config-file'),
                         "Expected admission-control-config-file in v1.28+ but not found")
 
 

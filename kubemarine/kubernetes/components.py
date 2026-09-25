@@ -15,7 +15,7 @@
 import io
 import re
 from textwrap import dedent
-from typing import List, Optional, Dict, Callable, Sequence, Union
+from typing import List, Optional, Dict, Callable, Sequence, Union, overload
 
 import yaml
 from jinja2 import Template
@@ -23,9 +23,9 @@ from ordered_set import OrderedSet
 
 from kubemarine import plugins, system
 from kubemarine.core import utils, log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, DeferredGroup, CollectorCallback, AbstractGroup, RunResult
-from kubemarine.core.yaml_merger import override_merger
+from kubemarine.core.yaml_merger import override_merger, merge_named_args
 from kubemarine.kubernetes.object import KubernetesObject
 
 ERROR_WAIT_FOR_PODS_NOT_SUPPORTED = "Waiting for pods of {components} components is currently not supported"
@@ -130,15 +130,14 @@ ALL_COMPONENTS = CONTROL_PLANE_SPECIFIC_COMPONENTS + NODE_COMPONENTS
 COMPONENTS_SUPPORT_PATCHES = CONTROL_PLANE_COMPONENTS + ['kubelet']
 
 
-def convert_kubeadm_config(config: dict, *, to_wire: bool) -> dict:
-    """Translate kubeadm arguments without mutating inventory or loaded objects.
-
-    Inventory retains mappings. Duplicate wire arguments cannot be represented by
-    that model, so reject them explicitly instead of silently losing settings.
-    """
+def convert_kubeadm_config(config: dict) -> dict:
+    """Read legacy configurations as v1beta4 without losing repeated arguments."""
     config = utils.deepcopy_yaml(config)
     if config.get('kind') not in ('ClusterConfiguration', 'InitConfiguration', 'JoinConfiguration'):
         return config
+    if config.get('apiVersion', 'kubeadm.k8s.io/v1beta4') not in (
+            'kubeadm.k8s.io/v1beta3', 'kubeadm.k8s.io/v1beta4'):
+        raise ValueError(f"Unsupported kubeadm configuration API: {config['apiVersion']}")
     config['apiVersion'] = 'kubeadm.k8s.io/v1beta4'
     paths = [('apiServer', 'extraArgs'), ('scheduler', 'extraArgs'),
              ('controllerManager', 'extraArgs'), ('etcd', 'local', 'extraArgs'),
@@ -149,16 +148,123 @@ def convert_kubeadm_config(config: dict, *, to_wire: bool) -> dict:
             parent = parent.get(key, {})
         key = path[-1]
         value = parent.get(key)
-        if to_wire and isinstance(value, dict):
+        if isinstance(value, dict):
             parent[key] = [{'name': name, 'value': arg} for name, arg in value.items()]
-        elif not to_wire and isinstance(value, list):
-            args = {}
-            for arg in value:
-                if arg['name'] in args:
-                    raise ValueError(f"Duplicate kubeadm argument {arg['name']!r} in {'.'.join(path)}")
-                args[arg['name']] = arg['value']
-            parent[key] = args
+    if config['kind'] == 'ClusterConfiguration':
+        config.get('apiServer', {}).pop('timeoutForControlPlane', None)
+    elif config['kind'] == 'JoinConfiguration':
+        timeout = config.get('discovery', {}).pop('timeout', None)
+        if timeout is not None:
+            config.setdefault('timeouts', {}).setdefault('discovery', timeout)
     return config
+
+
+@overload
+def get_arg(args: list, name: str, default: str) -> str:
+    ...
+
+
+@overload
+def get_arg(args: list, name: str, default: None = None) -> Optional[str]:
+    ...
+
+
+def get_arg(args: list, name: str, default: Optional[str] = None) -> Optional[str]:
+    """Return the last occurrence, matching component flag precedence."""
+    return next((arg['value'] for arg in reversed(args) if arg['name'] == name), default)
+
+
+def set_arg(args: list, name: str, value: Optional[str]) -> None:
+    """Replace a KubeMarine-managed flag; None removes all occurrences."""
+    args[:] = [arg for arg in args if arg['name'] != name]
+    if value is not None:
+        args.append({'name': name, 'value': value})
+
+
+def migrate_inventory(inventory: dict) -> bool:
+    """Migrate explicit inventory overrides without expanding defaults."""
+    services: dict = inventory.get('services', {})
+    original_config = services.get('kubeadm')
+    if original_config is None:
+        return False
+    config = utils.deepcopy_yaml(original_config)
+    timeout = config.get('apiServer', {}).get('timeoutForControlPlane')
+    if timeout is not None:
+        timeouts = services.get('kubeadm_timeouts', {})
+        current = timeouts.get('controlPlaneComponentHealthCheck', timeout)
+        if current != timeout:
+            raise ValueError('Conflicting kubeadm controlPlaneComponentHealthCheck and timeoutForControlPlane')
+    # A partial override does not necessarily contain kind or apiVersion.
+    kind = config.get('kind')
+    api_version = config.get('apiVersion')
+    config['kind'] = 'ClusterConfiguration'
+    converted = convert_kubeadm_config(config)
+    if kind is None:
+        converted.pop('kind')
+    if api_version is None:
+        converted.pop('apiVersion')
+    changed = converted != original_config
+    if changed:
+        original_config.clear()
+        original_config.update(converted)
+    if timeout is not None:
+        services.setdefault('kubeadm_timeouts', {})['controlPlaneComponentHealthCheck'] = timeout
+    return bool(changed)
+
+
+@enrichment(EnrichmentStage.FULL)
+def enrich_kubeadm_api(cluster: KubernetesCluster) -> None:
+    if migrate_inventory(cluster.inventory):
+        cluster.log.warning('Legacy kubeadm configuration was converted to v1beta4. '
+                            'Run migrate_kubemarine to persist the inventory and ConfigMap migration.')
+
+
+def migrate_kubeadm_cluster_config(config: dict, control_plane: NodeGroup) -> dict:
+    """Use installed kubeadm to migrate a stored ClusterConfiguration to v1beta4."""
+    if config.get('kind') != 'ClusterConfiguration':
+        raise ValueError('kubeadm-config does not contain a ClusterConfiguration')
+    api_version = config.get('apiVersion')
+    if api_version == 'kubeadm.k8s.io/v1beta4':
+        return utils.deepcopy_yaml(config)
+    if api_version != 'kubeadm.k8s.io/v1beta3':
+        raise ValueError(f'Unsupported kubeadm configuration API: {api_version}')
+
+    path = utils.get_remote_tmp_path('kubeadm-config-migration.yaml')
+    try:
+        control_plane.put(io.StringIO(yaml.safe_dump(config)), path, sudo=True)
+        migrated = control_plane.sudo(f'kubeadm config migrate --old-config={path}').get_simple_out()
+
+        cluster_configs = [document for document in yaml.safe_load_all(migrated)
+                           if isinstance(document, dict) and document.get('kind') == 'ClusterConfiguration']
+        if len(cluster_configs) != 1:
+            raise ValueError('kubeadm config migrate must produce exactly one ClusterConfiguration')
+
+        converted = cluster_configs[0]
+        if converted.get('apiVersion') != 'kubeadm.k8s.io/v1beta4':
+            raise ValueError('kubeadm config migrate did not produce a v1beta4 ClusterConfiguration')
+
+        control_plane.put(io.StringIO(yaml.safe_dump(converted)), path, sudo=True)
+        control_plane.sudo(f'kubeadm config validate --config={path}')
+        return converted
+    finally:
+        control_plane.sudo(f'rm -f {path}', warn=True)
+
+
+def migrate_kubeadm_configmap(cluster: KubernetesCluster) -> None:
+    """Migrate the stored ClusterConfiguration with the installed kubeadm binary."""
+    control_plane = cluster.nodes['control-plane'].get_first_member()
+    configmap = KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
+    configmap.reload(control_plane)
+    original = configmap.obj['data']['ClusterConfiguration']
+    config = yaml.safe_load(original)
+    converted = migrate_kubeadm_cluster_config(config, control_plane)
+    if converted == config:
+        cluster.log.info('kubeadm-config already uses v1beta4')
+        return
+
+    utils.dump_file(cluster, configmap.to_yaml(), 'kubeadm-config-before-v1beta4.yaml')
+    configmap.obj['data']['ClusterConfiguration'] = yaml.safe_dump(converted)
+    configmap.apply(control_plane)
 
 
 class KubeadmConfig:
@@ -190,18 +296,12 @@ class KubeadmConfig:
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
-        use_v1beta4 = kubernetes_minor_release_at_least(self.cluster.inventory, 'v1.37')
-        if use_v1beta4:
-            config = convert_kubeadm_config(config, to_wire=False)
+        if configmap == 'kubeadm-config':
+            config = migrate_kubeadm_cluster_config(config, control_plane)
 
         if edit_func is not None:
             config = edit_func(config)
-            wire_config = convert_kubeadm_config(config, to_wire=True) if use_v1beta4 else config
-            # This timeout belongs to Init/JoinConfiguration in v1beta4,
-            # not to the cluster-wide ConfigMap. to_yaml transfers it there.
-            if use_v1beta4 and wire_config.get('kind') == 'ClusterConfiguration':
-                wire_config.get('apiServer', {}).pop('timeoutForControlPlane', None)
-            configmap_obj.obj["data"][key] = yaml.dump(wire_config)
+            configmap_obj.obj["data"][key] = yaml.dump(convert_kubeadm_config(config))
 
         self.maps[configmap] = config
         return config
@@ -217,31 +317,31 @@ class KubeadmConfig:
         if not self.is_loaded(configmap):
             raise ValueError(f"To apply changed {configmap} ConfigMap, it is necessary to fetch it first")
 
+        if configmap == 'kubeadm-config':
+            key = CONFIGMAPS_CONSTANTS[configmap]['key']
+            self.loaded_maps[configmap].obj['data'][key] = yaml.dump(convert_kubeadm_config(self.maps[configmap]))
         self.loaded_maps[configmap].apply(control_plane)
 
     def to_yaml(self, init_config: dict) -> str:
-        if kubernetes_minor_release_less_than(self.cluster.inventory, 'v1.37'):
-            return yaml.dump_all(list(self.maps.values()) + [init_config])
-
-        configs = [convert_kubeadm_config(config, to_wire=True) for config in self.maps.values()]
-        init_config = convert_kubeadm_config(init_config, to_wire=True)
-        for config in configs:
-            if config.get('kind') == 'ClusterConfiguration':
-                timeout = config.get('apiServer', {}).pop('timeoutForControlPlane', None)
-                if timeout is not None:
-                    init_config.setdefault('timeouts', {})['controlPlaneComponentHealthCheck'] = timeout
-        timeout = init_config.get('discovery', {}).pop('timeout', None)
-        if timeout is not None:
-            init_config.setdefault('timeouts', {})['discovery'] = timeout
+        configs = [convert_kubeadm_config(config) for config in self.maps.values()]
+        init_config = convert_kubeadm_config(init_config)
         configs.append(init_config)
         return yaml.dump_all(configs)
 
     def merge_with_inventory(self, configmap: str) -> Callable[[dict], dict]:
         def merge_func(config_: dict) -> dict:
-            patch_config: dict = KubeadmConfig(self.cluster).maps[configmap]
+            patch_config: dict = utils.deepcopy_yaml(KubeadmConfig(self.cluster).maps[configmap])
+            if configmap == 'kubeadm-config':
+                for path in (('apiServer',), ('scheduler',), ('controllerManager',), ('etcd', 'local')):
+                    current, patch = config_, patch_config
+                    for key in path:
+                        current = current.get(key, {})
+                        patch = patch.get(key, {})
+                    if 'extraArgs' in patch:
+                        patch['extraArgs'] = merge_named_args(current.get('extraArgs', []), patch['extraArgs'])
             # It seems that all default lists are always overridden with custom instead of appending,
             # and so override merger seems the most suitable.
-            config_ = override_merger.merge(config_, utils.deepcopy_yaml(patch_config))
+            config_ = override_merger.merge(config_, patch_config)
             return config_
 
         return merge_func
@@ -303,6 +403,9 @@ def get_init_config(cluster: KubernetesCluster, group: AbstractGroup[RunResult],
         'kind': init_kind,
         'patches': {'directory': '/etc/kubernetes/patches'},
     }
+    timeouts = inventory['services'].get('kubeadm_timeouts', {})
+    if timeouts:
+        init_config['timeouts'] = utils.deepcopy_yaml(timeouts)
     if init:
         if control_plane:
             init_config.update(control_plane_spec)
@@ -334,14 +437,14 @@ def get_kubeadm_config(cluster: KubernetesCluster, init_config: dict) -> str:
 
 
 def _configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict) -> None:
-    kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', {})
+    kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', [])
 
     kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
 
     if not is_container_runtime_not_configurable(cluster):
-        kubelet_extra_args['container-runtime'] = 'remote'
+        set_arg(kubelet_extra_args, 'container-runtime', 'remote')
 
-    kubelet_extra_args['container-runtime-endpoint'] = 'unix:///run/containerd/containerd.sock'
+    set_arg(kubelet_extra_args, 'container-runtime-endpoint', 'unix:///run/containerd/containerd.sock')
 
 
 def reconfigure_components(group: NodeGroup, components: List[str],
@@ -960,7 +1063,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
         # The same containerd socket could be found by these two paths.
         # This path is usually configured by kubeadm for containerRuntimeEndpoint in /var/lib/kubelet/instance-config.yaml file.
         # As of k8s 1.36, "/var/run" socket path variant is usually used by kubeadm on fresh install.
-        # However, upgrade 1.33 to 1.34 for some reason sets socket path using "/run" variant, which breaks check.
+        # Some upgrades can set the socket path using the "/run" variant, which breaks the check.
         # Since these paths are interchangeable, we just replace "/run" with "/var/run". 
         varRunSockPath = "unix:///var/run/containerd/containerd.sock"
         runSockPath = "unix:///run/containerd/containerd.sock"

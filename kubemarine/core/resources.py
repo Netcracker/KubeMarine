@@ -387,6 +387,7 @@ class DynamicResources:
             # JSON validation
             kubemarine.core.schema.verify_connections,
             kubemarine.core.schema.verify_inventory,
+            kubemarine.kubernetes.components.enrich_kubeadm_api,
 
             # Early enrichment of procedure inventory for connections
             kubemarine.core.defaults.add_node_enrich_roles,

@@ -1,3 +1,0 @@
-csi:
-  snapshotter:
-    enabled: true
