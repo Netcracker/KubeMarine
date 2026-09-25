@@ -21,6 +21,7 @@ from test.unit import utils as test_utils
 
 from kubemarine import demo, kubernetes, sysctl
 from kubemarine.core import flow
+from kubemarine.kubernetes import components
 from kubemarine.procedures import reconfigure
 
 
@@ -53,7 +54,7 @@ class _AbstractReconfigureTest(unittest.TestCase):
 class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
     def test_enrich_and_finalize_inventory(self):
         self.inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.33.6',
+            'kubernetesVersion': 'v1.34.11',
             'apiServer': {
                 'extraArgs': {'api_k1': 'api_v1'},
                 'extraVolumes': [{'name': 'api_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
@@ -131,7 +132,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         self._test_enrich_and_finalize_inventory_check(services, False)
 
     def _test_enrich_and_finalize_inventory_check(self, services: dict, enriched: bool):
-        apiserver_args = services['kubeadm']['apiServer']['extraArgs'].items()
+        apiserver_args = {arg['name']: arg['value'] for arg in services['kubeadm']['apiServer']['extraArgs']}.items()
         self.assertIn(('api_k1', 'api_v1_new'), apiserver_args)
         self.assertIn(('api_k2', 'api_v2_new'), apiserver_args)
         self.assertEqual(enriched, ('profiling', 'false') in apiserver_args)
@@ -145,23 +146,23 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         self.assertIn('san2_new', apiserver_certsans)
         self.assertEqual(enriched, 'control-plane-1' in apiserver_certsans)
 
-        self.assertEqual('5m0s', services['kubeadm']['apiServer']['timeoutForControlPlane'])
+        self.assertEqual('5m0s', services['kubeadm_timeouts']['controlPlaneComponentHealthCheck'])
 
-        scheduler_args = services['kubeadm']['scheduler']['extraArgs'].items()
+        scheduler_args = {arg['name']: arg['value'] for arg in services['kubeadm']['scheduler']['extraArgs']}.items()
         self.assertIn(('sched_key1', 'sched_v1'), scheduler_args)
         self.assertEqual(enriched, ('profiling', 'false') in scheduler_args)
 
         scheduler_volumes = services['kubeadm']['scheduler']['extraVolumes']
         self.assertIn({'name': 'sched_name1_new', 'hostPath': '/home/path', 'mountPath': '/mount/path'}, scheduler_volumes)
 
-        ctrl_args = services['kubeadm']['controllerManager']['extraArgs'].items()
+        ctrl_args = {arg['name']: arg['value'] for arg in services['kubeadm']['controllerManager']['extraArgs']}.items()
         self.assertIn(('ctrl_k1', 'ctrl_k1_new'), ctrl_args)
         self.assertEqual(enriched, ('profiling', 'false') in ctrl_args)
 
         ctrl_volumes = services['kubeadm']['controllerManager']['extraVolumes']
         self.assertIn({'name': 'ctrl_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}, ctrl_volumes)
 
-        etcd_args = services['kubeadm']['etcd']['local']['extraArgs'].items()
+        etcd_args = {arg['name']: arg['value'] for arg in services['kubeadm']['etcd']['local']['extraArgs']}.items()
         self.assertIn(('etcd_k1', 'etcd_v1_new'), etcd_args)
 
         self.assertEqual('1.2.3', services['kubeadm']['etcd']['local']['imageTag'])
@@ -192,7 +193,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         cluster = self.new_cluster()
 
         apiserver = cluster.inventory['services']['kubeadm']['apiServer']
-        self.assertEqual('/changed/path', apiserver['extraArgs']['audit-policy-file'])
+        self.assertEqual('/changed/path', components.get_arg(apiserver['extraArgs'], 'audit-policy-file'))
         self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['hostPath'])
         self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['mountPath'])
 
@@ -207,7 +208,8 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         # This is a potential subject for change.
         # The behaviour just follows historical behaviour if installation procedure.
         self.assertEqual('/etc/kubernetes/pki/admission.yaml',
-                         inventory['services']['kubeadm']['apiServer']['extraArgs']['admission-control-config-file'])
+                         components.get_arg(inventory['services']['kubeadm']['apiServer']['extraArgs'],
+                                            'admission-control-config-file'))
 
     def test_error_control_plane_patch_refers_worker(self):
         self.setUpScheme(demo.FULLHA)
@@ -222,7 +224,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
 
     def test_error_kubelet_patch_refers_balancer(self):
         self.setUpScheme(demo.FULLHA)
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
                 {'nodes': ['balancer-1'], 'patch': {'maxPods': 111}},
@@ -233,7 +235,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
             self.new_cluster()
 
     def test_kubeadm_supports_patches(self):
-        kubernetes_version = 'v1.33.6'
+        kubernetes_version = 'v1.34.11'
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
         self.reconfigure['services']['kubeadm_patches'] = {
             'apiServer': [
@@ -409,7 +411,7 @@ class RunTasks(_AbstractReconfigureTest):
             self._run()
 
     def test_kubernetes_reconfigure_empty_patch_sections(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
         self.reconfigure.setdefault('services', {})['kubeadm_patches'] = {
             'apiServer': [], 'scheduler': [], 'controllerManager': [], 'etcd': [], 'kubelet': [],
         }
@@ -426,7 +428,7 @@ class RunTasks(_AbstractReconfigureTest):
             self._run()
 
     def test_kubernetes_reconfigure_detect_kube_proxy_conntrack_min_changes(self):
-        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
         self.reconfigure['services']['sysctl'] = {
             'net.netfilter.nf_conntrack_max': 1000001
         }

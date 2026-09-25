@@ -69,19 +69,19 @@ class RestoreEnrichmentTest(test_utils.CommonTest):
 
     def test_enrich_and_finalize_inventory_kubernetes_version(self):
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
-        descriptor = {'kubernetes': {'version': 'v1.33.6'}}
+        descriptor = {'kubernetes': {'version': 'v1.34.11'}}
         self._pack_descriptor(descriptor)
         self._pack_data()
 
         resources = self._run()
 
-        self.assertEqual('v1.33.6', resources.working_inventory['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.34.11', resources.working_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
-        self.assertEqual('v1.33.6', resources.finalized_inventory['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.34.11', resources.finalized_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
-        self.assertEqual('v1.33.6', resources.inventory()['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.34.11', resources.inventory()['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
     def test_enrich_and_finalize_inventory_thirdparties(self):

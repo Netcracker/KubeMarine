@@ -47,7 +47,11 @@
     "etcd": {
       "$ref": "#/definitions/Etcd"
     },
-    "apiVersion": {"type": ["string"], "default": "kubeadm.k8s.io/v1beta2"},
+    "apiVersion": {
+      "enum": ["kubeadm.k8s.io/v1beta4", "kubeadm.k8s.io/v1beta3"],
+      "default": "kubeadm.k8s.io/v1beta4",
+      "description": "Use v1beta4. Legacy v1beta3 input is accepted only for migration and converted with a warning."
+    },
     "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"},
     "featureGates": {
       "$ref": "#/definitions/FeatureGates"
@@ -78,7 +82,8 @@
           }
         },
         "timeoutForControlPlane": {
-          "type": "string"
+          "type": "string",
+          "description": "Legacy input only. Migrated to services.kubeadm_timeouts.controlPlaneComponentHealthCheck."
         }
       },
       "propertyNames": {
@@ -150,10 +155,38 @@
       "enum": ["extraArgs", "extraVolumes"]
     },
     "ExtraArgs": {
+      "description": "v1beta4 arguments merged by name. Legacy mappings are converted for compatibility.",
+      "oneOf": [
+        {"type": "object", "additionalProperties": {"type": "string"}},
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "value": {"type": "string"}},
+                "required": ["name", "value"],
+                "additionalProperties": false
+              },
+              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+            ]
+          }
+        }
+      ]
+    },
+    "Timeouts": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
+      "description": "Timeouts for generated kubeadm InitConfiguration and JoinConfiguration.",
+      "properties": {
+        "controlPlaneComponentHealthCheck": {"type": "string"},
+        "kubeletHealthCheck": {"type": "string"},
+        "kubernetesAPICall": {"type": "string"},
+        "etcdAPICall": {"type": "string"},
+        "tlsBootstrap": {"type": "string"},
+        "discovery": {"type": "string"},
+        "upgradeManifests": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "ExtraVolumes": {
       "type": "array",

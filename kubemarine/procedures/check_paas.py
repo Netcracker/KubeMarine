@@ -761,7 +761,7 @@ def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
         expected_config = yaml.dump(cluster.inventory['services']['audit']['cluster_policy'])
 
         api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
-        audit_file_name = api_server_extra_args['audit-policy-file']
+        audit_file_name = components.get_arg(api_server_extra_args, 'audit-policy-file', '')
 
         control_planes = cluster.nodes['control-plane']
 
@@ -1537,15 +1537,11 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
 
         kubeadm_config = components.KubeadmConfig(cluster)
         cluster_config = kubeadm_config.load('kubeadm-config', first_control_plane)
-        # Check if extraArgs is a list of dictionaries or a dictionary
         apiserver_actual_args = cluster_config["apiServer"]["extraArgs"]
-        if isinstance(apiserver_actual_args, list):
-            # Convert list of dictionaries to a single dictionary
-            apiserver_actual_args = {arg['name']: arg['value'] for arg in apiserver_actual_args}
 
         actual_state = "disabled"
-        if "admission-control-config-file" in apiserver_actual_args and (
-                "PodSecurity=true" in apiserver_actual_args.get("feature-gates", "")
+        if components.get_arg(apiserver_actual_args, "admission-control-config-file") is not None and (
+                "PodSecurity=true" in components.get_arg(apiserver_actual_args, "feature-gates", "")
                 or admission.is_pod_security_unconditional(cluster)
         ):
             actual_state = "enabled"
@@ -1562,7 +1558,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         expected_config = admission.generate_pss(cluster)
 
         apiserver_expected_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
-        config_file_name = apiserver_expected_args['admission-control-config-file']
+        config_file_name = components.get_arg(apiserver_expected_args, 'admission-control-config-file', '')
 
         broken = []
         result = control_planes.sudo(f"cat {config_file_name}", warn=True)

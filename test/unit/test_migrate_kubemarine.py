@@ -136,7 +136,7 @@ class PatchesResolvingTest(unittest.TestCase):
                               'upgrade_crictl', 'upgrade_cri', 'upgrade_haproxy', 'upgrade_keepalived',
                               'upgrade_calico', 'upgrade_nginx_ingress_controller',
                               'upgrade_kubernetes_dashboard', 'upgrade_local_path_provisioner',
-                              'test_cluster2', 'test_cluster1']
+                              'migrate_kubeadm_v1beta4', 'test_cluster2', 'test_cluster1']
             self.assertEqual(expected_order,
                              [p.identifier for p in resolved_patches if p.identifier in expected_order],
                              "Unexpected order of resolved patches")

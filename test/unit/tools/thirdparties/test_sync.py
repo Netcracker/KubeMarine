@@ -77,7 +77,8 @@ class SynchronizationTest(unittest.TestCase):
             if utils.minor_version(k8s_version) == utils.minor_version(k8s_oldest):
                 del self.compatibility_map()[k8s_version]
 
-        self.run_sync()
+        with mock.patch.object(self.defaults, 'default_version', return_value=self.k8s_versions()[-1]):
+            self.run_sync()
         self.assertNotIn(utils.minor_version(k8s_oldest), self.kubernetes_versions.stored['kubernetes_versions'])
 
     def test_compatibility_mapping_add_new_versions(self):
@@ -191,7 +192,8 @@ class SynchronizationTest(unittest.TestCase):
                 k8s_remove.append(k8s_version)
                 del self.compatibility_map()[k8s_version]
 
-        self.run_sync()
+        with mock.patch.object(self.defaults, 'default_version', return_value=self.k8s_versions()[-1]):
+            self.run_sync()
         for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml', 'thirdparties.yaml'):
             for software_name, mapping in self.compatibility.stored[config_filename].items():
                 if software_name in ('haproxy', 'keepalived'):
