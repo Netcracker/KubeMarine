@@ -112,7 +112,7 @@ class Plugins(SoftwareType):
                 new_settings = {
                     'version': plugin_version
                 }
-                extra_images = get_extra_images(manifests, plugin_version)
+                extra_images = get_extra_images(manifests, plugin_version, k8s_settings)
                 for image_name, image_version in extra_images.items():
                     if image_name in k8s_settings:
                         image_version = k8s_settings[image_name]
@@ -175,9 +175,9 @@ def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name:
     if plugin_name == 'nginx-ingress-controller':
         extra_images.append('webhook')
     elif plugin_name == 'kubernetes-dashboard':
-        extra_images.append('metrics-scraper')
+        extra_images.append('metrics-scraper')    
     elif plugin_name == 'local-path-provisioner':
-        extra_images.append('busybox')
+        extra_images.append('alpine')
 
     for extra_image in extra_images:
         version_key = f"{extra_image}-version"
@@ -314,7 +314,8 @@ def dashboard_extract_images(images: List[str], manifest_identity: Identity, plu
     return extra_images
 
 
-def local_path_provisioner_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
+def local_path_provisioner_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str, 
+                                          k8s_settings: Dict[str, str]) -> Dict[str, str]:
     expected_images = ['rancher/local-path-provisioner']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     for image in images:
@@ -322,15 +323,15 @@ def local_path_provisioner_extract_images(images: List[str], manifest_identity: 
             continue
         raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
 
-    return {'busybox': '1.34.1'}
+    return {'alpine': k8s_settings['alpine']}
 
 
-def get_extra_images(manifests: List[Manifest], plugin_version: str) -> Dict[str, str]:
+def get_extra_images(manifests: List[Manifest], plugin_version: str, k8s_settings: Dict[str, str]) -> Dict[str, str]:
     return dict(item for manifest in manifests
-                for item in get_extra_manifest_images(manifest, plugin_version).items())
+                for item in get_extra_manifest_images(manifest, plugin_version, k8s_settings).items())
 
 
-def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[str, str]:
+def get_extra_manifest_images(manifest: Manifest, plugin_version: str, k8s_settings: Dict[str, str]) -> Dict[str, str]:
     images = []
     for image in manifest.get_all_container_images():
         image = image.split('@sha256:')[0]
@@ -358,7 +359,7 @@ def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[s
     elif manifest.identity == Identity('kubernetes-dashboard'):
         return dashboard_extract_images(images, manifest.identity, plugin_version)
     elif manifest.identity == Identity('local-path-provisioner'):
-        return local_path_provisioner_extract_images(images, manifest.identity, plugin_version)
+        return local_path_provisioner_extract_images(images, manifest.identity, plugin_version, k8s_settings)
     else:
         raise Exception(f"Unsupported manifest {manifest.identity.name!r}")
 
