@@ -267,7 +267,7 @@ class SynchronizationTest(unittest.TestCase):
                          f"Metrics Scraper version for 'kubernetes-dashboard' and Kubernetes {k8s_latest} was not synced")
         self.assertEqual(expected_versions['alpine'],
                          plugin_mapping['local-path-provisioner'][k8s_latest].get('alpine-version'),
-                         f"Busybox version for 'local-path-provisioner' and Kubernetes {k8s_latest} was not synced")
+                         f"Alpine version for 'local-path-provisioner' and Kubernetes {k8s_latest} was not synced")
 
     def test_new_unexpected_image(self):
         unexpected_image = 'unexpected/image:1.2.3'
