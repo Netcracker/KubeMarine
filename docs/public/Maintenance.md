@@ -347,8 +347,10 @@ spec:
 etcd:
   local:
     extraArgs:
-      heartbeat-interval: "1000"
-      election-timeout: "10000"
+      - name: heartbeat-interval
+        value: "1000"
+      - name: election-timeout
+        value: "10000"
 ...
 ```
 
@@ -1098,25 +1100,37 @@ services:
       certSANs:
         - k8s-lb
       extraArgs:
-        enable-admission-plugins: NodeRestriction,PodNodeSelector
-        profiling: "false"
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
-        audit-log-maxage: "30"
-        audit-log-maxbackup: "10"
-        audit-log-maxsize: "100"
+        - name: enable-admission-plugins
+          value: NodeRestriction,PodNodeSelector
+        - name: profiling
+          value: "false"
+        - name: audit-log-path
+          value: /var/log/kubernetes/audit/audit.log
+        - name: audit-policy-file
+          value: /etc/kubernetes/audit-policy.yaml
+        - name: audit-log-maxage
+          value: "30"
+        - name: audit-log-maxbackup
+          value: "10"
+        - name: audit-log-maxsize
+          value: "100"
     scheduler:
       extraArgs:
-        profiling: "false"
+        - name: profiling
+          value: "false"
     controllerManager:
       extraArgs:
-        profiling: "false"
-        terminated-pod-gc-threshold: "1000"
+        - name: profiling
+          value: "false"
+        - name: terminated-pod-gc-threshold
+          value: "1000"
     etcd:
       local:
         extraArgs:
-          heartbeat-interval: "1000"
-          election-timeout: "10000"
+          - name: heartbeat-interval
+            value: "1000"
+          - name: election-timeout
+            value: "10000"
   kubeadm_kubelet:
     protectKernelDefaults: true
   kubeadm_kube-proxy:
@@ -1166,7 +1180,7 @@ In this way it is not possible to delete some property,
 allowing the corresponding Kubernetes component to fall back to the default behaviour.
 This can be worked around by manual changing of the `cluster.yaml`
 and running the `reconfigure` procedure with **empty** necessary section.
-For example, you can delete `services.kubeadm.etcd.local.extraArgs.election-timeout` from **cluster.yaml**
+For example, you can delete the entry named `election-timeout` from `services.kubeadm.etcd.local.extraArgs` in **cluster.yaml**
 and then run the procedure with the following procedure inventory:
 
 ```yaml

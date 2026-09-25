@@ -103,10 +103,12 @@ def enrich_restore_inventory(cluster: KubernetesCluster) -> None:
 def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
     kubeadm_sections = utils.subdict_yaml(
         cluster.procedure_inventory.get('services', {}),
-        ['kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches'])
+        ['kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches', 'kubeadm_timeouts'])
 
     if kubeadm_sections:
-        default_merger.merge(cluster.inventory.setdefault('services', {}), utils.deepcopy_yaml(kubeadm_sections))
+        kubeadm_sections = utils.deepcopy_yaml(kubeadm_sections)
+        components.migrate_inventory({'services': kubeadm_sections})
+        default_merger.merge(cluster.inventory.setdefault('services', {}), kubeadm_sections)
 
 
 @enrichment(EnrichmentStage.ALL)
@@ -202,9 +204,9 @@ def _enrich_etcd_watch_progress(cluster: KubernetesCluster) -> None:
         arg_name = "experimental-watch-progress-notify-interval"
 
     # Set the default if the option has not explicitly provided
-    if "watch-progress-notify-interval" not in etcd_extra_args \
-            and "experimental-watch-progress-notify-interval" not in etcd_extra_args:
-        etcd_extra_args[arg_name] = "5m"
+    if components.get_arg(etcd_extra_args, "watch-progress-notify-interval") is None \
+            and components.get_arg(etcd_extra_args, "experimental-watch-progress-notify-interval") is None:
+        components.set_arg(etcd_extra_args, arg_name, "5m")
 
 
 @enrichment(EnrichmentStage.FULL)
@@ -664,6 +666,7 @@ def init_workers(group: NodeGroup) -> None:
     join_dict = cluster.context.get("join_dict", get_join_dict(group))
 
     join_config = components.get_init_config(cluster, group, init=False, join_dict=join_dict)
+    join_config = components.convert_kubeadm_config(join_config)
     config = yaml.dump(join_config)
 
     utils.dump_file(cluster, config, 'join-config-workers.yaml')
@@ -1333,8 +1336,8 @@ def prepare_audit_policy(group: NodeGroup) -> None:
     """
     cluster: KubernetesCluster = group.cluster
     api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
-    audit_log_dir = os.path.dirname(api_server_extra_args['audit-log-path'])
-    audit_file_name = api_server_extra_args['audit-policy-file']
+    audit_log_dir = os.path.dirname(components.get_arg(api_server_extra_args, 'audit-log-path', ''))
+    audit_file_name = components.get_arg(api_server_extra_args, 'audit-policy-file', '')
     audit_policy_dir = os.path.dirname(audit_file_name)
     group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
 

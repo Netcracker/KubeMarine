@@ -47,9 +47,9 @@ services:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
-    apiVersion: 'kubeadm.k8s.io/v1beta3'
+    apiVersion: 'kubeadm.k8s.io/v1beta4'
     kind: ClusterConfiguration
-    kubernetesVersion: v1.34.2
+    kubernetesVersion: v1.34.11
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     imageRepository: registry.k8s.io
     dns: {}
@@ -59,40 +59,54 @@ services:
     apiServer:
       certSANs: []
       extraArgs:
-        tls-cipher-suites: TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384
-        enable-admission-plugins: NodeRestriction
-        profiling: "false"
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
-        audit-log-maxage: "30"
-        audit-log-maxbackup: "10"
-        audit-log-maxsize: "100"
+        - name: tls-cipher-suites
+          value: TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384
+        - name: enable-admission-plugins
+          value: NodeRestriction
+        - name: profiling
+          value: "false"
+        - name: audit-log-path
+          value: /var/log/kubernetes/audit/audit.log
+        - name: audit-policy-file
+          value: /etc/kubernetes/audit-policy.yaml
+        - name: audit-log-maxage
+          value: "30"
+        - name: audit-log-maxbackup
+          value: "10"
+        - name: audit-log-maxsize
+          value: "100"
       extraVolumes:
         - name: audit
-          hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
-          mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
+          hostPath: '{{ services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-policy-file") | map(attribute="value") | list | last }}'
+          mountPath: '{{ services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-policy-file") | map(attribute="value") | list | last }}'
           readOnly: True
           pathType: File
         - name: audit-log
-          hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
-          mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
+          hostPath: '{{ (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).rsplit("/", 1)[0] }}'
+          mountPath: '{{ (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).rsplit("/", 1)[0] }}'
           readOnly: False
           pathType: DirectoryOrCreate
     scheduler:
       extraArgs:
-        profiling: "false"
+        - name: profiling
+          value: "false"
       extraVolumes: []
     controllerManager:
       extraArgs:
-        profiling: "false"
-        terminated-pod-gc-threshold: "1000"
+        - name: profiling
+          value: "false"
+        - name: terminated-pod-gc-threshold
+          value: "1000"
       extraVolumes: []
     etcd:
       local:
         extraArgs:
-          auto-compaction-mode: "periodic"
-          auto-compaction-retention: "1h"
-          snapshot-count: "100000"
+          - name: auto-compaction-mode
+            value: "periodic"
+          - name: auto-compaction-retention
+            value: "1h"
+          - name: snapshot-count
+            value: "100000"
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []

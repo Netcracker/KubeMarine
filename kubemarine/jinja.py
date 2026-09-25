@@ -42,6 +42,18 @@ class JinjaNode(MutableNode):
     def _child(self, index: Index, val: Union[list, dict]) -> Node:
         return self._child_type(index)(val, path=self.path + (index,), env=self.env)
 
+    def descend(self, index: Index) -> Union[Primitive, Node]:
+        # Keep legacy inventory templates such as extraArgs['audit-policy-file']
+        # working while the underlying kubeadm arguments use v1beta4 lists.
+        if (isinstance(self.delegate, list) and isinstance(index, str)
+                and self.path[:2] == ('services', 'kubeadm') and self.path[-1] == 'extraArgs'):
+            for i in reversed(range(len(self.delegate))):
+                arg = self._child(i, self.delegate[i])
+                if arg.descend('name') == index:
+                    return arg.descend('value')
+            raise KeyError(index)
+        return super().descend(index)
+
     def _child_type(self, _: Index) -> Type['JinjaNode']:
         return JinjaNode
 

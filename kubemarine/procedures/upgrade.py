@@ -35,6 +35,11 @@ def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
 
 
 def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
+    # Persist a configuration readable by the new kubeadm before replacing
+    # binaries. Preserve the running cluster version and all custom settings.
+    if components.kubernetes_minor_release_at_least(cluster.inventory, 'v1.37'):
+        components.migrate_kubeadm_configmap(cluster)
+
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
@@ -68,11 +73,9 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
         # Instead, change only necessary apiServer args.
         def reconfigure_feature_gates(cluster_config: dict) -> dict:
-            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
-            if feature_gates is not None:
-                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = feature_gates
-            else:
-                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+            feature_gates = components.get_arg(
+                cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"], "feature-gates")
+            components.set_arg(cluster_config["apiServer"]["extraArgs"], "feature-gates", feature_gates)
 
             return cluster_config
 

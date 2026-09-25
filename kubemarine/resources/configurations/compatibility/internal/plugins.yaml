@@ -5,88 +5,98 @@
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.
 
 calico:
-  v1.33.0:
-    version: v3.30.3
-  v1.33.6:
-    version: v3.31.2
   v1.34.1:
     version: v3.30.3
   v1.34.2:
     version: v3.32.0
+  v1.34.11:
+    version: v3.32.0
   v1.35.0:
+    version: v3.32.0
+  v1.35.8:
     version: v3.32.0
   v1.36.0:
     version: v3.32.0
+  v1.36.4:
+    version: v3.32.0
+  v1.37.0:
+    version: v3.32.2
 nginx-ingress-controller:
-  v1.33.0:
-    version: v1.16.0
-    webhook-version: v1.6.9
-  v1.33.6:
-    version: v1.16.0
-    webhook-version: v1.6.9
   v1.34.1:
     version: v1.16.0
     webhook-version: v1.6.9
   v1.34.2:
     version: v1.16.0
     webhook-version: v1.6.9
+  v1.34.11:
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.35.0:
     version: v1.16.0
     webhook-version: v1.6.9
+  v1.35.8:
+    version: v1.16.0
+    webhook-version: v1.6.9
   v1.36.0:
+    version: v1.16.0
+    webhook-version: v1.6.9
+  v1.36.4:
+    version: v1.16.0
+    webhook-version: v1.6.9
+  v1.37.0:
     version: v1.16.0
     webhook-version: v1.6.9
 kubernetes-dashboard:
-  v1.33.0:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
-  v1.33.6:
-    version: v2.7.0
-    metrics-scraper-version: v1.0.8
   v1.34.1:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
   v1.34.2:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
+  v1.34.11:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
   v1.35.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
+  v1.35.8:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
   v1.36.0:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
+  v1.36.4:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
+  v1.37.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
 local-path-provisioner:
-  v1.33.0:
-    version: v0.0.31
-    busybox-version: 1.34.1
-  v1.33.6:
-    version: v0.0.32
-    busybox-version: 1.34.1
   v1.34.1:
     version: v0.0.32
     busybox-version: 1.34.1
   v1.34.2:
     version: v0.0.32
     busybox-version: 1.34.1
+  v1.34.11:
+    version: v0.0.32
+    busybox-version: 1.34.1
   v1.35.0:
     version: v0.0.32
     busybox-version: 1.34.1
+  v1.35.8:
+    version: v0.0.32
+    busybox-version: 1.34.1
   v1.36.0:
+    version: v0.0.32
+    busybox-version: 1.34.1
+  v1.36.4:
+    version: v0.0.32
+    busybox-version: 1.34.1
+  v1.37.0:
     version: v0.0.32
     busybox-version: 1.34.1
 envoy-gateway:
-  v1.33.0:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
-  v1.33.6:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
   v1.34.1:
     version: 2.6.0
     envoyGateway-version: v1.9.0
@@ -99,37 +109,43 @@ envoy-gateway:
     envoy-version: distroless-v1.39.0
     kubectl-version: 0.0.9
     ratelimit-version: 17b1956c
+  v1.34.11:
+    version: 2.6.0
+    envoyGateway-version: v1.9.0
+    envoy-version: distroless-v1.39.0
+    kubectl-version: 0.0.9
+    ratelimit-version: 17b1956c
   v1.35.0:
     version: 2.6.0
     envoyGateway-version: v1.9.0
     envoy-version: distroless-v1.39.0
     kubectl-version: 0.0.9
     ratelimit-version: 17b1956c
+  v1.35.8:
+    version: 2.6.0
+    envoyGateway-version: v1.9.0
+    envoy-version: distroless-v1.39.0
+    kubectl-version: 0.0.9
+    ratelimit-version: 17b1956c
   v1.36.0:
+    version: 2.6.0
+    envoyGateway-version: v1.9.0
+    envoy-version: distroless-v1.39.0
+    kubectl-version: 0.0.9
+    ratelimit-version: 17b1956c
+  v1.36.4:
+    version: 2.6.0
+    envoyGateway-version: v1.9.0
+    envoy-version: distroless-v1.39.0
+    kubectl-version: 0.0.9
+    ratelimit-version: 17b1956c
+  v1.37.0:
     version: 2.6.0
     envoyGateway-version: v1.9.0
     envoy-version: distroless-v1.39.0
     kubectl-version: 0.0.9
     ratelimit-version: 17b1956c
 openstack-cinder-csi:
-  v1.33.0:
-    version: 2.35.0
-    attacher-version: v4.10.0
-    provisioner-version: v5.3.0
-    snapshotter-version: v8.4.0
-    resizer-version: v1.14.0
-    livenessprobe-version: v2.17.0
-    nodeDriverRegistrar-version: v2.15.0
-    plugin-version: v1.35.0
-  v1.33.6:
-    version: 2.35.0
-    attacher-version: v4.10.0
-    provisioner-version: v5.3.0
-    snapshotter-version: v8.4.0
-    resizer-version: v1.14.0
-    livenessprobe-version: v2.17.0
-    nodeDriverRegistrar-version: v2.15.0
-    plugin-version: v1.35.0
   v1.34.1:
     version: 2.35.0
     attacher-version: v4.10.0
@@ -148,7 +164,25 @@ openstack-cinder-csi:
     livenessprobe-version: v2.17.0
     nodeDriverRegistrar-version: v2.15.0
     plugin-version: v1.35.0
+  v1.34.11:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
   v1.35.0:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.35.8:
     version: 2.35.0
     attacher-version: v4.10.0
     provisioner-version: v5.3.0
@@ -166,16 +200,38 @@ openstack-cinder-csi:
     livenessprobe-version: v2.17.0
     nodeDriverRegistrar-version: v2.15.0
     plugin-version: v1.35.0
+  v1.36.4:
+    version: 2.35.0
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.35.0
+  v1.37.0:
+    version: 2.36.2
+    attacher-version: v4.10.0
+    provisioner-version: v5.3.0
+    snapshotter-version: v8.4.0
+    resizer-version: v1.14.0
+    livenessprobe-version: v2.17.0
+    nodeDriverRegistrar-version: v2.15.0
+    plugin-version: v1.36.0
 csi-snapshot-controller:
-  v1.33.0:
-    version: 8.5.0
-  v1.33.6:
-    version: 8.5.0
   v1.34.1:
     version: 8.5.0
   v1.34.2:
     version: 8.5.0
+  v1.34.11:
+    version: 8.5.0
   v1.35.0:
     version: 8.5.0
+  v1.35.8:
+    version: 8.5.0
   v1.36.0:
+    version: 8.5.0
+  v1.36.4:
+    version: 8.5.0
+  v1.37.0:
     version: 8.5.0
