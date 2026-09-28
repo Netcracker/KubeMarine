@@ -23,7 +23,7 @@ from ordered_set import OrderedSet
 
 from kubemarine import plugins, system
 from kubemarine.core import utils, log
-from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, DeferredGroup, CollectorCallback, AbstractGroup, RunResult
 from kubemarine.core.yaml_merger import override_merger, merge_named_args
 from kubemarine.kubernetes.object import KubernetesObject
@@ -130,35 +130,6 @@ ALL_COMPONENTS = CONTROL_PLANE_SPECIFIC_COMPONENTS + NODE_COMPONENTS
 COMPONENTS_SUPPORT_PATCHES = CONTROL_PLANE_COMPONENTS + ['kubelet']
 
 
-def convert_kubeadm_config(config: dict) -> dict:
-    """Read legacy configurations as v1beta4 without losing repeated arguments."""
-    config = utils.deepcopy_yaml(config)
-    if config.get('kind') not in ('ClusterConfiguration', 'InitConfiguration', 'JoinConfiguration'):
-        return config
-    if config.get('apiVersion', 'kubeadm.k8s.io/v1beta4') not in (
-            'kubeadm.k8s.io/v1beta3', 'kubeadm.k8s.io/v1beta4'):
-        raise ValueError(f"Unsupported kubeadm configuration API: {config['apiVersion']}")
-    config['apiVersion'] = 'kubeadm.k8s.io/v1beta4'
-    paths = [('apiServer', 'extraArgs'), ('scheduler', 'extraArgs'),
-             ('controllerManager', 'extraArgs'), ('etcd', 'local', 'extraArgs'),
-             ('nodeRegistration', 'kubeletExtraArgs')]
-    for path in paths:
-        parent = config
-        for key in path[:-1]:
-            parent = parent.get(key, {})
-        key = path[-1]
-        value = parent.get(key)
-        if isinstance(value, dict):
-            parent[key] = [{'name': name, 'value': arg} for name, arg in value.items()]
-    if config['kind'] == 'ClusterConfiguration':
-        config.get('apiServer', {}).pop('timeoutForControlPlane', None)
-    elif config['kind'] == 'JoinConfiguration':
-        timeout = config.get('discovery', {}).pop('timeout', None)
-        if timeout is not None:
-            config.setdefault('timeouts', {}).setdefault('discovery', timeout)
-    return config
-
-
 @overload
 def get_arg(args: list, name: str, default: str) -> str:
     ...
@@ -179,92 +150,6 @@ def set_arg(args: list, name: str, value: Optional[str]) -> None:
     args[:] = [arg for arg in args if arg['name'] != name]
     if value is not None:
         args.append({'name': name, 'value': value})
-
-
-def migrate_inventory(inventory: dict) -> bool:
-    """Migrate explicit inventory overrides without expanding defaults."""
-    services: dict = inventory.get('services', {})
-    original_config = services.get('kubeadm')
-    if original_config is None:
-        return False
-    config = utils.deepcopy_yaml(original_config)
-    timeout = config.get('apiServer', {}).get('timeoutForControlPlane')
-    if timeout is not None:
-        timeouts = services.get('kubeadm_timeouts', {})
-        current = timeouts.get('controlPlaneComponentHealthCheck', timeout)
-        if current != timeout:
-            raise ValueError('Conflicting kubeadm controlPlaneComponentHealthCheck and timeoutForControlPlane')
-    # A partial override does not necessarily contain kind or apiVersion.
-    kind = config.get('kind')
-    api_version = config.get('apiVersion')
-    config['kind'] = 'ClusterConfiguration'
-    converted = convert_kubeadm_config(config)
-    if kind is None:
-        converted.pop('kind')
-    if api_version is None:
-        converted.pop('apiVersion')
-    changed = converted != original_config
-    if changed:
-        original_config.clear()
-        original_config.update(converted)
-    if timeout is not None:
-        services.setdefault('kubeadm_timeouts', {})['controlPlaneComponentHealthCheck'] = timeout
-    return bool(changed)
-
-
-@enrichment(EnrichmentStage.FULL)
-def enrich_kubeadm_api(cluster: KubernetesCluster) -> None:
-    if migrate_inventory(cluster.inventory):
-        cluster.log.warning('Legacy kubeadm configuration was converted to v1beta4. '
-                            'Run migrate_kubemarine to persist the inventory and ConfigMap migration.')
-
-
-def migrate_kubeadm_cluster_config(config: dict, control_plane: NodeGroup) -> dict:
-    """Use installed kubeadm to migrate a stored ClusterConfiguration to v1beta4."""
-    if config.get('kind') != 'ClusterConfiguration':
-        raise ValueError('kubeadm-config does not contain a ClusterConfiguration')
-    api_version = config.get('apiVersion')
-    if api_version == 'kubeadm.k8s.io/v1beta4':
-        return utils.deepcopy_yaml(config)
-    if api_version != 'kubeadm.k8s.io/v1beta3':
-        raise ValueError(f'Unsupported kubeadm configuration API: {api_version}')
-
-    path = utils.get_remote_tmp_path('kubeadm-config-migration.yaml')
-    try:
-        control_plane.put(io.StringIO(yaml.safe_dump(config)), path, sudo=True)
-        migrated = control_plane.sudo(f'kubeadm config migrate --old-config={path}').get_simple_out()
-
-        cluster_configs = [document for document in yaml.safe_load_all(migrated)
-                           if isinstance(document, dict) and document.get('kind') == 'ClusterConfiguration']
-        if len(cluster_configs) != 1:
-            raise ValueError('kubeadm config migrate must produce exactly one ClusterConfiguration')
-
-        converted = cluster_configs[0]
-        if converted.get('apiVersion') != 'kubeadm.k8s.io/v1beta4':
-            raise ValueError('kubeadm config migrate did not produce a v1beta4 ClusterConfiguration')
-
-        control_plane.put(io.StringIO(yaml.safe_dump(converted)), path, sudo=True)
-        control_plane.sudo(f'kubeadm config validate --config={path}')
-        return converted
-    finally:
-        control_plane.sudo(f'rm -f {path}', warn=True)
-
-
-def migrate_kubeadm_configmap(cluster: KubernetesCluster) -> None:
-    """Migrate the stored ClusterConfiguration with the installed kubeadm binary."""
-    control_plane = cluster.nodes['control-plane'].get_first_member()
-    configmap = KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
-    configmap.reload(control_plane)
-    original = configmap.obj['data']['ClusterConfiguration']
-    config = yaml.safe_load(original)
-    converted = migrate_kubeadm_cluster_config(config, control_plane)
-    if converted == config:
-        cluster.log.info('kubeadm-config already uses v1beta4')
-        return
-
-    utils.dump_file(cluster, configmap.to_yaml(), 'kubeadm-config-before-v1beta4.yaml')
-    configmap.obj['data']['ClusterConfiguration'] = yaml.safe_dump(converted)
-    configmap.apply(control_plane)
 
 
 class KubeadmConfig:
@@ -296,12 +181,14 @@ class KubeadmConfig:
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
-        if configmap == 'kubeadm-config':
-            config = migrate_kubeadm_cluster_config(config, control_plane)
+        if configmap == 'kubeadm-config' and config.get('apiVersion') != 'kubeadm.k8s.io/v1beta4':
+            raise ValueError('kube-system/kubeadm-config must use kubeadm.k8s.io/v1beta4. '
+                             'Run kubemarine migrate_kubemarine with this KubeMarine version '
+                             'before running checks or maintenance procedures.')
 
         if edit_func is not None:
             config = edit_func(config)
-            configmap_obj.obj["data"][key] = yaml.dump(convert_kubeadm_config(config))
+            configmap_obj.obj["data"][key] = yaml.dump(config)
 
         self.maps[configmap] = config
         return config
@@ -317,14 +204,10 @@ class KubeadmConfig:
         if not self.is_loaded(configmap):
             raise ValueError(f"To apply changed {configmap} ConfigMap, it is necessary to fetch it first")
 
-        if configmap == 'kubeadm-config':
-            key = CONFIGMAPS_CONSTANTS[configmap]['key']
-            self.loaded_maps[configmap].obj['data'][key] = yaml.dump(convert_kubeadm_config(self.maps[configmap]))
         self.loaded_maps[configmap].apply(control_plane)
 
     def to_yaml(self, init_config: dict) -> str:
-        configs = [convert_kubeadm_config(config) for config in self.maps.values()]
-        init_config = convert_kubeadm_config(init_config)
+        configs = list(self.maps.values())
         configs.append(init_config)
         return yaml.dump_all(configs)
 

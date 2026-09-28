@@ -107,7 +107,6 @@ def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
 
     if kubeadm_sections:
         kubeadm_sections = utils.deepcopy_yaml(kubeadm_sections)
-        components.migrate_inventory({'services': kubeadm_sections})
         default_merger.merge(cluster.inventory.setdefault('services', {}), kubeadm_sections)
 
 
@@ -666,7 +665,6 @@ def init_workers(group: NodeGroup) -> None:
     join_dict = cluster.context.get("join_dict", get_join_dict(group))
 
     join_config = components.get_init_config(cluster, group, init=False, join_dict=join_dict)
-    join_config = components.convert_kubeadm_config(join_config)
     config = yaml.dump(join_config)
 
     utils.dump_file(cluster, config, 'join-config-workers.yaml')

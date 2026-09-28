@@ -27,6 +27,7 @@ from ordered_set import OrderedSet
 
 from kubemarine import demo, plugins, system, kubernetes
 from kubemarine.kubernetes import components
+from kubemarine.patches import migrate_kubeadm_v1beta4 as kubeadm_migration
 
 
 class KubeadmConfigTest(unittest.TestCase):
@@ -42,9 +43,9 @@ class KubeadmConfigTest(unittest.TestCase):
         group.get_ordered_members_list.return_value = []
         group.cluster.context = {'join_dict': {}}
         group.cluster.inventory = {'services': {'kubeadm': {'kubernetesVersion': version}}}
-        join = {'apiVersion': 'kubeadm.k8s.io/v1beta3', 'kind': 'JoinConfiguration',
-                'nodeRegistration': {'kubeletExtraArgs': {'container-runtime-endpoint':
-                                                        'unix:///run/containerd/containerd.sock'}}}
+        join = {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'JoinConfiguration',
+                'nodeRegistration': {'kubeletExtraArgs': [{'name': 'container-runtime-endpoint',
+                                                         'value': 'unix:///run/containerd/containerd.sock'}]}}
         with mock.patch.object(kubernetes, 'get_join_dict', return_value={}), \
                 mock.patch.object(components, 'get_init_config', return_value=join), \
                 mock.patch.object(kubernetes.utils, 'dump_file'):
@@ -54,7 +55,7 @@ class KubeadmConfigTest(unittest.TestCase):
         self.assertEqual([{'name': 'container-runtime-endpoint',
                            'value': 'unix:///run/containerd/containerd.sock'}],
                          uploaded['nodeRegistration']['kubeletExtraArgs'])
-        self.assertIsInstance(join['nodeRegistration']['kubeletExtraArgs'], dict)
+        self.assertIsInstance(join['nodeRegistration']['kubeletExtraArgs'], list)
 
     def test_v1beta4_serialization_preserves_inventory_and_timeouts(self):
         for version in ('v1.34.11', 'v1.36.0', 'v1.37.0'):
@@ -62,9 +63,9 @@ class KubeadmConfigTest(unittest.TestCase):
                 inventory = demo.generate_inventory(**demo.ALLINONE)
                 inventory['services']['kubeadm'] = {
                     'kubernetesVersion': version,
-                    'apiVersion': 'kubeadm.k8s.io/v1beta3',
-                    'apiServer': {'timeoutForControlPlane': '5m'},
+                    'apiVersion': 'kubeadm.k8s.io/v1beta4',
                 }
+                inventory['services']['kubeadm_timeouts'] = {'controlPlaneComponentHealthCheck': '5m'}
                 cluster = demo.new_cluster(inventory)
                 before = deepcopy(cluster.inventory)
                 init = components.get_init_config(cluster, cluster.nodes['control-plane'], init=True)
@@ -84,17 +85,18 @@ class KubeadmConfigTest(unittest.TestCase):
                   'apiServer': {'extraArgs': [{'name': 'custom', 'value': 'true'}]},
                   'customField': {'preserved': True}}
         config['apiServer']['extraArgs'].append({'name': 'custom', 'value': 'false'})
-        normalized = components.convert_kubeadm_config(config)
+        normalized = kubeadm_migration.convert_kubeadm_config(config)
         self.assertEqual(config, normalized)
         self.assertIsNot(config, normalized)
         self.assertEqual('false', components.get_arg(normalized['apiServer']['extraArgs'], 'custom'))
 
-    def test_join_timeout_migration(self):
+    def test_join_timeout_serialization(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.37.0'}
         cluster = demo.new_cluster(inventory)
-        join = {'apiVersion': 'kubeadm.k8s.io/v1beta3', 'kind': 'JoinConfiguration',
-                'discovery': {'timeout': '3m'}, 'nodeRegistration': {'kubeletExtraArgs': {}}}
+        join = {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'JoinConfiguration',
+                'discovery': {}, 'timeouts': {'discovery': '3m'},
+                'nodeRegistration': {'kubeletExtraArgs': []}}
         result = list(yaml.safe_load_all(components.get_kubeadm_config(cluster, join)))[-1]
         self.assertEqual({'discovery': '3m'}, result['timeouts'])
         self.assertNotIn('timeout', result['discovery'])
@@ -117,33 +119,24 @@ class KubeadmConfigTest(unittest.TestCase):
                           'kubernetesVersion': 'v1.36.0',
                           'apiServer': {'extraArgs': {'custom': 'old'}}}
                 if api_version == 'v1beta4':
-                    config = components.convert_kubeadm_config(config)
+                    config = kubeadm_migration.convert_kubeadm_config(config)
                 data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
                 cluster.fake_shell.add(
                     demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
                     'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
-                if api_version == 'v1beta3':
-                    migrated = components.convert_kubeadm_config(config)
-                    path = '/tmp/kubeadm-config-migration.yaml'
-                    commands = {
-                        f'kubeadm config migrate --old-config={path}': yaml.safe_dump_all([migrated]),
-                        f'kubeadm config validate --config={path}': '',
-                        f'rm -f {path}': '',
-                    }
-                    for command, stdout in commands.items():
-                        cluster.fake_shell.add(
-                            demo.create_hosts_result([control_plane.get_host()], stdout=stdout),
-                            'sudo', [command])
 
                 def edit(value):
                     args = value['apiServer']['extraArgs']
-                    if isinstance(args, list):
-                        args[0]['value'] = 'new'
-                    else:
-                        args['custom'] = 'new'
+                    args[0]['value'] = 'new'
                     return value
 
                 kubeadm = components.KubeadmConfig(cluster)
+                if api_version == 'v1beta3':
+                    with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_cluster_config') as migrate:
+                        with self.assertRaisesRegex(ValueError, 'Run kubemarine migrate_kubemarine'):
+                            kubeadm.load('kubeadm-config', control_plane, edit)
+                        migrate.assert_not_called()
+                    continue
                 loaded = kubeadm.load('kubeadm-config', control_plane, edit)
                 expected_args = [{'name': 'custom', 'value': 'new'}]
                 self.assertEqual(expected_args, loaded['apiServer']['extraArgs'])
@@ -194,7 +187,7 @@ class KubeadmConfigTest(unittest.TestCase):
 
         with mock.patch.object(components.utils, 'dump_file') as dump_file, \
                 mock.patch.object(components.KubernetesObject, 'apply', autospec=True) as apply:
-            components.migrate_kubeadm_configmap(cluster)
+            kubeadm_migration.migrate_kubeadm_configmap(cluster)
 
         dump_file.assert_called_once()
         applied_configmap = apply.call_args.args[0]
@@ -222,7 +215,7 @@ class KubeadmConfigTest(unittest.TestCase):
         cluster.fake_shell.add(demo.create_hosts_result([host], stdout=json.dumps(configmap)), 'sudo', [command])
 
         with mock.patch.object(components.KubernetesObject, 'apply', autospec=True) as apply:
-            components.migrate_kubeadm_configmap(cluster)
+            kubeadm_migration.migrate_kubeadm_configmap(cluster)
 
         apply.assert_not_called()
 

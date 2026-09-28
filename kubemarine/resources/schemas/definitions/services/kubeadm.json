@@ -48,9 +48,9 @@
       "$ref": "#/definitions/Etcd"
     },
     "apiVersion": {
-      "enum": ["kubeadm.k8s.io/v1beta4", "kubeadm.k8s.io/v1beta3"],
+      "enum": ["kubeadm.k8s.io/v1beta4"],
       "default": "kubeadm.k8s.io/v1beta4",
-      "description": "Use v1beta4. Legacy v1beta3 input is accepted only for migration and converted with a warning."
+      "description": "Use v1beta4. Run migrate_kubemarine with the new KubeMarine version to migrate an existing cluster and inventory."
     },
     "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"},
     "featureGates": {
@@ -80,16 +80,12 @@
             "service-account-signing-key-file": {"type": "string"},
             "service-account-key-file": {"type": "string"}
           }
-        },
-        "timeoutForControlPlane": {
-          "type": "string",
-          "description": "Legacy input only. Migrated to services.kubeadm_timeouts.controlPlaneComponentHealthCheck."
         }
       },
       "propertyNames": {
         "anyOf": [
           {"$ref": "#/definitions/ControlPlaneComponentPropertyNames"},
-          {"enum": ["certSANs", "timeoutForControlPlane"]}
+          {"enum": ["certSANs"]}
         ]
       }
     },
@@ -155,24 +151,19 @@
       "enum": ["extraArgs", "extraVolumes"]
     },
     "ExtraArgs": {
-      "description": "v1beta4 arguments merged by name. Legacy mappings are converted for compatibility.",
-      "oneOf": [
-        {"type": "object", "additionalProperties": {"type": "string"}},
-        {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {"name": {"type": "string"}, "value": {"type": "string"}},
-                "required": ["name", "value"],
-                "additionalProperties": false
-              },
-              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
-            ]
-          }
-        }
-      ]
+      "description": "v1beta4 arguments merged by name. Run migrate_kubemarine to migrate legacy argument mappings.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "value": {"type": "string"}},
+            "required": ["name", "value"],
+            "additionalProperties": false
+          },
+          {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+        ]
+      }
     },
     "Timeouts": {
       "type": "object",

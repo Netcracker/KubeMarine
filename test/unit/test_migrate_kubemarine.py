@@ -28,6 +28,9 @@ from kubemarine.core.patch import Patch, InventoryOnlyPatch, RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import migrate_kubemarine
+from kubemarine.kubernetes import components
+from kubemarine.patches import migrate_kubeadm_v1beta4 as kubeadm_migration
+from kubemarine.patches.migrate_kubeadm_v1beta4 import MigrationAction, migrate_templates
 from kubemarine.procedures.migrate_kubemarine import (
     CriUpgradeAction, BalancerUpgradeAction, PluginUpgradeAction, ThirdpartyUpgradeAction
 )
@@ -132,14 +135,85 @@ class PatchesResolvingTest(unittest.TestCase):
             patches_list.append(new_patch("test_cluster1", RegularPatch))
 
             resolved_patches = migrate_kubemarine.load_patches()
-            expected_order = ['test_inventory1', 'test_inventory2',
+            expected_order = ['migrate_kubeadm_v1beta4', 'test_inventory1', 'test_inventory2',
                               'upgrade_crictl', 'upgrade_cri', 'upgrade_haproxy', 'upgrade_keepalived',
                               'upgrade_calico', 'upgrade_nginx_ingress_controller',
                               'upgrade_kubernetes_dashboard', 'upgrade_local_path_provisioner',
-                              'migrate_kubeadm_v1beta4', 'test_cluster2', 'test_cluster1']
+                              'test_cluster2', 'test_cluster1']
             self.assertEqual(expected_order,
                              [p.identifier for p in resolved_patches if p.identifier in expected_order],
                              "Unexpected order of resolved patches")
+
+
+class KubeadmMigrationTest(unittest.TestCase):
+    def test_migration_persists_before_next_action_and_is_repeatable(self):
+        inventory, context = generate_environment('v1.36.0', demo.ALLINONE)
+        context['preserve_inventory'] = False
+        inventory['services']['kubeadm'].update({
+            'apiVersion': 'kubeadm.k8s.io/v1beta3',
+            'apiServer': {'extraArgs': {'audit-policy-file': '/custom/policy.yaml'},
+                          'timeoutForControlPlane': '5m'},
+        })
+        inventory['services']['kubeadm']['apiServer']['extraVolumes'] = [{
+            'name': 'custom-policy', 'mountPath': '/custom/policy.yaml',
+            'hostPath': '{{ services.kubeadm.apiServer.extraArgs["audit-policy-file"] }}',
+        }]
+        res = demo.new_resources(inventory, context=context)
+        action = MigrationAction()
+        with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_configmap') as migrate, \
+                mock.patch.object(res, '_store_inventory') as store:
+            flow.run_actions(res, [action])
+            migrate.assert_called_once()
+            store.assert_called_once()
+        saved = res.inventory()
+        self.assertEqual('kubeadm.k8s.io/v1beta4', saved['services']['kubeadm']['apiVersion'])
+        self.assertEqual([{'name': 'audit-policy-file', 'value': '/custom/policy.yaml'}],
+                         saved['services']['kubeadm']['apiServer']['extraArgs'])
+        self.assertEqual('5m', saved['services']['kubeadm_timeouts']['controlPlaneComponentHealthCheck'])
+        self.assertIn('selectattr', saved['services']['kubeadm']['apiServer']['extraVolumes'][0]['hostPath'])
+        self.assertEqual('/custom/policy.yaml',
+                         res.cluster().inventory['services']['kubeadm']['apiServer']['extraVolumes'][0]['hostPath'])
+        self.assertIsNotNone(components.get_arg(
+            res.cluster().inventory['services']['kubeadm']['apiServer']['extraArgs'], 'profiling'))
+        with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_configmap'), \
+                mock.patch.object(res, '_store_inventory') as store:
+            flow.run_actions(res, [MigrationAction()])
+            store.assert_not_called()
+
+    def test_failed_configmap_migration_does_not_persist_inventory(self):
+        inventory, context = generate_environment('v1.36.0', demo.ALLINONE)
+        inventory['services']['kubeadm']['apiVersion'] = 'kubeadm.k8s.io/v1beta3'
+        res = demo.new_resources(inventory, context=context)
+        with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_configmap', side_effect=ValueError('migration failed')), \
+                mock.patch.object(res, '_store_inventory') as store:
+            with self.assertRaisesRegex(ValueError, 'migration failed'):
+                flow.run_actions(res, [MigrationAction()])
+            store.assert_not_called()
+        self.assertEqual('kubeadm.k8s.io/v1beta3', res.inventory()['services']['kubeadm']['apiVersion'])
+
+    def test_literal_template_references(self):
+        for reference in ('services.kubeadm.apiServer.extraArgs',
+                          "services['kubeadm']['scheduler']['extraArgs']",
+                          'services.kubeadm.etcd.local.extraArgs'):
+            with self.subTest(reference=reference):
+                inventory = {'value': '{{ ' + reference + "['custom-arg'] }}"}
+                self.assertTrue(migrate_templates(inventory))
+                self.assertIn('selectattr("name", "equalto", "custom-arg")', inventory['value'])
+                self.assertFalse(migrate_templates(inventory))
+        untouched = {'quoted': '{{ "services.kubeadm.apiServer.extraArgs[\'flag\']" }}',
+                     'other_root': "{{ other.services.kubeadm.apiServer.extraArgs['flag'] }}",
+                     'raw': "{% raw %}{{ services.kubeadm.apiServer.extraArgs['flag'] }}{% endraw %}"}
+        self.assertFalse(migrate_templates(untouched))
+
+    def test_legacy_inventory_requires_migration(self):
+        for override in ({'apiVersion': 'kubeadm.k8s.io/v1beta3'},
+                         {'apiServer': {'extraArgs': {'profiling': 'false'}}},
+                         {'apiServer': {'timeoutForControlPlane': '5m'}}):
+            with self.subTest(override=override):
+                inventory = demo.generate_inventory(**demo.ALLINONE)
+                inventory['services']['kubeadm'] = override
+                with self.assertRaises(errors.FailException):
+                    demo.new_cluster(inventory)
 
 
 class UpgradeCRI(unittest.TestCase):

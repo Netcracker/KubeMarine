@@ -56,43 +56,44 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': 'v1.34.11',
             'apiServer': {
-                'extraArgs': {'api_k1': 'api_v1'},
+                'extraArgs': [{'name': 'api_k1', 'value': 'api_v1'}],
                 'extraVolumes': [{'name': 'api_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
                 'certSANs': ['san1'],
-                'timeoutForControlPlane': '4m0s',
             },
             'scheduler': {
-                'extraArgs': {'sched_key1': 'sched_v1'},
+                'extraArgs': [{'name': 'sched_key1', 'value': 'sched_v1'}],
             },
             'controllerManager': {
                 'extraVolumes': [{'name': 'ctrl_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
             },
             'etcd': {'local': {
-                'extraArgs': {'etcd_k1': 'etcd_v1'},
+                'extraArgs': [{'name': 'etcd_k1', 'value': 'etcd_v1'}],
                 'imageTag': '1.2.3'
             }},
         }
         self.reconfigure['services']['kubeadm'] = {
             'apiServer': {
-                'extraArgs': {'api_k1': 'api_v1_new', 'api_k2': 'api_v2_new'},
+                'extraArgs': [{'name': 'api_k1', 'value': 'api_v1_new'},
+                              {'name': 'api_k2', 'value': 'api_v2_new'}],
                 'extraVolumes': [
                     {'<<': 'merge'},
                     {'name': 'api_name2_new', 'hostPath': '/home/path', 'mountPath': '/mount/path'}
                 ],
                 'certSANs': ['san2_new'],
-                'timeoutForControlPlane': '5m0s',
             },
             'scheduler': {
                 'extraVolumes': [{'name': 'sched_name1_new', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
             },
             'controllerManager': {
-                'extraArgs': {'ctrl_k1': 'ctrl_k1_new'},
+                'extraArgs': [{'name': 'ctrl_k1', 'value': 'ctrl_k1_new'}],
             },
             'etcd': {'local': {
-                'extraArgs': {'etcd_k1': 'etcd_v1_new'},
+                'extraArgs': [{'name': 'etcd_k1', 'value': 'etcd_v1_new'}],
             }},
         }
 
+        self.inventory['services']['kubeadm_timeouts'] = {'controlPlaneComponentHealthCheck': '4m0s'}
+        self.reconfigure['services']['kubeadm_timeouts'] = {'controlPlaneComponentHealthCheck': '5m0s'}
         self.inventory['services']['kubeadm_kubelet'] = {
             'enableDebuggingHandlers': False,
             'serializeImagePulls': True
@@ -186,7 +187,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
     def test_change_apiserver_args_check_jinja_dependent_parameters(self):
         self.reconfigure['services']['kubeadm'] = {
             'apiServer': {
-                'extraArgs': {'audit-policy-file': '/changed/path'},
+                'extraArgs': [{'name': 'audit-policy-file', 'value': '/changed/path'}],
             }
         }
 
@@ -200,7 +201,7 @@ class ReconfigureKubeadmEnrichment(_AbstractReconfigureTest):
     def test_pss_managed_arg_not_redefined(self):
         self.reconfigure['services']['kubeadm'] = {
             'apiServer': {
-                'extraArgs': {'admission-control-config-file': '/some/redefined/path'},
+                'extraArgs': [{'name': 'admission-control-config-file', 'value': '/some/redefined/path'}],
             },
         }
 

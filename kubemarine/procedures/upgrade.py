@@ -35,11 +35,6 @@ def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
 
 
 def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
-    # Persist a configuration readable by the new kubeadm before replacing
-    # binaries. Preserve the running cluster version and all custom settings.
-    if components.kubernetes_minor_release_at_least(cluster.inventory, 'v1.37'):
-        components.migrate_kubeadm_configmap(cluster)
-
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return

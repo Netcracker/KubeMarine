@@ -430,7 +430,7 @@ def verify_allowed_kubernetes_versions(kubernetes_versions: List[str]) -> None:
 def load_patches() -> List[Patch]:
     patches = list(kubemarine.patches.patches)
     patches.extend(resolve_upgrade_patches())
-    patches.sort(key=lambda p: p.priority())
+    patches.sort(key=lambda p: (p.identifier != 'migrate_kubeadm_v1beta4', p.priority()))
     return patches
 
 
