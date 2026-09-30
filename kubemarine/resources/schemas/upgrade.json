@@ -7,23 +7,45 @@
       "description": "List of new versions through which to upgrade the cluster to the last specified version"
     },
     "upgrade_nodes": {
-      "type": "array",
-      "description": "Manually specify certain nodes that need to be upgraded. Each item can be either a node name referring to the cluster.yaml, or full node specification.",
-      "items": {
-        "oneOf": [
-          {"$ref": "definitions/common/node_ref.json#/definitions/Name"},
-          {
-            "type": "object",
-            "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
-            "required": ["name"],
-            "propertyNames": {
-              "$ref": "definitions/node.json#/definitions/PropertyNames"
+      "description": "Manually specify certain nodes that need to be upgraded. Each item can be either a node name referring to the cluster.yaml, full node specification, or a selector object with labels/roles.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"$ref": "definitions/common/node_ref.json#/definitions/Name"},
+              {
+                "type": "object",
+                "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
+                "required": ["name"],
+                "propertyNames": {
+                  "$ref": "definitions/node.json#/definitions/PropertyNames"
+                }
+              }
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        {
+          "type": "object",
+          "description": "Selectors to choose nodes for upgrade by attributes instead of explicit names.",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "description": "Node labels that must be matched. All specified labels must be present on the node.",
+              "additionalProperties": {
+                "type": ["string", "boolean", "integer"]
+              }
+            },
+            "roles": {
+              "$ref": "definitions/common/node_ref.json#/definitions/Roles"
             }
-          }
-        ]
-      },
-      "minItems": 1,
-      "uniqueItems": true
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        }
+      ]
     },
     "disable-eviction": {"$ref": "definitions/procedures.json#/definitions/DisableEviction"},
     "prepull_group_size": {"$ref": "definitions/procedures.json#/definitions/PrepullGroupSize"},
