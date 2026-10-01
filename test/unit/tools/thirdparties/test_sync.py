@@ -322,8 +322,9 @@ class SynchronizationTest(unittest.TestCase):
         k8s_intermediate = k8s_versions[1]
         del self.compatibility_map()[k8s_intermediate]
 
-        with self.assertRaisesRegex(Exception, ERROR_PREVIOUS_MINOR.format(
-                version=re.escape(k8s_intermediate), previous_versions='.*')):
+        with mock.patch.object(self.defaults, 'default_version', return_value=k8s_versions[-1]), \
+                self.assertRaisesRegex(Exception, ERROR_PREVIOUS_MINOR.format(
+                    version=re.escape(k8s_intermediate), previous_versions='.*')):
             self.run_sync()
 
     def test_mapped_software_not_ascending_order(self):

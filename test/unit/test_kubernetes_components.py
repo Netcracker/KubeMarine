@@ -58,7 +58,7 @@ class KubeadmConfigTest(unittest.TestCase):
         self.assertIsInstance(join['nodeRegistration']['kubeletExtraArgs'], list)
 
     def test_v1beta4_serialization_preserves_inventory_and_timeouts(self):
-        for version in ('v1.34.11', 'v1.36.0', 'v1.37.0'):
+        for version in ('v1.34.2', 'v1.36.0', 'v1.37.0'):
             with self.subTest(version=version):
                 inventory = demo.generate_inventory(**demo.ALLINONE)
                 inventory['services']['kubeadm'] = {
@@ -316,7 +316,7 @@ class KubeadmConfigTest(unittest.TestCase):
     def test_kubelet_local_mode_enrichment(self):
         # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']
         self.assertIsNotNone(kubeadm.get('featureGates'))
@@ -324,7 +324,7 @@ class KubeadmConfigTest(unittest.TestCase):
 
         # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ with not empty featureGates
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['foo'] = 'bar'
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']
@@ -334,7 +334,7 @@ class KubeadmConfigTest(unittest.TestCase):
 
         # Do not change featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ if value is overridden
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.11'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['ControlPlaneKubeletLocalMode'] = False
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']

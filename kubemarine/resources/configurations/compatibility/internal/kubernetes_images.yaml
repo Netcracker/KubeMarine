@@ -5,16 +5,10 @@ kube-apiserver:
     version: v1.34.1
   v1.34.2:
     version: v1.34.2
-  v1.34.11:
-    version: v1.34.11
   v1.35.0:
     version: v1.35.0
-  v1.35.8:
-    version: v1.35.8
   v1.36.0:
     version: v1.36.0
-  v1.36.4:
-    version: v1.36.4
   v1.37.0:
     version: v1.37.0
 kube-controller-manager:
@@ -22,16 +16,10 @@ kube-controller-manager:
     version: v1.34.1
   v1.34.2:
     version: v1.34.2
-  v1.34.11:
-    version: v1.34.11
   v1.35.0:
     version: v1.35.0
-  v1.35.8:
-    version: v1.35.8
   v1.36.0:
     version: v1.36.0
-  v1.36.4:
-    version: v1.36.4
   v1.37.0:
     version: v1.37.0
 kube-scheduler:
@@ -39,16 +27,10 @@ kube-scheduler:
     version: v1.34.1
   v1.34.2:
     version: v1.34.2
-  v1.34.11:
-    version: v1.34.11
   v1.35.0:
     version: v1.35.0
-  v1.35.8:
-    version: v1.35.8
   v1.36.0:
     version: v1.36.0
-  v1.36.4:
-    version: v1.36.4
   v1.37.0:
     version: v1.37.0
 kube-proxy:
@@ -56,16 +38,10 @@ kube-proxy:
     version: v1.34.1
   v1.34.2:
     version: v1.34.2
-  v1.34.11:
-    version: v1.34.11
   v1.35.0:
     version: v1.35.0
-  v1.35.8:
-    version: v1.35.8
   v1.36.0:
     version: v1.36.0
-  v1.36.4:
-    version: v1.36.4
   v1.37.0:
     version: v1.37.0
 pause:
@@ -73,15 +49,9 @@ pause:
     version: 3.10.1
   v1.34.2:
     version: 3.10.1
-  v1.34.11:
-    version: 3.10.1
   v1.35.0:
     version: 3.10.1
-  v1.35.8:
-    version: 3.10.1
   v1.36.0:
-    version: 3.10.2
-  v1.36.4:
     version: 3.10.2
   v1.37.0:
     version: 3.10.2
@@ -90,15 +60,9 @@ etcd:
     version: 3.6.4-0
   v1.34.2:
     version: 3.6.5-0
-  v1.34.11:
-    version: 3.6.5-0
   v1.35.0:
     version: 3.6.6-0
-  v1.35.8:
-    version: 3.6.6-0
   v1.36.0:
-    version: 3.6.8-0
-  v1.36.4:
     version: 3.6.8-0
   v1.37.0:
     version: 3.7.0-0
@@ -107,15 +71,9 @@ coredns/coredns:
     version: v1.12.1
   v1.34.2:
     version: v1.12.1
-  v1.34.11:
-    version: v1.12.1
   v1.35.0:
     version: v1.13.1
-  v1.35.8:
-    version: v1.13.1
   v1.36.0:
-    version: v1.14.2
-  v1.36.4:
     version: v1.14.2
   v1.37.0:
     version: v1.14.6
