@@ -47,7 +47,11 @@
     "etcd": {
       "$ref": "#/definitions/Etcd"
     },
-    "apiVersion": {"type": ["string"], "default": "kubeadm.k8s.io/v1beta2"},
+    "apiVersion": {
+      "enum": ["kubeadm.k8s.io/v1beta4"],
+      "default": "kubeadm.k8s.io/v1beta4",
+      "description": "Use v1beta4. Run migrate_kubemarine with the new KubeMarine version to migrate an existing cluster and inventory."
+    },
     "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"},
     "featureGates": {
       "$ref": "#/definitions/FeatureGates"
@@ -76,15 +80,12 @@
             "service-account-signing-key-file": {"type": "string"},
             "service-account-key-file": {"type": "string"}
           }
-        },
-        "timeoutForControlPlane": {
-          "type": "string"
         }
       },
       "propertyNames": {
         "anyOf": [
           {"$ref": "#/definitions/ControlPlaneComponentPropertyNames"},
-          {"enum": ["certSANs", "timeoutForControlPlane"]}
+          {"enum": ["certSANs"]}
         ]
       }
     },
@@ -150,10 +151,33 @@
       "enum": ["extraArgs", "extraVolumes"]
     },
     "ExtraArgs": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
+      "description": "v1beta4 arguments merged by name. Run migrate_kubemarine to migrate legacy argument mappings.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "value": {"type": "string"}},
+            "required": ["name", "value"],
+            "additionalProperties": false
+          },
+          {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+        ]
       }
+    },
+    "Timeouts": {
+      "type": "object",
+      "description": "Timeouts for generated kubeadm InitConfiguration and JoinConfiguration.",
+      "properties": {
+        "controlPlaneComponentHealthCheck": {"type": "string"},
+        "kubeletHealthCheck": {"type": "string"},
+        "kubernetesAPICall": {"type": "string"},
+        "etcdAPICall": {"type": "string"},
+        "tlsBootstrap": {"type": "string"},
+        "discovery": {"type": "string"},
+        "upgradeManifests": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "ExtraVolumes": {
       "type": "array",

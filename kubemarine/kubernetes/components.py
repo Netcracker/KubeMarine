@@ -15,7 +15,7 @@
 import io
 import re
 from textwrap import dedent
-from typing import List, Optional, Dict, Callable, Sequence, Union
+from typing import List, Optional, Dict, Callable, Sequence, Union, overload
 
 import yaml
 from jinja2 import Template
@@ -25,7 +25,7 @@ from kubemarine import plugins, system
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, DeferredGroup, CollectorCallback, AbstractGroup, RunResult
-from kubemarine.core.yaml_merger import override_merger
+from kubemarine.core.yaml_merger import override_merger, merge_named_args
 from kubemarine.kubernetes.object import KubernetesObject
 
 ERROR_WAIT_FOR_PODS_NOT_SUPPORTED = "Waiting for pods of {components} components is currently not supported"
@@ -130,6 +130,28 @@ ALL_COMPONENTS = CONTROL_PLANE_SPECIFIC_COMPONENTS + NODE_COMPONENTS
 COMPONENTS_SUPPORT_PATCHES = CONTROL_PLANE_COMPONENTS + ['kubelet']
 
 
+@overload
+def get_arg(args: list, name: str, default: str) -> str:
+    ...
+
+
+@overload
+def get_arg(args: list, name: str, default: None = None) -> Optional[str]:
+    ...
+
+
+def get_arg(args: list, name: str, default: Optional[str] = None) -> Optional[str]:
+    """Return the last occurrence, matching component flag precedence."""
+    return next((arg['value'] for arg in reversed(args) if arg['name'] == name), default)
+
+
+def set_arg(args: list, name: str, value: Optional[str]) -> None:
+    """Replace a KubeMarine-managed flag; None removes all occurrences."""
+    args[:] = [arg for arg in args if arg['name'] != name]
+    if value is not None:
+        args.append({'name': name, 'value': value})
+
+
 class KubeadmConfig:
     def __init__(self, cluster: KubernetesCluster):
         self.cluster = cluster
@@ -159,6 +181,10 @@ class KubeadmConfig:
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
+        if configmap == 'kubeadm-config' and config.get('apiVersion') != 'kubeadm.k8s.io/v1beta4':
+            raise ValueError('kube-system/kubeadm-config must use kubeadm.k8s.io/v1beta4. '
+                             'Run kubemarine migrate_kubemarine with this KubeMarine version '
+                             'before running checks or maintenance procedures.')
 
         if edit_func is not None:
             config = edit_func(config)
@@ -187,10 +213,18 @@ class KubeadmConfig:
 
     def merge_with_inventory(self, configmap: str) -> Callable[[dict], dict]:
         def merge_func(config_: dict) -> dict:
-            patch_config: dict = KubeadmConfig(self.cluster).maps[configmap]
+            patch_config: dict = utils.deepcopy_yaml(KubeadmConfig(self.cluster).maps[configmap])
+            if configmap == 'kubeadm-config':
+                for path in (('apiServer',), ('scheduler',), ('controllerManager',), ('etcd', 'local')):
+                    current, patch = config_, patch_config
+                    for key in path:
+                        current = current.get(key, {})
+                        patch = patch.get(key, {})
+                    if 'extraArgs' in patch:
+                        patch['extraArgs'] = merge_named_args(current.get('extraArgs', []), patch['extraArgs'])
             # It seems that all default lists are always overridden with custom instead of appending,
             # and so override merger seems the most suitable.
-            config_ = override_merger.merge(config_, utils.deepcopy_yaml(patch_config))
+            config_ = override_merger.merge(config_, patch_config)
             return config_
 
         return merge_func
@@ -252,6 +286,9 @@ def get_init_config(cluster: KubernetesCluster, group: AbstractGroup[RunResult],
         'kind': init_kind,
         'patches': {'directory': '/etc/kubernetes/patches'},
     }
+    timeouts = inventory['services'].get('kubeadm_timeouts', {})
+    if timeouts:
+        init_config['timeouts'] = utils.deepcopy_yaml(timeouts)
     if init:
         if control_plane:
             init_config.update(control_plane_spec)
@@ -283,14 +320,14 @@ def get_kubeadm_config(cluster: KubernetesCluster, init_config: dict) -> str:
 
 
 def _configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict) -> None:
-    kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', {})
+    kubelet_extra_args = kubeadm_config.setdefault('nodeRegistration', {}).setdefault('kubeletExtraArgs', [])
 
     kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
 
     if not is_container_runtime_not_configurable(cluster):
-        kubelet_extra_args['container-runtime'] = 'remote'
+        set_arg(kubelet_extra_args, 'container-runtime', 'remote')
 
-    kubelet_extra_args['container-runtime-endpoint'] = 'unix:///run/containerd/containerd.sock'
+    set_arg(kubelet_extra_args, 'container-runtime-endpoint', 'unix:///run/containerd/containerd.sock')
 
 
 def reconfigure_components(group: NodeGroup, components: List[str],
@@ -909,7 +946,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
         # The same containerd socket could be found by these two paths.
         # This path is usually configured by kubeadm for containerRuntimeEndpoint in /var/lib/kubelet/instance-config.yaml file.
         # As of k8s 1.36, "/var/run" socket path variant is usually used by kubeadm on fresh install.
-        # However, upgrade 1.33 to 1.34 for some reason sets socket path using "/run" variant, which breaks check.
+        # Some upgrades can set the socket path using the "/run" variant, which breaks the check.
         # Since these paths are interchangeable, we just replace "/run" with "/var/run". 
         varRunSockPath = "unix:///var/run/containerd/containerd.sock"
         runSockPath = "unix:///run/containerd/containerd.sock"

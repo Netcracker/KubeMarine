@@ -1143,11 +1143,10 @@ By default, the installer uses the following parameters:
 | scheduler.extraArgs.profiling                           | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.profiling                   | `false`                                                  |                                                                                        |
 | controllerManager.extraArgs.terminated-pod-gc-threshold | `1000`                                                   |                                                                                        |
-| featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes versions 1.33, 1.34 and 1.35                                               |
+| featureGates.ControlPlaneKubeletLocalMode               | `true`                                                   | Provided for Kubernetes versions 1.34 and 1.35                                               |
 | etcd.local.extraArgs.auto-compaction-mode               | `periodic`                                               |
 | etcd.local.extraArgs.auto-compaction-retention          | `1h`                               |                     |
 | etcd.local.extraArgs.snapshot-count                     | `100000`                           |                     |
-| etcd.local.extraArgs.experimental-watch-progress-notify-interval | `5m`                           | Provided for Kubernetes versions up to v1.33 |
 | etcd.local.extraArgs.watch-progress-notify-interval              | `5m`                           | Provided for Kubernetes versions from v1.34  |
 
 The following is an example of kubeadm defaults override:
@@ -1161,25 +1160,37 @@ services:
     imageRepository: example.com:5443/registry.k8s.io
     apiServer:
       extraArgs:
-        enable-admission-plugins: NodeRestriction,PodNodeSelector
-        profiling: "false"
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
-        audit-log-maxage: "30"
-        audit-log-maxbackup: "10"
-        audit-log-maxsize: "100"
+        - name: enable-admission-plugins
+          value: NodeRestriction,PodNodeSelector
+        - name: profiling
+          value: "false"
+        - name: audit-log-path
+          value: /var/log/kubernetes/audit/audit.log
+        - name: audit-policy-file
+          value: /etc/kubernetes/audit-policy.yaml
+        - name: audit-log-maxage
+          value: "30"
+        - name: audit-log-maxbackup
+          value: "10"
+        - name: audit-log-maxsize
+          value: "100"
     scheduler:
       extraArgs:
-        profiling: "false"
+        - name: profiling
+          value: "false"
     controllerManager:
       extraArgs:
-        profiling: "false"
-        terminated-pod-gc-threshold: "1000"
+        - name: profiling
+          value: "false"
+        - name: terminated-pod-gc-threshold
+          value: "1000"
     etcd:
       local:
         extraArgs:
-          heartbeat-interval: "1000"
-          election-timeout: "10000"
+          - name: heartbeat-interval
+            value: "1000"
+          - name: election-timeout
+            value: "10000"
 
 ```
 
@@ -1232,17 +1243,24 @@ services:
   kubeadm:
     apiServer:
       extraArgs:
-        feature-gates: "ServiceAccountIssuerDiscovery=true"
-        service-account-issuer: "https://{{ cluster_name }}:6443"
-        service-account-jwks-uri: "https://{{ cluster_name }}:6443/openid/v1/jwks"
-        service-account-signing-key-file: /etc/kubernetes/pki/sa.key
-        service-account-key-file: /etc/kubernetes/pki/sa.pub
+        - name: feature-gates
+          value: "ServiceAccountIssuerDiscovery=true"
+        - name: service-account-issuer
+          value: "https://{{ cluster_name }}:6443"
+        - name: service-account-jwks-uri
+          value: "https://{{ cluster_name }}:6443/openid/v1/jwks"
+        - name: service-account-signing-key-file
+          value: /etc/kubernetes/pki/sa.key
+        - name: service-account-key-file
+          value: /etc/kubernetes/pki/sa.pub
     controllerManager:
       extraArgs:
-        feature-gates: "ServiceAccountIssuerDiscovery=true"
+        - name: feature-gates
+          value: "ServiceAccountIssuerDiscovery=true"
     scheduler:
       extraArgs:
-        feature-gates: "ServiceAccountIssuerDiscovery=true"
+        - name: feature-gates
+          value: "ServiceAccountIssuerDiscovery=true"
 ```
 
 To be able to fetch the public keys and validate the JWT tokens against the Kubernetes cluster’s issuer, you have to allow external unauthenticated requests.
@@ -1638,7 +1656,7 @@ services:
           name: "Kubernetes"
           enabled: 1
           gpgcheck: 0
-          baseurl: "https://pkgs.k8s.io/core:/stable:/v1.33/rpm/"
+          baseurl: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/"
         my_own_repo:
           name: "My repository"
           enabled: 1
@@ -6514,50 +6532,9 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 
 **Note**: If you need to upgrade an existing Kubernetes cluster to new version, please use the [Upgrade Procedure](Maintenance.md#upgrade-procedure).
 
-The tables below shows the correspondence of versions that are supported and is used during the installation:
+**Note**: Kubernetes v1.33 is no longer supported. Upgrade existing v1.33 clusters with a KubeMarine version that still supports v1.33 before using this version.
 
-## Default Dependent Components Versions for Kubernetes Versions v1.33.6
-| Type     | Name                                                  | Versions           |                       |                    |                    |                    |                    |                    |                    | Note                                                                                 |
-| -------- | ----------------------------------------------------- | ------------------ | --------------------- | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------------------------------------------------------------------------ |
-|          |                                                       | CentOS Stream 9    | RHEL/Oracle Linux 8.4 | Ubuntu 22.04       | Ubuntu 24.04       | Ubuntu 26.04       | Oracle Linux 8.4+  | RHEL 8.6+          | RockyLinux 8.6+    |                                                                                      |
-| binaries | kubeadm                                               | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | SHA1: bedb104b07faf47d011f2340da44231341806c5c                                       |
-|          | kubelet                                               | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | SHA1: 8ea61a9a1256f191201d06e0572b43abe44983e9                                       |
-|          | kubectl                                               | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | SHA1: bb1bc9fd4cfc016bd6db77a9928cb6e2db084766                                       |
-|          | calicoctl                                             | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | SHA1: 69ddd6d818cfa9bceb8a70a8d2a05efef955dfba Required only if calico is installed. |
-|          | etcdutl                                               | v3.5.24            | v3.5.24               | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | v3.5.24            | SHA1: 3d84b2cd25782560b81512298601e8680b733aff                                       |
-|          | crictl                                                | v1.33.0            | v1.33.0               | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | v1.33.0            | SHA1: d702fd5792aba3ebf451e4488df2916010a76a0d                                       |
-| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
-|          | haproxy                                               | 2.4*               | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
-|          | keepalived                                            | 2.2                | 2.1                   | 2.*                | 2.*                | 2.*                | 2.1                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
-| images   | registry.k8s.io/kube-apiserver                        | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            |                                                                                      |
-|          | registry.k8s.io/kube-controller-manager               | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            |                                                                                      |
-|          | registry.k8s.io/kube-proxy                            | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            |                                                                                      |
-|          | registry.k8s.io/kube-scheduler                        | v1.33.6            | v1.33.6               | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            | v1.33.6            |                                                                                      |
-|          | registry.k8s.io/coredns                               | v1.12.0            | v1.12.0               | v1.12.0            | v1.12.0            | v1.12.0            | v1.12.0            | v1.12.0            | v1.12.0            |                                                                                      |
-|          | registry.k8s.io/pause                                 | 3.10               | 3.10                  | 3.10               | 3.10               | 3.10               | 3.10               | 3.10               | 3.10               |                                                                                      |
-|          | registry.k8s.io/etcd                                  | 3.5.24-0           | 3.5.24-0              | 3.5.24-0           | 3.5.24-0           | 3.5.24-0           | 3.5.24-0           | 3.5.24-0           | 3.5.24-0           |                                                                                      |
-|          | calico/typha                                          | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | Required only if Typha is enabled in Calico config.                                  |
-|          | calico/cni                                            | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            |                                                                                      |
-|          | calico/node                                           | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            |                                                                                      |
-|          | calico/kube-controllers                               | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            |                                                                                      |
-|          | calico/apiserver                                      | v3.31.2            | v3.31.2               | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | v3.31.2            | Required only if API server is enabled in Calico config.                             |
-|          | ghcr.io/netcracker/ingress-nginx/controller           | v1.16.0            | v1.16.0               | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            |                                                                                      |
-|          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
-|          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
-|          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
-|          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
-|          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/csi-resizer               | v1.14.0            | v1.14.0               | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
-|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
+The tables below shows the correspondence of versions that are supported and is used during the installation:
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.34.2
 | Type     | Name                                                  | Versions           |                       |                    |                    |                    |                    |                    |                    | Note                                                                                 |
@@ -6592,7 +6569,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6601,6 +6578,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
+
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
 
@@ -6638,7 +6616,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6647,6 +6625,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
+
+
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.36.0
 
@@ -6657,7 +6637,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          |                                                       | CentOS Stream 9    | RHEL/Oracle Linux 8.4 | Ubuntu 22.04       | Ubuntu 24.04       | Ubuntu 26.04       | Oracle Linux 8.4+  | RHEL 8.6+          | RockyLinux 8.6+    |                                                                                      |
 | binaries | kubeadm                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 7132c7c775d2c8efde7b6ffda23532f6249fb4a1                                       |
 |          | kubelet                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 0ca6f9f04cf5fea2655929413d5376432c6b39f6                                       |
-|          | kubectl                                               | v1.36.0            | v1.36.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.36.0            | v1.36.0            | SHA1: f5306f5010f8775dfc3a885ad87c6c7f5921bbf7                                       |
+|          | kubectl                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: f5306f5010f8775dfc3a885ad87c6c7f5921bbf7                                       |
 |          | etcdutl                                               | v3.6.8             | v3.6.8                | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | SHA1: eaacf285474634db11a45973084a99e5f85784bd                                       |
 |          | calicoctl                                             | v3.32.0            | v3.32.0               | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | SHA1: a542ce4af15481a1d99297d39621710b094222b2 Required only if calico is installed. |
 |          | crictl                                                | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 8abff03f7296e8fca9ef7db18f29be3638ae874e                                       |
@@ -6684,7 +6664,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6692,4 +6672,52 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
+
+
+
+## Default Dependent Components Versions for Kubernetes Versions v1.37.0
+
+**Note**: Ubuntu 20.04 is not supported on Kubernetes v1.35+
+
+| Type     | Name                                                  | Versions           |                       |                    |                    |                    |                    |                    |                    | Note                                                                                 |
+| -------- | ----------------------------------------------------- | ------------------ | --------------------- | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------------------------------------------------------------------------ |
+|          |                                                       | CentOS Stream 9    | RHEL/Oracle Linux 8.4 | Ubuntu 22.04       | Ubuntu 24.04       | Ubuntu 26.04       | Oracle Linux 8.4+  | RHEL 8.6+          | RockyLinux 8.6+    |                                                                                      |
+| binaries | kubeadm                                               | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | SHA1: 29adf8386566c7dbfc173e1f9d6a46b345a19586                                       |
+|          | kubelet                                               | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | SHA1: e832e8d37adad058cf6d5795ecbe17fe73ceffb6                                       |
+|          | kubectl                                               | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | SHA1: f3860d99ca334a7716c597755a125efcba4d670f                                       |
+|          | etcdutl                                               | v3.7.0             | v3.7.0                | v3.7.0             | v3.7.0             | v3.7.0             | v3.7.0             | v3.7.0             | v3.7.0             | SHA1: fb218510cf271ef79baae66e9093bba79c1f2ef6                                       |
+|          | calicoctl                                             | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | SHA1: 6881d8924c1dfd64ab857f4c73ab5e4cd346fb3e Required only if calico is installed. |
+|          | crictl                                                | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | SHA1: 59081a9148a57d02820a644d7d6b78fe10c459dd                                       |
+| rpms     | containerd.io                                         | 1.6.*              | 1.6.*                 | 2.2.*              | 2.2.*              | 2.2.*              | 1.6.*              | 1.6.*              | 1.6.*              |                                                                                      |
+|          | haproxy/rh-haproxy                                    | 1.8                | 1.8                   | 2.*                | 2.*                | 3.*                | 1.8                | 1.8                | 1.8                | Required only if balancers are presented in the deployment scheme.                   |
+|          | keepalived                                            | 1.3                | 2.1                   | 2.*                | 2.*                | 2.*                | 1.3                | 2.1                | 2.1                | Required only if VRRP is presented in the deployment scheme.                         |
+| images   | registry.k8s.io/kube-apiserver                        | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            |                                                                                      |
+|          | registry.k8s.io/kube-controller-manager               | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            |                                                                                      |
+|          | registry.k8s.io/kube-proxy                            | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            |                                                                                      |
+|          | registry.k8s.io/kube-scheduler                        | v1.37.0            | v1.37.0               | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            | v1.37.0            |                                                                                      |
+|          | registry.k8s.io/coredns                               | v1.14.6            | v1.14.6               | v1.14.6            | v1.14.6            | v1.14.6            | v1.14.6            | v1.14.6            | v1.14.6            |                                                                                      |
+|          | registry.k8s.io/pause                                 | 3.10.2             | 3.10.2                | 3.10.2             | 3.10.2             | 3.10.2             | 3.10.2             | 3.10.2             | 3.10.2             |                                                                                      |
+|          | registry.k8s.io/etcd                                  | 3.7.0-0            | 3.7.0-0               | 3.7.0-0            | 3.7.0-0            | 3.7.0-0            | 3.7.0-0            | 3.7.0-0            | 3.7.0-0            |                                                                                      |
+|          | calico/typha                                          | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | Required only if Typha is enabled in Calico config.                                  |
+|          | calico/cni                                            | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            |                                                                                      |
+|          | calico/node                                           | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            |                                                                                      |
+|          | calico/kube-controllers                               | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            |                                                                                      |
+|          | calico/apiserver                                      | v3.32.2            | v3.32.2               | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | v3.32.2            | Required only if API server is enabled in Calico config.                             |
+|          | ghcr.io/netcracker/ingress-nginx/controller           | v1.16.0            | v1.16.0               | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            | v1.16.0            |                                                                                      |
+|          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
+|          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
+|          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/csi-resizer               | v1.14.0            | v1.14.0               | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | v1.14.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/livenessprobe             | v2.17.0            | v2.17.0               | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | v2.17.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
+|          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |

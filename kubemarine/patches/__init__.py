@@ -23,9 +23,11 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.containerd_limitnofile import ContainerdLimitNOFILEPatch
+from kubemarine.patches.migrate_kubeadm_v1beta4 import KubeadmV1Beta4Patch
 
 patches: List[Patch] = [
     ContainerdLimitNOFILEPatch(),
+    KubeadmV1Beta4Patch(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

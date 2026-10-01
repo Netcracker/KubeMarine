@@ -68,11 +68,9 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
         # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
         # Instead, change only necessary apiServer args.
         def reconfigure_feature_gates(cluster_config: dict) -> dict:
-            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
-            if feature_gates is not None:
-                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = feature_gates
-            else:
-                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+            feature_gates = components.get_arg(
+                cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"], "feature-gates")
+            components.set_arg(cluster_config["apiServer"]["extraArgs"], "feature-gates", feature_gates)
 
             return cluster_config
 
