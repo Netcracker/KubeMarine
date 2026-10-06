@@ -1,5 +1,5 @@
 module ipip_check
 
-go 1.26.4
+go 1.26.8
 
 require github.com/google/gopacket v1.1.19
