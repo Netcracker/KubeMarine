@@ -248,20 +248,20 @@ def expect_daemonset(cluster: KubernetesCluster,
             daemonsets.append(DaemonSet(cluster, name=name['name'], namespace=name['namespace']))
 
     while retries > 0:
-        up_to_date = True
+        actual_and_ready = True
         for daemonset in daemonsets:
-            if not daemonset.reload(control_plane=node, suppress_exceptions=True).is_up_to_date():
-                up_to_date = False
+            if not daemonset.reload(control_plane=node, suppress_exceptions=True).is_actual_and_ready():
+                actual_and_ready = False
 
-        if up_to_date:
-            cluster.log.debug("DaemonSets are up to date")
+        if actual_and_ready:
+            cluster.log.debug("DaemonSets are actual and ready")
             return
         else:
             retries -= 1
-            cluster.log.debug(f"DaemonSets are not up to date yet... ({retries * timeout}s left)")
+            cluster.log.debug(f"DaemonSets are not actual and ready yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the DaemonSets did not become ready. '
+    raise Exception('In the expected time, the DaemonSets did not become actual and ready. '
                     'Try to increase number of retries in expect.daemonsets: '
                     # pylint: disable-next=line-too-long
                     'https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
@@ -810,21 +810,25 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
         chart_metadata = yaml.safe_load(stream)
         chart_name = chart_metadata["name"]
 
-    cluster.log.debug("Running helm chart %s" % chart_name)
-
-    release = config.get('release', chart_name)
-    cluster.log.debug("Deploying release %s" % release)
-
     namespace = config.get('namespace')
     if not namespace:
         cluster.log.verbose('Namespace configuration is missing, "default" namespace will be used')
         namespace = "default"
 
-    prepare_for_helm_command = f'helm --kubeconfig {local_config_path} -n {namespace} '
-    command = prepare_for_helm_command + f'upgrade -i {release} {chart_path} --create-namespace'
+    release = config.get('release', chart_name)
+    cluster.log.debug(f"Deploying release {release} for chart {chart_name} in namespace {namespace}")
+
+    command = f'helm --kubeconfig {local_config_path} -n {namespace} upgrade -i {release} {chart_path} ' \
+               '--create-namespace --wait --atomic'
     if config.get("take_ownership"):
         command += " --take-ownership"
 
+    cluster.log.debug("Removing all pending revisions for the release")
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    first_control_plane.sudo(f"kubectl delete secret -n {namespace} "
+                             f"-l 'owner=helm,name={release},status in (pending-upgrade,pending-rollback)'", warn=True)
+
+    cluster.log.debug("Upgrading helm chart")
     execute_subprocess_with_logging(cluster, command)
 
 

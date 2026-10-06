@@ -14,11 +14,13 @@
 
 import base64
 import os
+import time
 import yaml
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine import kubernetes, plugins
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine.kubernetes.daemonset import DaemonSet
 
 ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for envoy gateway plugin since it is not installed"
 
@@ -247,15 +249,35 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
     except Exception as e:
         cluster.log.debug(f"Failed to check if chart version is 2.5.0: {e}")
 
+    envoy_ds = DaemonSet(cluster, name="envoy-external-gateway", namespace=envoy_plugin["namespace"])
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    envoy_ds.reload(first_control_plane, suppress_exceptions=True)
+    previous_generation = envoy_ds.obj.get("metadata", {}).get("generation", 0)
+
     helm_plugin_config["values"] = default_merger.merge(helm_plugin_config["values"], envoy_plugin["crValuesOverride"])
     utils.dump_file(cluster.context, yaml.dump(helm_plugin_config["values"]), "envoy-cr-values.yaml", dump_location=True)
     plugins.apply_helm(cluster=cluster, config=helm_plugin_config)
+
+    # We wait for 30s to let Envoy Gateway to update envoy-external-gateway DaemonSet, before checking its status 
+    cluster.log.debug(f"Waiting for envoy-external-gateway DaemonSet generation to be updated...")
+    retries = 6
+    interval = 5
+    while retries > 0:
+        envoy_ds.reload(first_control_plane, suppress_exceptions=True)
+        new_generation = envoy_ds.obj.get("metadata", {}).get("generation", 0)
+        if previous_generation != new_generation:
+            cluster.log.debug(f"Envoy Gateway DaemonSet generation was updated")
+            break
+        cluster.log.debug(f"Envoy Gateway DaemonSet generation did not change yet... ({interval*retries}s left)")
+        retries -= 1
+        time.sleep(interval)
+    else:
+        cluster.log.debug(f"Envoy Gateway DaemonSet generation did not change, assuming no changes are needed")
 
     # This special handling is needed for upgrade from 2.5.0 version, because pods in 2.5.0 terminate too long.
     # We delete the daemonset and then manually delete pods with overrode small grace-period 
     if is_previous_version_2_5_0 and chart_version != "2.5.0":
         cluster.log.debug(f"Deleting 2.5.0 external gateway pods")
-        first_control_plane = cluster.nodes['control-plane'].get_first_member()
         first_control_plane.sudo(f'kubectl delete daemonset -n {envoy_plugin["namespace"]} '
                                  'envoy-external-gateway --now --cascade=orphan', warn=True)
         first_control_plane.sudo(f'kubectl delete pod -n {envoy_plugin["namespace"]} '
