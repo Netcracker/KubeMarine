@@ -258,7 +258,7 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
     utils.dump_file(cluster.context, yaml.dump(helm_plugin_config["values"]), "envoy-cr-values.yaml", dump_location=True)
     plugins.apply_helm(cluster=cluster, config=helm_plugin_config)
 
-    # We wait for 30s to let Envoy Gateway to update envoy-external-gateway DaemonSet, before checking its status 
+    # We wait for up to 30s to let Envoy Gateway to update envoy-external-gateway DaemonSet, before checking its status 
     cluster.log.debug(f"Waiting for envoy-external-gateway DaemonSet generation to be updated...")
     retries = 6
     interval = 5
@@ -272,7 +272,7 @@ def apply_cr_chart(cluster: KubernetesCluster) -> None:
         retries -= 1
         time.sleep(interval)
     else:
-        cluster.log.debug(f"Envoy Gateway DaemonSet generation did not change, assuming no changes are needed")
+        cluster.log.warning(f"Envoy Gateway DaemonSet generation did not change, assuming no changes are needed")
 
     # This special handling is needed for upgrade from 2.5.0 version, because pods in 2.5.0 terminate too long.
     # We delete the daemonset and then manually delete pods with overrode small grace-period 

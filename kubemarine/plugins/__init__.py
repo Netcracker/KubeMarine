@@ -235,7 +235,7 @@ def expect_daemonset(cluster: KubernetesCluster,
     if retries is None:
         retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
-    log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
+    log.debug(f"Expecting the following DaemonSets to be actual and ready: {daemonsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
 
     log.debug("Waiting for DaemonSets...")
@@ -810,23 +810,26 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
         chart_metadata = yaml.safe_load(stream)
         chart_name = chart_metadata["name"]
 
+    cluster.log.debug("Running helm chart %s" % chart_name)
+
+    release = config.get('release', chart_name)
+    cluster.log.debug("Deploying release %s" % release)
+
     namespace = config.get('namespace')
     if not namespace:
         cluster.log.verbose('Namespace configuration is missing, "default" namespace will be used')
         namespace = "default"
 
-    release = config.get('release', chart_name)
-    cluster.log.debug(f"Deploying release {release} for chart {chart_name} in namespace {namespace}")
-
-    command = f'helm --kubeconfig {local_config_path} -n {namespace} upgrade -i {release} {chart_path} ' \
-               '--create-namespace --wait --atomic'
+    prepare_for_helm_command = f'helm --kubeconfig {local_config_path} -n {namespace} '
+    command = prepare_for_helm_command + f'upgrade -i {release} {chart_path} --create-namespace'
     if config.get("take_ownership"):
         command += " --take-ownership"
 
     cluster.log.debug("Removing all pending revisions for the release")
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     first_control_plane.sudo(f"kubectl delete secret -n {namespace} "
-                             f"-l 'owner=helm,name={release},status in (pending-upgrade,pending-rollback)'", warn=True)
+                             f"-l 'owner=helm,name={release},"
+                             "status in (pending-install,pending-upgrade,pending-rollback)'", warn=True)
 
     cluster.log.debug("Upgrading helm chart")
     execute_subprocess_with_logging(cluster, command)
