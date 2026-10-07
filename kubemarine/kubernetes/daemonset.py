@@ -22,7 +22,7 @@ class DaemonSet(KubernetesObject):
         super().__init__(cluster, kind='DaemonSet', name=name, namespace=namespace, obj=obj)
 
     def is_actual_and_ready(self) -> bool:
-        return self.is_ready() and self.is_up_to_date()
+        return self.is_ready() and self.is_up_to_date() and self.is_generation_updated()
 
     def is_up_to_date(self) -> bool:
         desired_number_scheduled = self._obj.get('status', {}).get('desiredNumberScheduled')
@@ -37,6 +37,13 @@ class DaemonSet(KubernetesObject):
         return desired_number_scheduled is not None \
             and number_ready is not None \
             and desired_number_scheduled == number_ready
+
+    def is_generation_updated(self) -> bool:
+        generation = self._obj.get('metadata', {}).get('generation')
+        observed_generation = self._obj.get('status', {}).get('observedGeneration')
+        return generation is not None \
+            and observed_generation is not None \
+            and generation == observed_generation
 
     def is_scheduled(self) -> bool:
         desired_number_scheduled = self._obj.get('status', {}).get('desiredNumberScheduled')
