@@ -524,7 +524,14 @@ class KubernetesCluster(Environment):
 
         return common_group
 
-    def schedule_cumulative_point(self, point_method: Callable) -> None:
+    def schedule_cumulative_point(self, point_method: Callable, group: NodeGroup = None) -> None:
+        """
+        Schedule cumulative point method to be executed on the specified group of nodes.
+        Groups of different calls for the same method are merged.
+
+        :param point_method: cumulative point method
+        :param group: nodes to execute the method on. By default, new nodes or all nodes if no new nodes.
+        """
         self._check_within_flow()
 
         func = cast(FunctionType, point_method)
@@ -538,12 +545,22 @@ class KubernetesCluster(Environment):
             self.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
             return
 
-        scheduled_points = self.context.get('scheduled_cumulative_points', [])
+        if group is None:
+            group = self.get_new_nodes_or_self()
 
+        scheduled_points: Dict[Callable, List[str]] = self.context.setdefault('scheduled_cumulative_points', {})
+
+        nodes_names = group.get_nodes_names()
         if point_method not in scheduled_points:
-            scheduled_points.append(point_method)
-            self.context['scheduled_cumulative_points'] = scheduled_points
-            self.log.verbose('Method %s scheduled' % point_fullname)
+            scheduled_points[point_method] = list(nodes_names)
+            self.log.verbose('Method %s scheduled for nodes %s' % (point_fullname, nodes_names))
+            return
+
+        scheduled_nodes = scheduled_points[point_method]
+        new_nodes = [name for name in nodes_names if name not in scheduled_nodes]
+        if new_nodes:
+            scheduled_nodes.extend(new_nodes)
+            self.log.verbose('Method %s additionally scheduled for nodes %s' % (point_fullname, new_nodes))
         else:
             self.log.verbose('Method %s already scheduled' % point_fullname)
 

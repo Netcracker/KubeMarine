@@ -25,6 +25,7 @@ import invoke
 
 from kubemarine.core import flow, static, utils
 from kubemarine.core.cluster import EnrichmentStage
+from kubemarine.core.group import NodeGroup
 from kubemarine.procedures import do
 from kubemarine import demo
 
@@ -35,12 +36,16 @@ test_msg = "test_function_return_result"
 static.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
-def flow_test_func(cluster: demo.FakeKubernetesCluster):
+def flow_test_func(cluster: demo.FakeKubernetesCluster, _: NodeGroup = None):
     # Need to fill values in cluster context in some tests to know that function was called
     current_value = cluster.context.get("test_info", 0)
     cluster.context["test_info"] = current_value + 1
 
     return test_msg
+
+
+def cumulative_point_test_func(cluster: demo.FakeKubernetesCluster, group: NodeGroup):
+    cluster.context.setdefault("cumulative_point_groups", []).extend(group.get_nodes_names())
 
 
 tasks: dict = {
@@ -190,6 +195,47 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(1, cluster.context.get("test_info"),
                          f"It had to be one call of test_func for {method_full_name} cumulative point")
 
+    def _proceed_cumulative_point(self, cluster: demo.FakeKubernetesCluster, force: bool = False) -> set:
+        cumulative_points = {
+            cumulative_point_test_func: ['prepare.system.modprobe']
+        }
+        flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe", force=force)
+        return set(cluster.context.get("cumulative_point_groups", []))
+
+    def test_schedule_cumulative_point_subset(self):
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
+        subset = cluster.nodes['worker']
+        cluster.schedule_cumulative_point(cumulative_point_test_func, subset)
+        self.assertEqual(set(subset.get_nodes_names()), self._proceed_cumulative_point(cluster))
+        self.assertNotIn(cumulative_point_test_func, cluster.context["scheduled_cumulative_points"])
+
+    def test_schedule_cumulative_point_merge_subsets(self):
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
+        workers = cluster.nodes['worker']
+        control_planes = cluster.nodes['control-plane']
+        cluster.schedule_cumulative_point(cumulative_point_test_func, workers)
+        cluster.schedule_cumulative_point(cumulative_point_test_func, control_planes)
+        cluster.schedule_cumulative_point(cumulative_point_test_func, workers)
+        expected_groups = set(workers.get_nodes_names() + control_planes.get_nodes_names())
+        actual_groups = self._proceed_cumulative_point(cluster)
+        self.assertEqual(expected_groups, actual_groups)
+
+    def test_schedule_cumulative_point_subset_and_default(self):
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
+        cluster.schedule_cumulative_point(cumulative_point_test_func, cluster.nodes['worker'])
+        cluster.schedule_cumulative_point(cumulative_point_test_func)
+        actual_groups = self._proceed_cumulative_point(cluster)
+        self.assertEqual(set(cluster.get_new_nodes_or_self().get_nodes_names()), actual_groups)
+
+    def test_force_cumulative_point_not_scheduled_default_group(self):
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
+        self.assertEqual(set(cluster.get_new_nodes_or_self().get_nodes_names()),
+                         self._proceed_cumulative_point(cluster, force=True))
+
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
@@ -257,11 +303,11 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
 
-        def cumulative_func(cluster: demo.FakeKubernetesCluster):
+        def cumulative_func(cluster: demo.FakeKubernetesCluster, group: NodeGroup):
             proceeded_tasks = cluster.context["proceeded_tasks"]
             self.assertIn('deploy.loadbalancer.haproxy', proceeded_tasks,
                           f"Cumulative point should be executed at the end of tasks")
-            flow_test_func(cluster)
+            flow_test_func(cluster, group)
 
         cumulative_points = {
             cumulative_func: [flow.END_OF_TASKS]

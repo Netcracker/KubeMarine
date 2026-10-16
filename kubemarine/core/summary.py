@@ -18,6 +18,7 @@ from typing import Dict, Callable
 
 from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroup
 
 
 @total_ordering
@@ -55,6 +56,6 @@ def print_summary(context: dict, logger: log.EnhancedLogger) -> None:
         logger.info(key + value)
 
 
-def exec_delayed(cluster: KubernetesCluster) -> None:
+def exec_delayed(cluster: KubernetesCluster, _: NodeGroup) -> None:
     for call in cluster.context.get('delayed_summary_report', []):
         call(cluster)

@@ -19,7 +19,7 @@ import sys
 import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from typing import Optional, List, Union, Sequence, Tuple, Dict, Any
+from typing import Optional, List, Union, Sequence, Tuple, Dict, Any, Callable
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log, defaults
 
@@ -490,24 +490,26 @@ def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
         return {}
 
-    scheduled_methods = cluster.context.get('scheduled_cumulative_points', [])
+    scheduled_methods: Dict[Callable, List[str]] = cluster.context.get('scheduled_cumulative_points', {})
 
     results = {}
     for point_method, points_tasks_names in points_list.items():
         if point_task_name in points_tasks_names:
 
             point_method_fullname = point_method.__module__ + '.' + point_method.__qualname__
-            if force:
+            if point_method in scheduled_methods:
+                group = cluster.make_group_from_nodes(scheduled_methods[point_method])
+            elif force:
                 cluster.log.verbose('Method %s will be forcibly executed' % point_method_fullname)
-            elif point_method not in scheduled_methods:
+                group = cluster.get_new_nodes_or_self()
+            else:
                 cluster.log.verbose('Method %s not scheduled - cumulative point call skipped' % point_method_fullname)
                 continue
 
-            cluster.log.info("*** CUMULATIVE POINT %s ***" % point_method_fullname)
+            cluster.log.info("*** CUMULATIVE POINT %s on %s ***" % (point_method_fullname, group.get_nodes_names()))
 
-            call_result = point_method(cluster)
-            if point_method in scheduled_methods:
-                scheduled_methods.remove(point_method)
+            call_result = point_method(cluster, group)
+            scheduled_methods.pop(point_method, None)
             results[point_method_fullname] = call_result
 
     return results
