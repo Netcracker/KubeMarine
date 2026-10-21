@@ -146,7 +146,7 @@ def system_prepare_system_zram(group: NodeGroup) -> None:
     if not cluster.inventory.get('services', {}).get('zram'):
         cluster.log.debug("Skipped - no zram items defined in config file")
         return
-    system.configure_sensitive_service(group, zram.setup_zram)
+    group.call(zram.setup_zram)
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:

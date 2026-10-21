@@ -6500,8 +6500,8 @@ The description of cumulative points is as follows:
 
 |Method|Scheduled by Tasks|Executed before tasks|Description|
 |---|---|---|---|
-|os.reboot_nodes|prepare.system.setup_selinux<br>prepare.system.disable_firewalld<br>prepare.system.disable_swap<br>prepare.system.modprobe<br>prepare.system.sysctl|prepare.system.sysctl|Reboots all cluster nodes.|
-|os.verify_system|prepare.system.setup_selinux<br>prepare.system.disable_firewalld<br>prepare.system.disable_swap<br>prepare.system.modprobe<br>prepare.system.sysctl|prepare.system.sysctl|Verifies that configured system configurations have been applied.|
+|os.reboot_nodes|prepare.system.setup_selinux<br>prepare.system.disable_firewalld<br>prepare.system.disable_swap<br>prepare.system.modprobe<br>prepare.system.sysctl<br>prepare.system.zram|prepare.system.sysctl|Reboots the nodes affected by the scheduling tasks. Most tasks affect all cluster nodes, while `prepare.system.zram` affects only the nodes with ZRAM configuration.|
+|os.verify_system|prepare.system.setup_selinux<br>prepare.system.disable_firewalld<br>prepare.system.disable_swap<br>prepare.system.modprobe<br>prepare.system.sysctl<br>prepare.system.zram|prepare.system.sysctl|Verifies that configured system configurations have been applied on the nodes affected by the scheduling tasks.|
 
 Cumulative points are not necessarily always executed. Tasks independently decide when to schedule a cumulative point.
 For example, if the configurations are not updated, then a reboot for applying them is also not required.

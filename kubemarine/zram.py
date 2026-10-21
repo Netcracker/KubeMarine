@@ -95,18 +95,23 @@ def check_zram(group: NodeGroup) -> List[str]:
     return errors
 
 
-def setup_zram(group: NodeGroup) -> bool:
+def setup_zram(group: NodeGroup) -> None:
     """
-    Configures ZRAM on nodes and returns true if nodes reboot is required.
+    Configures ZRAM on nodes and schedules reboot with verification for the affected nodes.
     """
+    from kubemarine import system  # pylint: disable=cyclic-import
 
     cluster: KubernetesCluster = group.cluster
     logger = cluster.log
-    is_changed = False
+    affected_group = cluster.make_group([])
     zram_list = cluster.inventory.get('services', {}).get('zram', [])
     for idx, zram_item in enumerate(zram_list):
         item_group = cluster.create_group_from_groups_nodes_names(zram_item.get('groups') or [], zram_item.get('nodes') or [])
         item_group = item_group.intersection_group(group)
+        if item_group.is_empty():
+            logger.debug(f"Skipped zram for path {zram_item['path']} - no nodes to configure")
+            continue
+
         unit_name = f'zram-setup-{zram_item["path"].strip("/").replace("/", "-")}.service'
         unit_destination = f'/etc/systemd/system/{unit_name}'
 
@@ -123,9 +128,11 @@ def setup_zram(group: NodeGroup) -> bool:
             logger.debug(item_group.sudo(f"systemctl disable {unit_name}", warn=True))
             logger.debug(item_group.sudo(f"rm -f {unit_destination}"))
             logger.debug(item_group.sudo("systemctl daemon-reload"))
-        is_changed = True
+        affected_group = affected_group.include_group(item_group)
 
-    return is_changed
+    if not affected_group.is_empty():
+        cluster.schedule_cumulative_point(system.reboot_nodes, affected_group)
+        cluster.schedule_cumulative_point(system.verify_system, affected_group)
 
 
 def _render_unit(item: dict) -> str:
