@@ -60,7 +60,13 @@ def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
 
 
 def merge_named_args(base: list, nxt: list) -> list:
-    """Override arguments by name, retaining unrelated defaults and repeated values."""
+    """
+    Merge kubeadm extraArgs by name.
+    All `base` arguments with names present in `nxt` are removed, and then `nxt` arguments are appended.
+    `nxt` may contain the same name several times, all such arguments are preserved.
+
+    Example: base [{a: 1}, {b: 2}] and nxt [{b: 3}] give [{a: 1}, {b: 3}].
+    """
     names = {arg['name'] for arg in nxt}
     return [arg for arg in base if arg['name'] not in names] + nxt
 

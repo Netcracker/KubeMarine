@@ -1198,6 +1198,55 @@ services:
 
 **Note**: These kubeadm parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
+**Note**: The `services.kubeadm` section uses the `kubeadm.k8s.io/v1beta4` API.
+The `extraArgs` sections are lists of `name` and `value` pairs.
+If `extraArgs` are specified in the inventory, they are merged with the default arguments by name,
+that is, only the arguments with the specified names are overridden, and the other default arguments are preserved.
+The control plane health check timeout is specified in `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`
+instead of `services.kubeadm.apiServer.timeoutForControlPlane`.
+
+If the cluster was installed using a previous KubeMarine version, the inventory should be updated manually
+after the KubeMarine update and before any other procedures, otherwise the inventory fails to be validated against the schema:
+
+* Change `services.kubeadm.apiVersion` from `kubeadm.k8s.io/v1beta3` to `kubeadm.k8s.io/v1beta4`, or remove it.
+* Convert `extraArgs` of `apiServer`, `scheduler`, `controllerManager`, and `etcd.local` from maps to lists.
+* Move `services.kubeadm.apiServer.timeoutForControlPlane` to `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`.
+* Update custom Jinja templates that read `extraArgs` as a map.
+
+The `kube-system/kubeadm-config` ConfigMap does not require changes, it is already stored by kubeadm in `v1beta4`.
+
+For example:
+
+```yaml
+# before
+services:
+  kubeadm:
+    apiVersion: kubeadm.k8s.io/v1beta3
+    apiServer:
+      timeoutForControlPlane: 5m
+      extraArgs:
+        profiling: "false"
+      extraVolumes:
+        - name: audit-policy
+          hostPath: '{{ services.kubeadm.apiServer.extraArgs["audit-policy-file"] }}'
+          mountPath: /etc/kubernetes/audit-policy.yaml
+
+# after
+services:
+  kubeadm:
+    apiVersion: kubeadm.k8s.io/v1beta4
+    apiServer:
+      extraArgs:
+        - name: profiling
+          value: "false"
+      extraVolumes:
+        - name: audit-policy
+          hostPath: '{{ services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-policy-file") | map(attribute="value") | list | last }}'
+          mountPath: /etc/kubernetes/audit-policy.yaml
+  kubeadm_timeouts:
+    controlPlaneComponentHealthCheck: 5m
+```
+
 During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error, kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
 Kubemarine allows to configure kubeadm preflight errors to be ignored.
@@ -6569,7 +6618,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6578,7 +6627,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
-
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.35.0
 
@@ -6616,7 +6664,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6625,8 +6673,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
-
-
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.36.0
 
@@ -6637,7 +6683,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          |                                                       | CentOS Stream 9    | RHEL/Oracle Linux 8.4 | Ubuntu 22.04       | Ubuntu 24.04       | Ubuntu 26.04       | Oracle Linux 8.4+  | RHEL 8.6+          | RockyLinux 8.6+    |                                                                                      |
 | binaries | kubeadm                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 7132c7c775d2c8efde7b6ffda23532f6249fb4a1                                       |
 |          | kubelet                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 0ca6f9f04cf5fea2655929413d5376432c6b39f6                                       |
-|          | kubectl                                               | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: f5306f5010f8775dfc3a885ad87c6c7f5921bbf7                                       |
+|          | kubectl                                               | v1.36.0            | v1.36.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.36.0            | v1.36.0            | SHA1: f5306f5010f8775dfc3a885ad87c6c7f5921bbf7                                       |
 |          | etcdutl                                               | v3.6.8             | v3.6.8                | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | v3.6.8             | SHA1: eaacf285474634db11a45973084a99e5f85784bd                                       |
 |          | calicoctl                                             | v3.32.0            | v3.32.0               | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | v3.32.0            | SHA1: a542ce4af15481a1d99297d39621710b094222b2 Required only if calico is installed. |
 |          | crictl                                                | v1.36.0            | v1.36.0               | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | v1.36.0            | SHA1: 8abff03f7296e8fca9ef7db18f29be3638ae874e                                       |
@@ -6664,7 +6710,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/ratelimit                                  | 17b1956c           | 17b1956c              | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | 17b1956c           | Required only if envoy-gateway plugin is set to be installed.                        |
-|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.9              | 0.0.9                 | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | 0.0.9              | Required only if envoy-gateway plugin is set to be installed.                        |
+|          | ghcr.io/netcracker/qubership-docker-kubectl           | 0.0.6              | 0.0.6                 | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | 0.0.6              | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | registry.k8s.io/sig-storage/csi-attacher              | v4.10.0            | v4.10.0               | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | v4.10.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-provisioner           | v5.3.0             | v5.3.0                | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | v5.3.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/csi-snapshotter           | v8.4.0             | v8.4.0                | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | v8.4.0             | Required only if openstack-cinder-csi plugin is set to be installed.                 |
@@ -6673,9 +6719,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | registry.k8s.io/sig-storage/csi-node-driver-registrar | v2.15.0            | v2.15.0               | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | v2.15.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/provider-os/cinder-csi-plugin         | v1.35.0            | v1.35.0               | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | v1.35.0            | Required only if openstack-cinder-csi plugin is set to be installed.                 |
 |          | registry.k8s.io/sig-storage/snapshot-controller       | v8.5.0             | v8.5.0               | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | v8.5.0             | Required only if csi-snapshot-controller plugin is set to be installed.                 |
-
-
-
 ## Default Dependent Components Versions for Kubernetes Versions v1.37.0
 
 **Note**: Ubuntu 20.04 is not supported on Kubernetes v1.35+

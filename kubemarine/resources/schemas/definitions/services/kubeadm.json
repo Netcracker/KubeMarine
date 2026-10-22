@@ -50,7 +50,7 @@
     "apiVersion": {
       "enum": ["kubeadm.k8s.io/v1beta4"],
       "default": "kubeadm.k8s.io/v1beta4",
-      "description": "Use v1beta4. Run migrate_kubemarine with the new KubeMarine version to migrate an existing cluster and inventory."
+      "description": "Only kubeadm.k8s.io/v1beta4 is supported."
     },
     "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"},
     "featureGates": {
@@ -151,7 +151,7 @@
       "enum": ["extraArgs", "extraVolumes"]
     },
     "ExtraArgs": {
-      "description": "v1beta4 arguments merged by name. Run migrate_kubemarine to migrate legacy argument mappings.",
+      "description": "List of {name, value} arguments. The arguments are merged with the default arguments by name.",
       "type": "array",
       "items": {
         "oneOf": [

@@ -26,8 +26,9 @@ import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import demo, plugins, system, kubernetes
+from kubemarine.core import errors
 from kubemarine.kubernetes import components
-from kubemarine.patches import migrate_kubeadm_v1beta4 as kubeadm_migration
+from kubemarine.core.yaml_merger import merge_named_args
 
 
 class KubeadmConfigTest(unittest.TestCase):
@@ -80,15 +81,35 @@ class KubeadmConfigTest(unittest.TestCase):
                 self.assertIsInstance(docs[-1]['nodeRegistration']['kubeletExtraArgs'], list)
                 self.assertEqual(before, cluster.inventory)
 
-    def test_v1beta4_read_roundtrip_preserves_duplicates(self):
-        config = {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'ClusterConfiguration',
-                  'apiServer': {'extraArgs': [{'name': 'custom', 'value': 'true'}]},
-                  'customField': {'preserved': True}}
-        config['apiServer']['extraArgs'].append({'name': 'custom', 'value': 'false'})
-        normalized = kubeadm_migration.convert_kubeadm_config(config)
-        self.assertEqual(config, normalized)
-        self.assertIsNot(config, normalized)
-        self.assertEqual('false', components.get_arg(normalized['apiServer']['extraArgs'], 'custom'))
+    def test_legacy_kubeadm_inventory_is_rejected(self):
+        for override in ({'apiVersion': 'kubeadm.k8s.io/v1beta3'},
+                         {'apiServer': {'extraArgs': {'profiling': 'false'}}},
+                         {'apiServer': {'timeoutForControlPlane': '5m'}}):
+            with self.subTest(override=override):
+                inventory = demo.generate_inventory(**demo.ALLINONE)
+                inventory['services']['kubeadm'] = override
+                with self.assertRaises(errors.FailException):
+                    demo.new_cluster(inventory)
+
+    def test_merge_named_args(self):
+        base = [{'name': 'audit-policy-file', 'value': '/etc/policy.yaml'}, {'name': 'profiling', 'value': 'false'}]
+        self.assertEqual([{'name': 'audit-policy-file', 'value': '/etc/policy.yaml'},
+                          {'name': 'profiling', 'value': 'true'}],
+                         merge_named_args(base, [{'name': 'profiling', 'value': 'true'}]))
+        # repeated arguments of the override are preserved, the last one takes precedence
+        duplicates = [{'name': 'custom', 'value': 'true'}, {'name': 'custom', 'value': 'false'}]
+        merged = merge_named_args(base, duplicates)
+        self.assertEqual(base + duplicates, merged)
+        self.assertEqual('false', components.get_arg(merged, 'custom'))
+
+    def test_inventory_merge_of_partial_extra_args(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'true'}]}}
+        cluster = demo.new_cluster(inventory)
+        args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+        self.assertEqual('true', components.get_arg(args, 'profiling'))
+        self.assertEqual(1, len([arg for arg in args if arg['name'] == 'profiling']))
+        self.assertIsNotNone(components.get_arg(args, 'audit-policy-file'))
 
     def test_join_timeout_serialization(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
@@ -108,116 +129,56 @@ class KubeadmConfigTest(unittest.TestCase):
         self._check_load_and_edit_existing_kubeadm_config('v1.36.0')
 
     def _check_load_and_edit_existing_kubeadm_config(self, target_version):
-        for api_version in ('v1beta3', 'v1beta4'):
-            with self.subTest(api_version=api_version):
-                inventory = demo.generate_inventory(**demo.ALLINONE)
-                inventory['services']['kubeadm'] = {'kubernetesVersion': target_version}
-                cluster = demo.new_cluster(inventory)
-                control_plane = cluster.nodes['control-plane'].get_first_member()
-                config = {'kind': 'ClusterConfiguration',
-                          'apiVersion': f'kubeadm.k8s.io/{api_version}',
-                          'kubernetesVersion': 'v1.36.0',
-                          'apiServer': {'extraArgs': {'custom': 'old'}}}
-                if api_version == 'v1beta4':
-                    config = kubeadm_migration.convert_kubeadm_config(config)
-                data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
-                cluster.fake_shell.add(
-                    demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
-                    'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
-
-                def edit(value):
-                    args = value['apiServer']['extraArgs']
-                    args[0]['value'] = 'new'
-                    return value
-
-                kubeadm = components.KubeadmConfig(cluster)
-                if api_version == 'v1beta3':
-                    with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_cluster_config') as migrate:
-                        with self.assertRaisesRegex(ValueError, 'Run kubemarine migrate_kubemarine'):
-                            kubeadm.load('kubeadm-config', control_plane, edit)
-                        migrate.assert_not_called()
-                    continue
-                loaded = kubeadm.load('kubeadm-config', control_plane, edit)
-                expected_args = [{'name': 'custom', 'value': 'new'}]
-                self.assertEqual(expected_args, loaded['apiServer']['extraArgs'])
-                wire = yaml.safe_load(kubeadm.loaded_maps['kubeadm-config'].obj['data']['ClusterConfiguration'])
-                self.assertEqual('v1.36.0', wire['kubernetesVersion'])
-                self.assertEqual('kubeadm.k8s.io/v1beta4', wire['apiVersion'])
-                self.assertEqual(expected_args, wire['apiServer']['extraArgs'])
-
-    def test_migrate_kubeadm_configmap_uses_installed_kubeadm(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.36.0'}
+        inventory['services']['kubeadm'] = {'kubernetesVersion': target_version}
         cluster = demo.new_cluster(inventory)
         control_plane = cluster.nodes['control-plane'].get_first_member()
-        host = control_plane.get_host()
+        config = {'kind': 'ClusterConfiguration',
+                  'apiVersion': 'kubeadm.k8s.io/v1beta4',
+                  'kubernetesVersion': 'v1.36.0',
+                  'apiServer': {'extraArgs': [{'name': 'custom', 'value': 'old'}]}}
+        data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
+        cluster.fake_shell.add(
+            demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
+            'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
 
-        original = {
-            'apiVersion': 'kubeadm.k8s.io/v1beta3',
-            'kind': 'ClusterConfiguration',
-            'kubernetesVersion': 'v1.36.0',
-            'apiServer': {'extraArgs': {'profiling': 'false'}},
-        }
-        configmap = {
-            'apiVersion': 'v1',
-            'kind': 'ConfigMap',
-            'metadata': {'name': 'kubeadm-config', 'namespace': 'kube-system'},
-            'data': {'ClusterConfiguration': yaml.safe_dump(original)},
-        }
-        migrated = {
-            'apiVersion': 'kubeadm.k8s.io/v1beta4',
-            'kind': 'ClusterConfiguration',
-            'kubernetesVersion': 'v1.36.0',
-            'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'false'}]},
-        }
-        migration_output = yaml.safe_dump_all([
-            {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'InitConfiguration'},
-            migrated,
-        ])
+        def edit(value):
+            args = value['apiServer']['extraArgs']
+            args[0]['value'] = 'new'
+            return value
 
-        path = '/tmp/kubeadm-config-migration.yaml'
-        commands = {
-            'kubectl get configmap -n kube-system kubeadm-config -o json': json.dumps(configmap),
-            f'kubeadm config migrate --old-config={path}': migration_output,
-            f'kubeadm config validate --config={path}': '',
-            f'rm -f {path}': '',
-        }
-        for command, stdout in commands.items():
-            cluster.fake_shell.add(demo.create_hosts_result([host], stdout=stdout), 'sudo', [command])
+        kubeadm = components.KubeadmConfig(cluster)
+        loaded = kubeadm.load('kubeadm-config', control_plane, edit)
+        expected_args = [{'name': 'custom', 'value': 'new'}]
+        self.assertEqual(expected_args, loaded['apiServer']['extraArgs'])
+        wire = yaml.safe_load(kubeadm.loaded_maps['kubeadm-config'].obj['data']['ClusterConfiguration'])
+        self.assertEqual('v1.36.0', wire['kubernetesVersion'])
+        self.assertEqual('kubeadm.k8s.io/v1beta4', wire['apiVersion'])
+        self.assertEqual(expected_args, wire['apiServer']['extraArgs'])
 
-        with mock.patch.object(components.utils, 'dump_file') as dump_file, \
-                mock.patch.object(components.KubernetesObject, 'apply', autospec=True) as apply:
-            kubeadm_migration.migrate_kubeadm_configmap(cluster)
-
-        dump_file.assert_called_once()
-        applied_configmap = apply.call_args.args[0]
-        applied = yaml.safe_load(applied_configmap.obj['data']['ClusterConfiguration'])
-        self.assertEqual(migrated, applied)
-        self.assertEqual(1, cluster.fake_shell.called_times(
-            host, 'sudo', [f'kubeadm config migrate --old-config={path}']))
-        self.assertEqual(1, cluster.fake_shell.called_times(host, 'sudo', [f'rm -f {path}']))
-
-    def test_migrate_kubeadm_configmap_skips_v1beta4(self):
+    def test_merge_kubeadm_config_with_inventory(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'true'}]}}
         cluster = demo.new_cluster(inventory)
+        inventory_before = deepcopy(cluster.inventory)
         control_plane = cluster.nodes['control-plane'].get_first_member()
-        host = control_plane.get_host()
-        configmap = {
-            'apiVersion': 'v1',
-            'kind': 'ConfigMap',
-            'metadata': {'name': 'kubeadm-config', 'namespace': 'kube-system'},
-            'data': {'ClusterConfiguration': yaml.safe_dump({
-                'apiVersion': 'kubeadm.k8s.io/v1beta4',
-                'kind': 'ClusterConfiguration',
-            })},
-        }
-        command = 'kubectl get configmap -n kube-system kubeadm-config -o json'
-        cluster.fake_shell.add(demo.create_hosts_result([host], stdout=json.dumps(configmap)), 'sudo', [command])
+        config = {'kind': 'ClusterConfiguration',
+                  'apiVersion': 'kubeadm.k8s.io/v1beta4',
+                  'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'false'},
+                                              {'name': 'configmap-only', 'value': 'value'}]}}
+        data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
+        cluster.fake_shell.add(
+            demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
+            'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
 
-        with mock.patch.object(components.KubernetesObject, 'apply', autospec=True) as apply:
-            kubeadm_migration.migrate_kubeadm_configmap(cluster)
-
-        apply.assert_not_called()
+        kubeadm = components.KubeadmConfig(cluster)
+        merged = kubeadm.load('kubeadm-config', control_plane, kubeadm.merge_with_inventory('kubeadm-config'))
+        args = merged['apiServer']['extraArgs']
+        self.assertEqual('true', components.get_arg(args, 'profiling'))
+        self.assertEqual(1, len([arg for arg in args if arg['name'] == 'profiling']))
+        self.assertEqual('value', components.get_arg(args, 'configmap-only'))
+        # arguments from the ConfigMap should not leak to the inventory
+        self.assertEqual(inventory_before, cluster.inventory)
 
     def test_get_init_config_control_plane(self):
         inventory = demo.generate_inventory(control_plane=1, worker=1, balancer=0)

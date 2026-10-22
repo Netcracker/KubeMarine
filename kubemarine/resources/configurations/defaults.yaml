@@ -82,8 +82,8 @@ services:
           readOnly: True
           pathType: File
         - name: audit-log
-          hostPath: '{{ (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).rsplit("/", 1)[0] }}'
-          mountPath: '{{ (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).rsplit("/", 1)[0] }}'
+          hostPath: '{% set path = (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
+          mountPath: '{% set path = (services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-log-path") | map(attribute="value") | list | last).split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
           readOnly: False
           pathType: DirectoryOrCreate
     scheduler:

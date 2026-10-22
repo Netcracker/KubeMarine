@@ -181,10 +181,6 @@ class KubeadmConfig:
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
-        if configmap == 'kubeadm-config' and config.get('apiVersion') != 'kubeadm.k8s.io/v1beta4':
-            raise ValueError('kube-system/kubeadm-config must use kubeadm.k8s.io/v1beta4. '
-                             'Run kubemarine migrate_kubemarine with this KubeMarine version '
-                             'before running checks or maintenance procedures.')
 
         if edit_func is not None:
             config = edit_func(config)
@@ -213,8 +209,12 @@ class KubeadmConfig:
 
     def merge_with_inventory(self, configmap: str) -> Callable[[dict], dict]:
         def merge_func(config_: dict) -> dict:
+            # The copy is required because extraArgs of patch_config are replaced below.
+            # Without it, arguments from the ConfigMap would be written to cluster.inventory.
             patch_config: dict = utils.deepcopy_yaml(KubeadmConfig(self.cluster).maps[configmap])
             if configmap == 'kubeadm-config':
+                # override_merger does not know that the paths are of services.kubeadm section,
+                # so named extraArgs are merged explicitly. See yaml_merger.merge_named_args().
                 for path in (('apiServer',), ('scheduler',), ('controllerManager',), ('etcd', 'local')):
                     current, patch = config_, patch_config
                     for key in path:
@@ -946,7 +946,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
         # The same containerd socket could be found by these two paths.
         # This path is usually configured by kubeadm for containerRuntimeEndpoint in /var/lib/kubelet/instance-config.yaml file.
         # As of k8s 1.36, "/var/run" socket path variant is usually used by kubeadm on fresh install.
-        # Some upgrades can set the socket path using the "/run" variant, which breaks the check.
+        # However, upgrade 1.33 to 1.34 for some reason sets socket path using "/run" variant, which breaks check.
         # Since these paths are interchangeable, we just replace "/run" with "/var/run". 
         varRunSockPath = "unix:///var/run/containerd/containerd.sock"
         runSockPath = "unix:///run/containerd/containerd.sock"

@@ -106,8 +106,7 @@ def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
         ['kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches', 'kubeadm_timeouts'])
 
     if kubeadm_sections:
-        kubeadm_sections = utils.deepcopy_yaml(kubeadm_sections)
-        default_merger.merge(cluster.inventory.setdefault('services', {}), kubeadm_sections)
+        default_merger.merge(cluster.inventory.setdefault('services', {}), utils.deepcopy_yaml(kubeadm_sections))
 
 
 @enrichment(EnrichmentStage.ALL)

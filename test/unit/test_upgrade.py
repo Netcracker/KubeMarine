@@ -28,7 +28,6 @@ from kubemarine import kubernetes, system, plugins, thirdparties
 from kubemarine.core import errors, utils as kutils, static, log, flow, schema
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.kubernetes import components
-from kubemarine.patches import migrate_kubeadm_v1beta4 as kubeadm_migration
 from kubemarine.procedures import upgrade, install
 from kubemarine import demo
 
@@ -41,31 +40,6 @@ def get_kubernetes_versions() -> List[str]:
 def get_plugin_versions(plugin: str) -> List[str]:
     return list(OrderedSet([static.KUBERNETES_VERSIONS['compatibility_map'][v][plugin]
                             for v in get_kubernetes_versions()]))
-
-
-class KubeadmAPIMigrationTest(unittest.TestCase):
-    def test_upgrade_does_not_repeat_migration(self):
-        for version, thirdparties, expected in [
-                ('v1.36.0', {'kubeadm': {}}, ['install']),
-                ('v1.37.0', {'kubeadm': {}}, ['install']),
-                ('v1.37.0', {}, []),
-        ]:
-            with self.subTest(version=version, thirdparties=bool(thirdparties)):
-                cluster = mock.Mock()
-                cluster.nodes = {'control-plane': mock.Mock()}
-                cluster.inventory = {'services': {'thirdparties': thirdparties,
-                                                  'kubeadm': {'kubernetesVersion': version}}}
-                events = []
-                cluster.make_group_from_roles.return_value.call.side_effect = \
-                    lambda *a, events=events, **kw: events.append('install')
-                with mock.patch.object(kubeadm_migration, 'migrate_kubeadm_configmap') as migrate:
-                    migrate.side_effect = lambda *a, events=events: events.append('apply')
-                    upgrade.system_prepare_thirdparties(cluster)
-                    self.assertEqual(expected, events)
-                    if 'apply' in expected:
-                        migrate.assert_called_once_with(cluster)
-                    else:
-                        migrate.assert_not_called()
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
