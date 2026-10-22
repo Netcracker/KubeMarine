@@ -361,8 +361,8 @@ def disable_swap(group: NodeGroup) -> Optional[RunnersGroupResult]:
     return None
 
 
-def reboot_nodes(cluster: KubernetesCluster) -> None:
-    cluster.get_new_nodes_or_self().call(reboot_group)
+def reboot_nodes(_: KubernetesCluster, group: NodeGroup) -> None:
+    group.call(reboot_group)
 
 def detect_kernel_upgrade(group: NodeGroup) -> List[str]:
     cluster = group.cluster
@@ -532,8 +532,7 @@ def configure_timesyncd(group: NodeGroup, retries: int = 120) -> RunnersGroupRes
     raise Exception("Time not synced, but timeout is reached")
 
 
-def verify_system(cluster: KubernetesCluster) -> None:
-    group = cluster.get_new_nodes_or_self()
+def verify_system(cluster: KubernetesCluster, group: NodeGroup) -> None:
     log = cluster.log
     # this method handles clusters with multiple OS
     os_family = group.get_nodes_os()
