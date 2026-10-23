@@ -57,16 +57,16 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
     # add extraArgs to kube-apiserver config
     extra_args = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]
     if not is_pod_security_unconditional(cluster):
-        enabled_admissions = extra_args.get("feature-gates")
+        enabled_admissions = components.get_arg(extra_args, "feature-gates")
         if enabled_admissions:
             if 'PodSecurity=true' not in enabled_admissions:
                 enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
         else:
             enabled_admissions = "PodSecurity=true"
 
-        extra_args["feature-gates"] = enabled_admissions
+        components.set_arg(extra_args, "feature-gates", enabled_admissions)
 
-    extra_args["admission-control-config-file"] = admission_path
+    components.set_arg(extra_args, "admission-control-config-file", admission_path)
 
 
 def verify_version(owner: str, version: str, kubernetes_version: str) -> None:

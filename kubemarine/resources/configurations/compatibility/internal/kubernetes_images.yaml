@@ -1,10 +1,6 @@
 # !!!Do not change the content of the file!!!
 # This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 kube-apiserver:
-  v1.33.0:
-    version: v1.33.0
-  v1.33.6:
-    version: v1.33.6
   v1.34.1:
     version: v1.34.1
   v1.34.2:
@@ -13,11 +9,9 @@ kube-apiserver:
     version: v1.35.0
   v1.36.0:
     version: v1.36.0
+  v1.37.0:
+    version: v1.37.0
 kube-controller-manager:
-  v1.33.0:
-    version: v1.33.0
-  v1.33.6:
-    version: v1.33.6
   v1.34.1:
     version: v1.34.1
   v1.34.2:
@@ -26,11 +20,9 @@ kube-controller-manager:
     version: v1.35.0
   v1.36.0:
     version: v1.36.0
+  v1.37.0:
+    version: v1.37.0
 kube-scheduler:
-  v1.33.0:
-    version: v1.33.0
-  v1.33.6:
-    version: v1.33.6
   v1.34.1:
     version: v1.34.1
   v1.34.2:
@@ -39,11 +31,9 @@ kube-scheduler:
     version: v1.35.0
   v1.36.0:
     version: v1.36.0
+  v1.37.0:
+    version: v1.37.0
 kube-proxy:
-  v1.33.0:
-    version: v1.33.0
-  v1.33.6:
-    version: v1.33.6
   v1.34.1:
     version: v1.34.1
   v1.34.2:
@@ -52,11 +42,9 @@ kube-proxy:
     version: v1.35.0
   v1.36.0:
     version: v1.36.0
+  v1.37.0:
+    version: v1.37.0
 pause:
-  v1.33.0:
-    version: '3.10'
-  v1.33.6:
-    version: '3.10'
   v1.34.1:
     version: 3.10.1
   v1.34.2:
@@ -65,11 +53,9 @@ pause:
     version: 3.10.1
   v1.36.0:
     version: 3.10.2
+  v1.37.0:
+    version: 3.10.2
 etcd:
-  v1.33.0:
-    version: 3.5.21-0
-  v1.33.6:
-    version: 3.5.24-0
   v1.34.1:
     version: 3.6.4-0
   v1.34.2:
@@ -78,11 +64,9 @@ etcd:
     version: 3.6.6-0
   v1.36.0:
     version: 3.6.8-0
+  v1.37.0:
+    version: 3.7.0-0
 coredns/coredns:
-  v1.33.0:
-    version: v1.12.0
-  v1.33.6:
-    version: v1.12.0
   v1.34.1:
     version: v1.12.1
   v1.34.2:
@@ -91,3 +75,5 @@ coredns/coredns:
     version: v1.13.1
   v1.36.0:
     version: v1.14.2
+  v1.37.0:
+    version: v1.14.6

@@ -141,7 +141,6 @@ class PatchesResolvingTest(unittest.TestCase):
                              [p.identifier for p in resolved_patches if p.identifier in expected_order],
                              "Unexpected order of resolved patches")
 
-
 class UpgradeCRI(unittest.TestCase):
     def prepare_environment(self, os_name: str, os_version: str):
         # pylint: disable=attribute-defined-outside-init
