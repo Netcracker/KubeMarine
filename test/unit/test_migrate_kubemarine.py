@@ -27,9 +27,6 @@ from kubemarine.core.cluster import EnrichmentStage, KubernetesCluster
 from kubemarine.core.patch import Patch, InventoryOnlyPatch, RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.kubernetes import components
-from kubemarine.patches import migrate_kubeadm_v1beta4 as kubeadm_migration
-from kubemarine.patches.migrate_kubeadm_v1beta4 import KubeadmV1Beta4Action, KubeadmV1Beta4Patch
 from kubemarine.procedures import migrate_kubemarine
 from kubemarine.procedures.migrate_kubemarine import (
     CriUpgradeAction, BalancerUpgradeAction, PluginUpgradeAction, ThirdpartyUpgradeAction
@@ -135,7 +132,7 @@ class PatchesResolvingTest(unittest.TestCase):
             patches_list.append(new_patch("test_cluster1", RegularPatch))
 
             resolved_patches = migrate_kubemarine.load_patches()
-            expected_order = ['migrate_kubeadm_v1beta4', 'test_inventory1', 'test_inventory2',
+            expected_order = ['test_inventory1', 'test_inventory2',
                               'upgrade_crictl', 'upgrade_cri', 'upgrade_haproxy', 'upgrade_keepalived',
                               'upgrade_calico', 'upgrade_nginx_ingress_controller',
                               'upgrade_kubernetes_dashboard', 'upgrade_local_path_provisioner',
@@ -143,72 +140,6 @@ class PatchesResolvingTest(unittest.TestCase):
             self.assertEqual(expected_order,
                              [p.identifier for p in resolved_patches if p.identifier in expected_order],
                              "Unexpected order of resolved patches")
-
-
-class KubeadmMigrationTest(unittest.TestCase):
-    def test_patch_is_inventory_only(self):
-        self.assertIsInstance(KubeadmV1Beta4Patch(), InventoryOnlyPatch)
-
-    def test_migration_persists_inventory_and_is_repeatable(self):
-        inventory, context = generate_environment('v1.36.0', demo.ALLINONE)
-        context['preserve_inventory'] = False
-        inventory['services']['kubeadm'].update({
-            'apiVersion': 'kubeadm.k8s.io/v1beta3',
-            'apiServer': {'extraArgs': {'audit-policy-file': '/custom/policy.yaml'},
-                          'timeoutForControlPlane': '5m'},
-            'scheduler': {'extraArgs': {'profiling': 'true'}},
-            'controllerManager': {'extraArgs': {'profiling': 'true'}},
-            'etcd': {'local': {'extraArgs': {'heartbeat-interval': '1000'}}},
-        })
-        res = demo.new_resources(inventory, context=context)
-        with mock.patch.object(res, '_store_inventory') as store:
-            flow.run_actions(res, [KubeadmV1Beta4Action()])
-            store.assert_called_once()
-
-        kubeadm = res.inventory()['services']['kubeadm']
-        self.assertEqual('kubeadm.k8s.io/v1beta4', kubeadm['apiVersion'])
-        self.assertEqual([{'name': 'audit-policy-file', 'value': '/custom/policy.yaml'}],
-                         kubeadm['apiServer']['extraArgs'])
-        self.assertNotIn('timeoutForControlPlane', kubeadm['apiServer'])
-        self.assertEqual([{'name': 'profiling', 'value': 'true'}], kubeadm['scheduler']['extraArgs'])
-        self.assertEqual([{'name': 'profiling', 'value': 'true'}], kubeadm['controllerManager']['extraArgs'])
-        self.assertEqual([{'name': 'heartbeat-interval', 'value': '1000'}], kubeadm['etcd']['local']['extraArgs'])
-        self.assertEqual('5m', res.inventory()['services']['kubeadm_timeouts']['controlPlaneComponentHealthCheck'])
-
-        # The migrated inventory is valid, and the partial override keeps the other default arguments.
-        api_server_args = res.cluster().inventory['services']['kubeadm']['apiServer']['extraArgs']
-        self.assertEqual('/custom/policy.yaml', components.get_arg(api_server_args, 'audit-policy-file'))
-        self.assertIsNotNone(components.get_arg(api_server_args, 'profiling'))
-
-        with mock.patch.object(res, '_store_inventory') as store:
-            flow.run_actions(res, [KubeadmV1Beta4Action()])
-            store.assert_not_called()
-
-    def test_migration_does_not_expand_defaults(self):
-        for kubeadm in ({}, {'kubernetesVersion': 'v1.36.0'}, {'apiVersion': 'kubeadm.k8s.io/v1beta4'},
-                        {'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'true'}]}}):
-            with self.subTest(kubeadm=kubeadm):
-                inventory = {'services': {'kubeadm': deepcopy(kubeadm)}}
-                self.assertFalse(kubeadm_migration.migrate_inventory(inventory))
-                self.assertEqual({'services': {'kubeadm': kubeadm}}, inventory)
-        self.assertFalse(kubeadm_migration.migrate_inventory({}))
-
-    def test_timeout_migration(self):
-        for timeouts in (None, {'controlPlaneComponentHealthCheck': '5m'}):
-            with self.subTest(timeouts=timeouts):
-                services = {'kubeadm': {'apiServer': {'timeoutForControlPlane': '5m'}}}
-                if timeouts is not None:
-                    services['kubeadm_timeouts'] = timeouts
-                self.assertTrue(kubeadm_migration.migrate_inventory({'services': services}))
-                self.assertEqual({'apiServer': {}}, services['kubeadm'])
-                self.assertEqual({'controlPlaneComponentHealthCheck': '5m'}, services['kubeadm_timeouts'])
-
-    def test_conflicting_timeouts(self):
-        inventory = {'services': {'kubeadm': {'apiServer': {'timeoutForControlPlane': '5m'}},
-                                  'kubeadm_timeouts': {'controlPlaneComponentHealthCheck': '4m'}}}
-        with self.assertRaisesRegex(ValueError, 'Conflicting'):
-            kubeadm_migration.migrate_inventory(inventory)
-
 
 class UpgradeCRI(unittest.TestCase):
     def prepare_environment(self, os_name: str, os_version: str):

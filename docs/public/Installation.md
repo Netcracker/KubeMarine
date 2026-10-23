@@ -1205,51 +1205,6 @@ that is, only the arguments with the specified names are overridden, and the oth
 The control plane health check timeout is specified in `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`
 instead of `services.kubeadm.apiServer.timeoutForControlPlane`.
 
-If the cluster was installed using a previous KubeMarine version, the inventory fails to be validated against the schema
-until it is migrated. After the KubeMarine update and before any other procedures,
-run the [Kubemarine Migration Procedure](Maintenance.md#kubemarine-migration-procedure) once.
-The `migrate_kubeadm_v1beta4` patch changes the inventory only:
-
-* `services.kubeadm.apiVersion` is changed from `kubeadm.k8s.io/v1beta3` to `kubeadm.k8s.io/v1beta4`.
-* `extraArgs` of `apiServer`, `scheduler`, `controllerManager`, and `etcd.local` are converted from maps to lists.
-* `services.kubeadm.apiServer.timeoutForControlPlane` is moved to `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`.
-
-Custom Jinja templates that read `extraArgs` as a map are not migrated, and should be updated manually.
-
-The `kube-system/kubeadm-config` ConfigMap does not require changes, it is already stored by kubeadm in `v1beta4`.
-
-The following example shows the inventory before and after the migration, with the custom template updated manually:
-
-```yaml
-# before
-services:
-  kubeadm:
-    apiVersion: kubeadm.k8s.io/v1beta3
-    apiServer:
-      timeoutForControlPlane: 5m
-      extraArgs:
-        profiling: "false"
-      extraVolumes:
-        - name: audit-policy
-          hostPath: '{{ services.kubeadm.apiServer.extraArgs["audit-policy-file"] }}'
-          mountPath: /etc/kubernetes/audit-policy.yaml
-
-# after
-services:
-  kubeadm:
-    apiVersion: kubeadm.k8s.io/v1beta4
-    apiServer:
-      extraArgs:
-        - name: profiling
-          value: "false"
-      extraVolumes:
-        - name: audit-policy
-          hostPath: '{{ services.kubeadm.apiServer.extraArgs | selectattr("name", "equalto", "audit-policy-file") | map(attribute="value") | list | last }}'
-          mountPath: /etc/kubernetes/audit-policy.yaml
-  kubeadm_timeouts:
-    controlPlaneComponentHealthCheck: 5m
-```
-
 During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error, kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
 Kubemarine allows to configure kubeadm preflight errors to be ignored.

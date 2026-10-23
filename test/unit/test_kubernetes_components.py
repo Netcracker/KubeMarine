@@ -18,45 +18,19 @@ import re
 import unittest
 from contextlib import contextmanager
 from copy import deepcopy
-from unittest import mock
 from typing import List
 from test.unit import utils as test_utils
 
 import yaml
 from ordered_set import OrderedSet
 
-from kubemarine import demo, plugins, system, kubernetes
+from kubemarine import demo, plugins, system
 from kubemarine.core import errors
 from kubemarine.kubernetes import components
 from kubemarine.core.yaml_merger import merge_named_args
 
 
 class KubeadmConfigTest(unittest.TestCase):
-    def test_worker_join_upload_uses_v1beta4_arguments(self):
-        self._check_worker_join_upload('v1.37.0')
-
-    def test_worker_join_upload_uses_v1beta4_for_older_versions(self):
-        self._check_worker_join_upload('v1.36.0')
-
-    def _check_worker_join_upload(self, version):
-        group = mock.Mock()
-        group.is_empty.return_value = False
-        group.get_ordered_members_list.return_value = []
-        group.cluster.context = {'join_dict': {}}
-        group.cluster.inventory = {'services': {'kubeadm': {'kubernetesVersion': version}}}
-        join = {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'JoinConfiguration',
-                'nodeRegistration': {'kubeletExtraArgs': [{'name': 'container-runtime-endpoint',
-                                                         'value': 'unix:///run/containerd/containerd.sock'}]}}
-        with mock.patch.object(kubernetes, 'get_join_dict', return_value={}), \
-                mock.patch.object(components, 'get_init_config', return_value=join), \
-                mock.patch.object(kubernetes.utils, 'dump_file'):
-            kubernetes.init_workers(group)
-        uploaded = yaml.safe_load(group.put.call_args.args[0].getvalue())
-        self.assertEqual('kubeadm.k8s.io/v1beta4', uploaded['apiVersion'])
-        self.assertEqual([{'name': 'container-runtime-endpoint',
-                           'value': 'unix:///run/containerd/containerd.sock'}],
-                         uploaded['nodeRegistration']['kubeletExtraArgs'])
-        self.assertIsInstance(join['nodeRegistration']['kubeletExtraArgs'], list)
 
     def test_v1beta4_serialization_preserves_inventory_and_timeouts(self):
         for version in ('v1.34.2', 'v1.36.0', 'v1.37.0'):
