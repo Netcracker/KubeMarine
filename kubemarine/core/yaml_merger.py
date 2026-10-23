@@ -39,6 +39,12 @@ def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
     strategy, strategy_definition_position = get_strategy_position(nxt, path)
 
     if strategy is None:
+        kubeadm_path = path[1:] if path[:1] == ['services'] else path
+        if kubeadm_path in (['kubeadm', 'apiServer', 'extraArgs'],
+                            ['kubeadm', 'scheduler', 'extraArgs'],
+                            ['kubeadm', 'controllerManager', 'extraArgs'],
+                            ['kubeadm', 'etcd', 'local', 'extraArgs']):
+            return merge_named_args(base, nxt)
         return nxt
 
     elements_after = nxt[(strategy_definition_position + 1):]
@@ -51,6 +57,18 @@ def list_merger(_: Merger, path: list, base: list, nxt: list) -> list:
     nxt.extend(elements_after)
 
     return nxt
+
+
+def merge_named_args(base: list, nxt: list) -> list:
+    """
+    Merge kubeadm extraArgs by name.
+    All `base` arguments with names present in `nxt` are removed, and then `nxt` arguments are appended.
+    `nxt` may contain the same name several times, all such arguments are preserved.
+
+    Example: base [{a: 1}, {b: 2}] and nxt [{b: 3}] give [{a: 1}, {b: 3}].
+    """
+    names = {arg['name'] for arg in nxt}
+    return [arg for arg in base if arg['name'] not in names] + nxt
 
 
 default_merger: Merger = Merger(

@@ -97,7 +97,8 @@ services:
         - k8s-worker-2
         - k8s-worker-3
       extraArgs:
-        enable-admission-plugins: NodeRestriction,PodNodeSelector
+        - name: enable-admission-plugins
+          value: NodeRestriction,PodNodeSelector
 
   cri:
     containerRuntime: containerd

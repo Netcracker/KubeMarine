@@ -27,6 +27,9 @@
     "kubeadm": {
       "$ref": "services/kubeadm.json"
     },
+    "kubeadm_timeouts": {
+      "$ref": "services/kubeadm.json#/definitions/Timeouts"
+    },
     "kernel_security": {
       "$ref": "services/kernel_security.json"
     },

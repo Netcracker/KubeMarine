@@ -83,6 +83,9 @@
           },
           "additionalProperties": false
         },
+        "kubeadm_timeouts": {
+          "$ref": "definitions/services/kubeadm.json#/definitions/Timeouts"
+        },
         "sysctl": {
           "$ref": "definitions/services/sysctl.json"
         }

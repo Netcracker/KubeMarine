@@ -25,10 +25,135 @@ import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import demo, plugins, system
+from kubemarine.core import errors
 from kubemarine.kubernetes import components
+from kubemarine.core.yaml_merger import merge_named_args
 
 
 class KubeadmConfigTest(unittest.TestCase):
+
+    def test_v1beta4_serialization_preserves_inventory_and_timeouts(self):
+        for version in ('v1.34.2', 'v1.36.0', 'v1.37.0'):
+            with self.subTest(version=version):
+                inventory = demo.generate_inventory(**demo.ALLINONE)
+                inventory['services']['kubeadm'] = {
+                    'kubernetesVersion': version,
+                    'apiVersion': 'kubeadm.k8s.io/v1beta4',
+                }
+                inventory['services']['kubeadm_timeouts'] = {'controlPlaneComponentHealthCheck': '5m'}
+                cluster = demo.new_cluster(inventory)
+                before = deepcopy(cluster.inventory)
+                init = components.get_init_config(cluster, cluster.nodes['control-plane'], init=True)
+                docs = list(yaml.safe_load_all(components.get_kubeadm_config(cluster, init)))
+                config = next(doc for doc in docs if doc['kind'] == 'ClusterConfiguration')
+                self.assertEqual('kubeadm.k8s.io/v1beta4', config['apiVersion'])
+                for section in ('apiServer', 'scheduler', 'controllerManager'):
+                    self.assertIsInstance(config[section]['extraArgs'], list)
+                self.assertIsInstance(config['etcd']['local']['extraArgs'], list)
+                self.assertNotIn('timeoutForControlPlane', config['apiServer'])
+                self.assertEqual('5m', docs[-1]['timeouts']['controlPlaneComponentHealthCheck'])
+                self.assertIsInstance(docs[-1]['nodeRegistration']['kubeletExtraArgs'], list)
+                self.assertEqual(before, cluster.inventory)
+
+    def test_legacy_kubeadm_inventory_is_rejected(self):
+        for override in ({'apiVersion': 'kubeadm.k8s.io/v1beta3'},
+                         {'apiServer': {'extraArgs': {'profiling': 'false'}}},
+                         {'apiServer': {'timeoutForControlPlane': '5m'}}):
+            with self.subTest(override=override):
+                inventory = demo.generate_inventory(**demo.ALLINONE)
+                inventory['services']['kubeadm'] = override
+                with self.assertRaises(errors.FailException):
+                    demo.new_cluster(inventory)
+
+    def test_merge_named_args(self):
+        base = [{'name': 'audit-policy-file', 'value': '/etc/policy.yaml'}, {'name': 'profiling', 'value': 'false'}]
+        self.assertEqual([{'name': 'audit-policy-file', 'value': '/etc/policy.yaml'},
+                          {'name': 'profiling', 'value': 'true'}],
+                         merge_named_args(base, [{'name': 'profiling', 'value': 'true'}]))
+        # repeated arguments of the override are preserved, the last one takes precedence
+        duplicates = [{'name': 'custom', 'value': 'true'}, {'name': 'custom', 'value': 'false'}]
+        merged = merge_named_args(base, duplicates)
+        self.assertEqual(base + duplicates, merged)
+        self.assertEqual('false', components.get_arg(merged, 'custom'))
+
+    def test_inventory_merge_of_partial_extra_args(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'true'}]}}
+        cluster = demo.new_cluster(inventory)
+        args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+        self.assertEqual('true', components.get_arg(args, 'profiling'))
+        self.assertEqual(1, len([arg for arg in args if arg['name'] == 'profiling']))
+        self.assertIsNotNone(components.get_arg(args, 'audit-policy-file'))
+
+    def test_join_timeout_serialization(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.37.0'}
+        cluster = demo.new_cluster(inventory)
+        join = {'apiVersion': 'kubeadm.k8s.io/v1beta4', 'kind': 'JoinConfiguration',
+                'discovery': {}, 'timeouts': {'discovery': '3m'},
+                'nodeRegistration': {'kubeletExtraArgs': []}}
+        result = list(yaml.safe_load_all(components.get_kubeadm_config(cluster, join)))[-1]
+        self.assertEqual({'discovery': '3m'}, result['timeouts'])
+        self.assertNotIn('timeout', result['discovery'])
+
+    def test_load_and_edit_existing_kubeadm_config(self):
+        self._check_load_and_edit_existing_kubeadm_config('v1.37.0')
+
+    def test_load_and_edit_uses_v1beta4_for_older_versions(self):
+        self._check_load_and_edit_existing_kubeadm_config('v1.36.0')
+
+    def _check_load_and_edit_existing_kubeadm_config(self, target_version):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'kubernetesVersion': target_version}
+        cluster = demo.new_cluster(inventory)
+        control_plane = cluster.nodes['control-plane'].get_first_member()
+        config = {'kind': 'ClusterConfiguration',
+                  'apiVersion': 'kubeadm.k8s.io/v1beta4',
+                  'kubernetesVersion': 'v1.36.0',
+                  'apiServer': {'extraArgs': [{'name': 'custom', 'value': 'old'}]}}
+        data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
+        cluster.fake_shell.add(
+            demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
+            'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
+
+        def edit(value):
+            args = value['apiServer']['extraArgs']
+            args[0]['value'] = 'new'
+            return value
+
+        kubeadm = components.KubeadmConfig(cluster)
+        loaded = kubeadm.load('kubeadm-config', control_plane, edit)
+        expected_args = [{'name': 'custom', 'value': 'new'}]
+        self.assertEqual(expected_args, loaded['apiServer']['extraArgs'])
+        wire = yaml.safe_load(kubeadm.loaded_maps['kubeadm-config'].obj['data']['ClusterConfiguration'])
+        self.assertEqual('v1.36.0', wire['kubernetesVersion'])
+        self.assertEqual('kubeadm.k8s.io/v1beta4', wire['apiVersion'])
+        self.assertEqual(expected_args, wire['apiServer']['extraArgs'])
+
+    def test_merge_kubeadm_config_with_inventory(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kubeadm'] = {'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'true'}]}}
+        cluster = demo.new_cluster(inventory)
+        inventory_before = deepcopy(cluster.inventory)
+        control_plane = cluster.nodes['control-plane'].get_first_member()
+        config = {'kind': 'ClusterConfiguration',
+                  'apiVersion': 'kubeadm.k8s.io/v1beta4',
+                  'apiServer': {'extraArgs': [{'name': 'profiling', 'value': 'false'},
+                                              {'name': 'configmap-only', 'value': 'value'}]}}
+        data = {'data': {'ClusterConfiguration': yaml.dump(config)}}
+        cluster.fake_shell.add(
+            demo.create_hosts_result([control_plane.get_host()], stdout=json.dumps(data)),
+            'sudo', ['kubectl get configmap -n kube-system kubeadm-config -o json'])
+
+        kubeadm = components.KubeadmConfig(cluster)
+        merged = kubeadm.load('kubeadm-config', control_plane, kubeadm.merge_with_inventory('kubeadm-config'))
+        args = merged['apiServer']['extraArgs']
+        self.assertEqual('true', components.get_arg(args, 'profiling'))
+        self.assertEqual(1, len([arg for arg in args if arg['name'] == 'profiling']))
+        self.assertEqual('value', components.get_arg(args, 'configmap-only'))
+        # arguments from the ConfigMap should not leak to the inventory
+        self.assertEqual(inventory_before, cluster.inventory)
+
     def test_get_init_config_control_plane(self):
         inventory = demo.generate_inventory(control_plane=1, worker=1, balancer=0)
         cluster = demo.new_cluster(inventory)
@@ -126,7 +251,7 @@ class KubeadmConfigTest(unittest.TestCase):
     def test_kubelet_local_mode_enrichment(self):
         # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']
         self.assertIsNotNone(kubeadm.get('featureGates'))
@@ -134,7 +259,7 @@ class KubeadmConfigTest(unittest.TestCase):
 
         # Enriched featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ with not empty featureGates
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['foo'] = 'bar'
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']
@@ -144,7 +269,7 @@ class KubeadmConfigTest(unittest.TestCase):
 
         # Do not change featureGates.ControlPlaneKubeletLocalMode=true for kubernetes 1.31+ if value is overridden
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.33.6'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.34.2'
         inventory['services'].setdefault('kubeadm', {}).setdefault('featureGates', {})['ControlPlaneKubeletLocalMode'] = False
         cluster = demo.new_cluster(inventory)
         kubeadm = cluster.inventory['services']['kubeadm']
