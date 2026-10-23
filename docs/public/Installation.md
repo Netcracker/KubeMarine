@@ -1205,17 +1205,20 @@ that is, only the arguments with the specified names are overridden, and the oth
 The control plane health check timeout is specified in `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`
 instead of `services.kubeadm.apiServer.timeoutForControlPlane`.
 
-If the cluster was installed using a previous KubeMarine version, the inventory should be updated manually
-after the KubeMarine update and before any other procedures, otherwise the inventory fails to be validated against the schema:
+If the cluster was installed using a previous KubeMarine version, the inventory fails to be validated against the schema
+until it is migrated. After the KubeMarine update and before any other procedures,
+run the [Kubemarine Migration Procedure](Maintenance.md#kubemarine-migration-procedure) once.
+The `migrate_kubeadm_v1beta4` patch changes the inventory only:
 
-* Change `services.kubeadm.apiVersion` from `kubeadm.k8s.io/v1beta3` to `kubeadm.k8s.io/v1beta4`, or remove it.
-* Convert `extraArgs` of `apiServer`, `scheduler`, `controllerManager`, and `etcd.local` from maps to lists.
-* Move `services.kubeadm.apiServer.timeoutForControlPlane` to `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`.
-* Update custom Jinja templates that read `extraArgs` as a map.
+* `services.kubeadm.apiVersion` is changed from `kubeadm.k8s.io/v1beta3` to `kubeadm.k8s.io/v1beta4`.
+* `extraArgs` of `apiServer`, `scheduler`, `controllerManager`, and `etcd.local` are converted from maps to lists.
+* `services.kubeadm.apiServer.timeoutForControlPlane` is moved to `services.kubeadm_timeouts.controlPlaneComponentHealthCheck`.
+
+Custom Jinja templates that read `extraArgs` as a map are not migrated, and should be updated manually.
 
 The `kube-system/kubeadm-config` ConfigMap does not require changes, it is already stored by kubeadm in `v1beta4`.
 
-For example:
+The following example shows the inventory before and after the migration, with the custom template updated manually:
 
 ```yaml
 # before
