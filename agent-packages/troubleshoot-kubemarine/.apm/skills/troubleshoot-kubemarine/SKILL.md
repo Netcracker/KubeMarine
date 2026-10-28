@@ -42,6 +42,7 @@ requester to collect it — do not attempt to infer its content.
 | Artifact to request / look for        | What to extract from it                                                 |
 | ------------------------------------- | ----------------------------------------------------------------------- |
 | Kubemarine stdout / pipeline output   | `TASK FAILED` line, KME code, traceback                                |
+| Kubemarine version (`kubemarine version` output, or from the pipeline log/release tag) | Known version-specific issues (e.g. v1.28.3 etcd manifest incompatibility) |
 | `cluster.yaml`                        | Node roles, OS family, k8s version, registry, plugin config            |
 | Procedure YAML                        | Target versions, tasks list, inventory overrides                        |
 | `kubectl get nodes -o wide` output    | Node status, IP addresses, OS, k8s version                             |
@@ -89,8 +90,11 @@ From `cluster.yaml` or node info in attached artifacts:
 - Multiple subnets visible? → MTU mismatch or Calico IP autodetection issue.
 - Calico version 3.29.0 or 3.29.1 in `cluster.yaml` or pod image tag? → GC failures due to missing RBAC.
 - Large cluster with many ingresses (visible from `kubectl get ingress`)? → ingress-nginx admission webhook timeout.
+- URLs not opening in the browser? → check `ingress-nginx` or `envoy-gateway` pod status/logs (whichever is configured
+  in `cluster.yaml`) for crash loops, config-reload errors, or backend connectivity failures.
 
-If none of the above artifacts are attached, ask the requester to attach `cluster.yaml` and Calico pod logs.
+If none of the above artifacts are attached, ask the requester to attach `cluster.yaml`, Calico pod logs, and
+`ingress-nginx`/`envoy-gateway` pod logs (as relevant to the symptom).
 
 ### etcd issue
 
