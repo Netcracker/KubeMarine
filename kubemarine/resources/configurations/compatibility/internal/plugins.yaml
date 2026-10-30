@@ -65,35 +65,35 @@ local-path-provisioner:
     alpine-version: 3.24.2
 envoy-gateway:
   v1.34.1:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
+    version: 2.6.1
+    envoyGateway-version: v1.9.2
+    envoy-version: distroless-v1.39.1
+    kubectl-version: 0.0.11
+    ratelimit-version: 0482748e
   v1.34.2:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
+    version: 2.6.1
+    envoyGateway-version: v1.9.2
+    envoy-version: distroless-v1.39.1
+    kubectl-version: 0.0.11
+    ratelimit-version: 0482748e
   v1.35.0:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
+    version: 2.6.1
+    envoyGateway-version: v1.9.2
+    envoy-version: distroless-v1.39.1
+    kubectl-version: 0.0.11
+    ratelimit-version: 0482748e
   v1.36.0:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
+    version: 2.6.1
+    envoyGateway-version: v1.9.2
+    envoy-version: distroless-v1.39.1
+    kubectl-version: 0.0.11
+    ratelimit-version: 0482748e
   v1.37.0:
-    version: 2.6.0
-    envoyGateway-version: v1.9.0
-    envoy-version: distroless-v1.39.0
-    kubectl-version: 0.0.9
-    ratelimit-version: 17b1956c
+    version: 2.6.1
+    envoyGateway-version: v1.9.2
+    envoy-version: distroless-v1.39.1
+    kubectl-version: 0.0.11
+    ratelimit-version: 0482748e
 openstack-cinder-csi:
   v1.34.1:
     version: 2.35.0
