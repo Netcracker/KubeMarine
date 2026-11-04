@@ -167,5 +167,8 @@ def _get_actual_mounts(stdout: str) -> dict:
     actual = {}
     for line in stdout.splitlines():
         words = line.split()
+        # we expect two parts - path and size
+        if len(words) != 2:
+            continue
         actual[words[0]] = int(int(words[1])/(1024*1024))
     return actual
