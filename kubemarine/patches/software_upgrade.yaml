@@ -41,5 +41,6 @@ plugins:
   - v1.34.2
   - v1.35.0
   - v1.36.0
+  - v1.37.0
   openstack-cinder-csi: []
   csi-snapshot-controller: []
