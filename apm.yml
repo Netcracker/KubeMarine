@@ -1,0 +1,16 @@
+name: kubemarine
+version: 1.0.0
+description: APM project for KubeMarine
+targets:
+  - claude
+  - copilot
+  - cursor
+dependencies:
+  apm: []
+  mcp: []
+includes: auto
+scripts: {}
+devDependencies:
+  apm:
+    - Netcracker/qubership-ai-packages/agent-packages/apm-authoring
+    - ./agent-packages/troubleshoot-kubemarine/

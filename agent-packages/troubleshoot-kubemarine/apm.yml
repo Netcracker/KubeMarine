@@ -1,0 +1,13 @@
+name: troubleshoot-kubemarine
+version: 1.0.0
+description: Skill to troubleshoot KubeMarine-managed Kubernetes clusters and the KubeMarine CLI itself
+type: skill
+targets:
+  - claude
+  - copilot
+  - cursor
+dependencies:
+  apm: []
+  mcp: []
+includes: auto
+scripts: {}

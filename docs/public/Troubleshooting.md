@@ -106,7 +106,7 @@ ValueError: max_workers must be greater than 0
 ```
 
 ### How to resolve
-1. Run the [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure) to identify potential issues with the nodes or the cluster.
+1. Run the [IAAS checker](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Kubecheck.md#iaas-procedure) and [PAAS checker](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Kubecheck.md#paas-procedure) to identify potential issues with the nodes or the cluster.
 2. If the checker reports failed tests, fix the cause of the failure and rerun the task.
 3. Adjust the number of workers to ensure `max_workers` is greater than 0.
 4. If you are unable to resolve the issue, [start a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and provide the error details along with the stack trace for further assistance.
@@ -145,7 +145,7 @@ KME0002: Remote group exception
 ```
 
 ### How to resolve
-1. Run the [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure) to ensure that the infrastructure and platform are functioning properly.
+1. Run the [IAAS checker](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Kubecheck.md#iaas-procedure) and [PAAS checker](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Kubecheck.md#paas-procedure) to ensure that the infrastructure and platform are functioning properly.
 2. Inspect the node where the error occurred. In our particular example, it is required to check the presence of the required package manager and install it if it is missing. 
 3. Verify that all necessary dependencies are correctly installed on the node, and reattempt the task.
 4. Ensure that the inventory and configuration files are correctly set up, following the proper sequence of commands.
@@ -186,7 +186,7 @@ KME0002: Remote group exception
 2. Reboot the hypervisor or node if it is not responding, or manually terminate any hanging processes.
 3. Check for SSH connectivity issues between the deployer node and the cluster, and verify the network stability.
 4. Investigate the environment or settings of the executable command for any misconfigurations or issues causing the prolonged execution.
-5. Run the [IAAS checker](Kubecheck.md#iaas-procedure) to detect any network connectivity issues between the nodes.
+5. Run the [IAAS checker](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Kubecheck.md#iaas-procedure) to detect any network connectivity issues between the nodes.
 6. If the problem persists, update the executable or make other environment changes to resolve the hanging command.
 
 ### Recommendations
@@ -905,7 +905,7 @@ Not applicable.
 ### How to resolve
 The root cause of the issue is a corrupted etcd database. 
 
-If you have a relevant backup created by the [`kubemarine backup`](/docs/public/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster, you can use the [`kubemarine restore`](/docs/public/Maintenance.md#restore-procedure) procedure.
+If you have a relevant backup created by the [`kubemarine backup`](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole Kubernetes cluster, you can use the [`kubemarine restore`](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Maintenance.md#restore-procedure) procedure.
 
 If you prefer to restore only the etcd database rather than the entire cluster, you can use the `kubemarine restore` procedure with a list of required tasks:
 ```bash
@@ -1269,7 +1269,7 @@ Not applicable.
 ### How to resolve
 The root cause of this issue is a network policy applied at the infrastructure level that blocks traffic for the `podSubnet` and/or `serviceSubnet` on the nodes' ports.
 
-To resolve the issue, ensure that the [prerequisites](/docs/public/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are properly configured.
+To resolve the issue, ensure that the [prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#prerequisites-for-cluster-nodes) for `podSubnet` and `serviceSubnet` are properly configured.
 
 For OpenStack IaaS environments:
 1. Check both the Security Group settings and the Allowed Address Pairs settings (if Port Security is enabled on the nodes' ports).
@@ -1769,10 +1769,10 @@ Not applicable.
 Not applicable.
 
 ### How to resolve
-The root cause of this issue is incompatibility between the Docker version and the Kubemarine base [image version](/Dockerfile#L1). Kubemarine uses system calls that are not allowed by default in Docker, causing the failure.
+The root cause of this issue is incompatibility between the Docker version and the Kubemarine base [image version](https://github.com/Netcracker/KubeMarine/blob/main/Dockerfile#L1). Kubemarine uses system calls that are not allowed by default in Docker, causing the failure.
 
 To fix this issue:
-1. **Check for compatibility issues** between the Docker version being used and the Kubemarine base [image version](/Dockerfile#L1). If there are known issues, upgrade Docker to a version that resolves them.
+1. **Check for compatibility issues** between the Docker version being used and the Kubemarine base [image version](https://github.com/Netcracker/KubeMarine/blob/main/Dockerfile#L1). If there are known issues, upgrade Docker to a version that resolves them.
    
 2. **Use additional grants** for the Kubemarine container by adding the `--privileged` or `--cap-add` options to the Docker command to provide the necessary permissions.
 
@@ -1919,7 +1919,7 @@ To resolve this issue:
 
 2. Remember that these customizations are applied by kubeadm only during the upgrade. Therefore, you must manually add your customizations to both the `/etc/kubernetes/manifests/etcd.yaml` file and the `kubeadm-config` config map.
 
-3. Ensure that all custom settings for etcd, `kube-apiserver`, `kube-controller`, and `kube-scheduler` are also reflected in the `cluster.yaml` file. Refer to [services.kubeadm parameters](Installation.md#kubeadm) for more details.
+3. Ensure that all custom settings for etcd, `kube-apiserver`, `kube-controller`, and `kube-scheduler` are also reflected in the `cluster.yaml` file. Refer to [services.kubeadm parameters](https://github.com/Netcracker/KubeMarine/blob/main/docs/public/Installation.md#kubeadm) for more details.
 
 ### Recommendations
 To preserve your customizations during future Kubernetes upgrades, ensure they are properly reflected in both the `kubeadm-config` config map and `cluster.yaml`.
