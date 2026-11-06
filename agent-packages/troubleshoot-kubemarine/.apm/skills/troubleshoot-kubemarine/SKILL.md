@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-kubemarine
-description: Diagnose and resolve Kubernetes installation, upgrade, and operational failures performed via Kubemarine, from artifacts attached to a ticket — KME error codes, kubectl/etcd logs, pipeline output, or cluster.yaml. Internal tickets often describe the problem simply as a "Kubernetes" issue without naming Kubemarine explicitly — this skill still applies. Use when troubleshooting a kubemarine install/upgrade/add_node/remove_node procedure failure, a Kubernetes installation or operational failure, an etcd issue, a Calico networking problem, a node NotReady status, a CoreDNS resolution failure, an ingress or webhook failure, or any Kubernetes generic operational issue in a KubeMarine-managed cluster (internal or SaaS).
+description: Diagnose and resolve Kubernetes installation, upgrade, and operational failures performed via Kubemarine — KME error codes, etcd issues, Calico networking problems, node NotReady status, CoreDNS resolution failures, and ingress/webhook failures. Use when troubleshooting a kubemarine install/upgrade/add_node/remove_node procedure failure, a Kubernetes installation or operational failure, or any Kubernetes generic operational issue in a KubeMarine-managed cluster (internal or SaaS).
 ---
 
 ## Scope
