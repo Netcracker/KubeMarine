@@ -426,3 +426,16 @@ plugins:
                       name: kubernetes-dashboard
                       port:
                         number: 443
+
+  headlamp:
+    install: true
+    installation:
+      priority: 2
+    namespace: "headlamp"
+    releaseName: "headlamp"
+    hostname: 'headlamp.k8s.example.com'
+    headlampRegistry: ghcr.io
+    debugRegistry: docker.io
+    debugImage: library/alpine:3.24.2
+    values:
+      replicaCount: 1

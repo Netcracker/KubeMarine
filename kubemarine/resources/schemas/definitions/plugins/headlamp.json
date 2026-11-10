@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Enable and/or change default settings for 'headlamp' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of Headlamp helm chart"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace where Headlamp should be installed",
+      "default": "headlamp"
+    },
+    "releaseName": {
+      "type": "string",
+      "description": "Release name for Headlamp helm chart. It is also used as a name of Headlamp Deployment, Service, Ingress, and HTTPRoute.",
+      "default": "headlamp"
+    },
+    "hostname": {
+      "type": "string",
+      "default": "'dashboard.{{ cluster_name }}'",
+      "description": "Address on which the Headlamp UI is located. Used in Ingress and HTTPRoute resources. Should differ from the 'kubernetes-dashboard' hostname if both plugins are installed."
+    },
+    "headlampRegistry": {
+      "type": "string",
+      "default": "",
+      "description": "Registry for Headlamp image. If empty, 'installation.registry' or 'ghcr.io' is used."
+    },
+    "debugRegistry": {
+      "type": "string",
+      "default": "",
+      "description": "Registry for the image of node shell pods and pod debug containers. If empty, 'installation.registry' is used, if specified."
+    },
+    "debugImage": {
+      "type": "string",
+      "description": "Image to use for node shell pods and pod debug containers"
+    },
+    "values": {
+      "type": "object",
+      "description": "Override values for Headlamp helm chart"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "namespace", "releaseName", "hostname", "headlampRegistry", "debugRegistry", "debugImage", "values"]}
+    ]
+  }
+}

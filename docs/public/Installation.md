@@ -71,6 +71,8 @@ This section provides information about the inventory, features, and steps for i
         - [nginx-ingress-controller](#nginx-ingress-controller)
         - [envoy-gateway](#envoy-gateway)
         - [kubernetes-dashboard](#kubernetes-dashboard)
+        - [headlamp](#headlamp)
+          - [Headlamp Behind Authentication Proxy](#headlamp-behind-authentication-proxy)
         - [local-path-provisioner](#local-path-provisioner)
         - [openstack-cinder-csi](#openstack-cinder-csi)
         - [csi-snapshot-controller](#csi-snapshot-controller)
@@ -4089,6 +4091,7 @@ When you want to install a plugin, the installer includes pre-configured plug-in
   * [nginx-ingress-controller](#nginx-ingress-controller)
   * [envoy-gateway](#nginx-ingress-controller)
 * [kubernetes-dashboard](#kubernetes-dashboard)
+* [headlamp](#headlamp)
 * [local-path-provisioner](#local-path-provisioner)
 
 **Note**: It is not possible to install multiple plugins of the same type at the same time.
@@ -4602,6 +4605,8 @@ plugins:
 
 ##### kubernetes-dashboard
 
+**Note:** kubernetes-dashboard plugin is deprecated and will be removed in future versions, please use [`headlamp` plugin](#headlamp) instead.
+
 Before proceeding, refer to the _Official Documentation of the Kubernetes Dashboard UI_ at [https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) and visit [official Kubernetes Dashboard repository](https://github.com/kubernetes/dashboard).
 
 By default, the Kubernetes dashboard is not installed, as it is not a mandatory part of the cluster. However, you can install it by enabling the plugin.
@@ -4729,6 +4734,139 @@ plugins:
 ```
  
 **Warning**: Be very careful when overriding these parameters.
+
+##### headlamp
+
+Before proceeding, refer to the [Official Documentation of Headlamp](https://headlamp.dev/docs/latest/) and visit [official Headlamp repository](https://github.com/kubernetes-sigs/headlamp).
+
+Headlamp is a Kubernetes web UI and a successor of the [kubernetes-dashboard](#kubernetes-dashboard). Both plugins are independent of each other,
+and they can be installed at the same time, but with different hostnames.
+
+By default, Headlamp is not installed, as it is not a mandatory part of the cluster. However, you can install it by enabling the plugin.
+
+The following is an example to enable Headlamp plugin:
+
+```yaml
+plugins:
+  headlamp:
+    install: true
+```
+
+**Note**: By default, Headlamp is available at `dashboard.{{ cluster_name }}`, that is, the same address as the [kubernetes-dashboard](#kubernetes-dashboard).
+If both plugins are installed, the `hostname` of one of them should be redefined, otherwise the inventory validation fails. For example:
+
+```yaml
+plugins:
+  kubernetes-dashboard:
+    install: true
+  headlamp:
+    install: true
+    hostname: 'headlamp.{{ cluster_name }}'
+```
+
+**Note**: Headlamp is exposed according to the installed ingress controllers:
+* If `nginx-ingress-controller` is installed, the `Ingress` resource is created. It is available only via HTTPS, using the default controller certificate.
+* If `envoy-gateway` is installed, the `HTTPRoute` resource attached to the `default-external-gateway` Gateway is created.
+  It is available via HTTPS only if the certificate is configured for `envoy-gateway`, otherwise via HTTP.
+* If both plugins are installed, both resources are created.
+
+If you enable the plugin, all other parameters are applied by default. The following is a list of supported parameters:
+
+```yaml
+plugins:
+  headlamp:
+    # Allows to specify Headlamp chart version.
+    # If not specified, KubeMarine will choose recommended version depending on k8s version.
+    version: ''
+    install: false
+    # Allows to specify namespace and release name for Headlamp chart.
+    # The release name is also used as a name of the Deployment, Service, Ingress, and HTTPRoute.
+    namespace: "headlamp"
+    releaseName: "headlamp"
+    # Address on which Headlamp UI is located.
+    # Should differ from the kubernetes-dashboard hostname if both plugins are installed.
+    hostname: 'dashboard.{{ cluster_name }}'
+    # Registry of the Headlamp image.
+    headlampRegistry: ''
+    # Registry of the debugImage.
+    debugRegistry: ''
+    # Image of the pods, which are created by Headlamp to open shell on nodes,
+    # and of the ephemeral containers, which are created by Headlamp to debug pods.
+    debugImage: 'library/alpine:{{ globals.compatibility_map.software["headlamp"][services.kubeadm.kubernetesVersion]["alpine-version"] }}'
+    # Allows to override values for Headlamp chart.
+    # For example, following configuration could be used to change resources and to provide tolerations:
+    # values:
+    #   resources:
+    #     requests:
+    #       cpu: 200m
+    #       memory: 256Mi
+    #   tolerations:
+    #   - key: node-role.kubernetes.io/control-plane
+    #     operator: Exists
+    #     effect: NoSchedule
+    #
+    # Supported parameters could be found in the chart values.yaml
+    values: {}
+```
+
+**Note**:
+* The registries are resolved as follows:
+  * By default, the Headlamp image is pulled from `ghcr.io`, and `debugImage` is used as is, that is, from `docker.io`.
+  * If `plugin_defaults.installation.registry` is specified, it is used for both images.
+  * If `plugins.headlamp.installation.registry` is specified, it is used for both images and has priority over `plugin_defaults`.
+  * If `headlampRegistry` or `debugRegistry` is specified, it is used for the corresponding image and has the highest priority.
+* Headlamp namespace is created by Helm without any [Pod Security Standards](#rbac-pss) labels,
+  so the default PSS profile of the cluster is applied to it. The Headlamp pods satisfy the `restricted` profile.
+* Node shell pods are privileged. By default, they are created in the `kube-system` namespace.
+  If you change the namespace using `values.config.nodeShellNamespace`, make sure that it allows privileged pods.
+* Supported chart parameters could be found in the chart `values.yaml`.
+  KubeMarine provides its own defaults for some of them, for example, `securityContext`, `ingress`, and `httpRoute`. The values from `values` section have priority over KubeMarine defaults.
+
+###### Headlamp Behind Authentication Proxy
+
+It is possible to deploy an authentication proxy (for example, `keycloak-gatekeeper` / `oauth2-proxy`) between the ingress controller and Headlamp.
+In this case, the traffic should flow as follows: `envoy-gateway` -> authentication proxy -> Headlamp service.
+
+KubeMarine does not install the authentication proxy, it should be deployed separately, for example, in the Headlamp namespace,
+and configured to forward the authenticated requests to the Headlamp service, that is, `http://<releaseName>.<namespace>.svc:80` (`http://headlamp.headlamp.svc:80` by default).
+
+The Ingress and HTTPRoute resources created by the Headlamp chart should then be configured to route the traffic to the authentication proxy service
+instead of Headlamp service. For example, if the authentication proxy service is `keycloak-gatekeeper` with port `80`:
+
+```yaml
+plugins:
+  headlamp:
+    install: true
+    values:
+      # Relevant if nginx-ingress-controller is installed
+      ingress:
+        hosts:
+        - host: '{{ plugins.headlamp.hostname }}'
+          paths:
+          - path: /
+            type: Prefix
+            backend:
+              service:
+                name: keycloak-gatekeeper
+                port:
+                  number: 80
+      # Relevant if envoy-gateway is installed
+      httpRoute:
+        rules:
+        - matches:
+          - path:
+              type: PathPrefix
+              value: /
+          backendRefs:
+          - name: keycloak-gatekeeper
+            port: 80
+```
+
+**Note**:
+* The lists in `values` replace the KubeMarine defaults, so `ingress.hosts` should be specified completely.
+  The other KubeMarine defaults, for example, `ingress.tls`, `httpRoute.hostnames`, and `httpRoute.parentRefs`, are preserved.
+* The authentication proxy service should be located in the Headlamp namespace,
+  because Ingress cannot refer to the services in other namespaces, and HTTPRoute requires a `ReferenceGrant` for that.
 
 ##### local-path-provisioner
 
@@ -4963,6 +5101,7 @@ Plugins are installed in a strict sequential order. The installation sequence is
 |envoy-gateway|`1`|
 |nginx-ingress-controller|`1`|
 |kubernetes-dashboard|`3`|
+|headlamp|`3`|
 |local-path-provisioner|`3`|
 
 You can change the priorities of preinstalled plugins, as well as set your own priority for the custom plugins.
@@ -6572,6 +6711,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
 |          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | ghcr.io/headlamp-k8s/headlamp                         | v0.46.0            | v0.46.0               | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | Required only if Headlamp plugin is set to be installed.                             |
+|          | library/alpine                                        | 3.24.2             | 3.24.2                | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | Required only if Headlamp or local-path-provisioner plugins are set to be installed.                             |
 |          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
@@ -6618,6 +6759,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
 |          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | ghcr.io/headlamp-k8s/headlamp                         | v0.46.0            | v0.46.0               | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | Required only if Headlamp plugin is set to be installed.                             |
+|          | library/alpine                                        | 3.24.2             | 3.24.2                | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | Required only if Headlamp or local-path-provisioner plugins are set to be installed.                             |
 |          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
@@ -6664,6 +6807,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
 |          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | ghcr.io/headlamp-k8s/headlamp                         | v0.46.0            | v0.46.0               | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | Required only if Headlamp plugin is set to be installed.                             |
+|          | library/alpine                                        | 3.24.2             | 3.24.2                | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | Required only if Headlamp or local-path-provisioner plugins are set to be installed.                             |
 |          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |
@@ -6709,6 +6854,8 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | ghcr.io/netcracker/kube-webhook-certgen               | v1.6.9             | v1.6.9                | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             | v1.6.9             |                                                                                      |
 |          | kubernetesui/dashboard                                | v2.7.0             | v2.7.0                | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | v2.7.0             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
 |          | kubernetesui/metrics-scraper                          | v1.0.8             | v1.0.8                | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | v1.0.8             | Required only if Kubernetes Dashboard plugin is set to be installed.                 |
+|          | ghcr.io/headlamp-k8s/headlamp                         | v0.46.0            | v0.46.0               | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | v0.46.0            | Required only if Headlamp plugin is set to be installed.                             |
+|          | library/alpine                                        | 3.24.2             | 3.24.2                | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | 3.24.2             | Required only if Headlamp or local-path-provisioner plugins are set to be installed.                             |
 |          | rancher/local-path-provisioner                        | v0.0.32            | v0.0.32               | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | v0.0.32            | Required only if local-path provisioner plugin is set to be installed.               |
 |          | envoyproxy/envoy                                      | distroless-v1.39.0 | distroless-v1.39.0    | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | distroless-v1.39.0 | Required only if envoy-gateway plugin is set to be installed.                        |
 |          | envoyproxy/gateway                                    | v1.9.0             | v1.9.0                | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | v1.9.0             | Required only if envoy-gateway plugin is set to be installed.                        |

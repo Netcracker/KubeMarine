@@ -39,6 +39,7 @@ import kubemarine.packages
 import kubemarine.plugins
 import kubemarine.plugins.builtin
 import kubemarine.plugins.calico
+import kubemarine.plugins.headlamp
 import kubemarine.plugins.kubernetes_dashboard
 import kubemarine.plugins.local_path_provisioner
 import kubemarine.plugins.nginx_ingress
@@ -479,6 +480,7 @@ class DynamicResources:
             kubemarine.plugins.verify_inventory,
             kubemarine.plugins.builtin.verify_inventory,
             kubemarine.plugins.calico.enrich_inventory,
+            kubemarine.plugins.headlamp.verify_inventory,
             kubemarine.plugins.kubernetes_dashboard.enrich_inventory,
             kubemarine.plugins.local_path_provisioner.enrich_inventory,
             kubemarine.plugins.nginx_ingress.enrich_inventory,

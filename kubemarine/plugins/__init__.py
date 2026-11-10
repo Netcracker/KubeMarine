@@ -152,7 +152,7 @@ def verify_image_redefined(plugin_name: str, previous_version: str, next_version
     i.e. redefined, then "upgrade_plugin" should have this image explicitly
     redefined too.
     """
-    sensitive_keys = ['image', 'helper-pod-image', 'version']
+    sensitive_keys = ['image', 'helper-pod-image', 'debugImage', 'version']
     for key, value in raw_plugins.items():
         if isinstance(value, dict):
             verify_image_redefined(plugin_name,
