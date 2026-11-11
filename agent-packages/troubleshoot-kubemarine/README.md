@@ -29,8 +29,12 @@ agent-packages/troubleshoot-kubemarine/
 agent to consult for full alert strings, stack traces, and step-by-step fixes. `SKILL.md` intentionally does not
 duplicate that detail — keep both files in sync when the source troubleshooting guide changes.
 
-> Automated doc sync and `apm.yml` registration (root `devDependency`, CI jobs) are not set up yet — this package
-> currently only contains the skill itself.
+Automation (see `.github/workflows/`):
+
+- `sync-troubleshooting-skill.yml` copies `docs/public/Troubleshooting.md` into `references/` when it changes on `main`.
+- `apm-package-update.yml` refreshes APM dependencies weekly and opens a PR (auto-merge is off by default).
+
+The package is registered as a `devDependency` in the root `apm.yml`.
 
 ## Installing directly
 
