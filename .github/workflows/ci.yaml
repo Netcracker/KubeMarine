@@ -33,8 +33,8 @@ jobs:
       matrix:
         target:
           - {os: windows-2022, arch: 'win64'}
-          - {os: macos-14, arch: 'macos14-x86_64'}
-          - {os: macos-14, arch: 'macos14-arm64'}
+          - {os: macos-15, arch: 'macos15-x86_64'}
+          - {os: macos-15, arch: 'macos15-arm64'}
           - {os: ubuntu-latest, arch: 'linux-x86_64'}
         include:
           - executable_path: './dist/kubemarine'
@@ -44,9 +44,9 @@ jobs:
             build_cmd: python scripts/ci/build_binary.py
           - target: {os: windows-2022, arch: 'win64'}
             build_cmd: python scripts/ci/build_binary.py
-          - target: {os: macos-14, arch: 'macos14-x86_64'}
+          - target: {os: macos-15, arch: 'macos15-x86_64'}
             build_cmd: python scripts/ci/build_binary.py x86_64
-          - target: {os: macos-14, arch: 'macos14-arm64'}
+          - target: {os: macos-15, arch: 'macos15-arm64'}
             build_cmd: python scripts/ci/build_binary.py arm64
     steps:
       - name: Checkout Repo
@@ -73,14 +73,13 @@ jobs:
           retention-days: 1
 
   test-binary:
-    # Currently macos-latest is macos-14-arm64, and thus binary build for macos14-arm64 can be tested on it.
     runs-on: macos-latest
     needs: build-binary
     steps:
       - name: Download Executable
         uses: actions/download-artifact@v4
         with:
-          name: kubemarine-macos14-arm64
+          name: kubemarine-macos15-arm64
       - name: Run Selftest
         run: |
           chmod +x kubemarine
@@ -97,10 +96,10 @@ jobs:
       matrix:
         os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version:
-          - "3.9"
           - "3.10"
           - "3.11"
           - "3.12"
+          - "3.13"
         include:
           - wheel: 'dist/*.whl'
             remove_files_script: 'find . -not -path "./test*" -not -path "./examples*" -not -path "./scripts*" -delete'
