@@ -73,6 +73,7 @@ This section provides information about the inventory, features, and steps for i
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [headlamp](#headlamp)
           - [Headlamp Behind Authentication Proxy](#headlamp-behind-authentication-proxy)
+          - [Dashboard migration to Headlamp](#dashboard-migration-to-headlamp)
         - [local-path-provisioner](#local-path-provisioner)
         - [openstack-cinder-csi](#openstack-cinder-csi)
         - [csi-snapshot-controller](#csi-snapshot-controller)
@@ -4867,6 +4868,54 @@ plugins:
   The other KubeMarine defaults, for example, `ingress.tls`, `httpRoute.hostnames`, and `httpRoute.parentRefs`, are preserved.
 * The authentication proxy service should be located in the Headlamp namespace,
   because Ingress cannot refer to the services in other namespaces, and HTTPRoute requires a `ReferenceGrant` for that.
+
+###### Dashboard migration to Headlamp
+
+To migrate from kubernetes-dashboard to headlamp, do the following:
+1. Patch kubernetes-dashboard Ingress/HTTPRoute hostname, change it to e.g. `disable.com`.
+This is to ensure that there will be no hostnames conflicts between legacy dashboard and headlamp.
+At this point dashboard will become unavailable.
+  ```bash
+  $ kubectl patch httproute kubernetes-dashboard -n kubernetes-dashboard --type='json' -p='[{"op": "replace", "path": "/spec/hostnames/0", "value": "disable.com"}]'
+  $ kubectl patch ingress kubernetes-dashboard -n kubernetes-dashboard --type='json' -p='[{"op": "replace", "path": "/spec/rules/0/host", "value": "disable.com"}]'
+  ```
+2. Edit `cluster.yaml`: disable `kubernetes-dashboard`, enable and configure `headlamp`. Run install procedure with `deploy.plugins` taks.
+  ```yaml
+  plugins:
+    kubernetes-dashboard:
+      install: false
+
+    headlamp:
+      install: true
+      # below configuration should be used only if you plan to use auth proxy
+      values:
+        ingress:
+          hosts: 
+          - host: dashboard.{{cluster_name}}
+            paths:
+            - path: /
+              type: Prefix
+              backend:
+                service:
+                  name: $YOUR_AUTH_PROXY_SVC
+                  port:
+                    number: $YOUR_AUTH_PROXY_PORY
+        httpRoute:
+          hostnames:
+          - dashboard.{{cluster_name}}
+          rules:
+          - matches:
+            - path:
+                value: /
+              type: PathPrefix
+            backendRefs:
+            - name: $YOUR_AUTH_PROXY_SVC
+              port: $YOUR_AUTH_PROXY_PORT
+  ```
+3. If you use authentication proxy, deploy it to headlamp namespace, so that it is available as `$YOUR_AUTH_PROXY_SVC` Service on port `$YOUR_AUTH_PROXY_PORT`. At this point headlamp dashboard should become available.
+4. Verify everything works as expected, dashboard available, login works, UI is shown.
+5. If something does not work, you can rollback to kubernetes-dashboard by patching headlamp Ingress/HTTPRoute hostname to `disable-headlamp.com`, then patch kubernetes-dashboard Ingress/HTTPRoute hostname back to your dashboard name.
+6. If everything is ok, remove `kubernetes-dasbhoard` namespace.
 
 ##### local-path-provisioner
 
