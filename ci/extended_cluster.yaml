@@ -28,10 +28,15 @@ services:
   etc_hosts:
     172.17.1.1:
       - dashboard.test-local-k8s.com
+      - headlamp.test-local-k8s.com
 
 plugins:
   kubernetes-dashboard:
     install: true
+
+  headlamp:
+    install: true
+    hostname: 'headlamp.{{ cluster_name }}'
 
   envoy-gateway:
     install: true

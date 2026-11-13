@@ -35,6 +35,7 @@ plugins:
   calico: []
   nginx-ingress-controller: []
   kubernetes-dashboard: []
+  headlamp: []
   local-path-provisioner: []
   envoy-gateway:
   - v1.34.1

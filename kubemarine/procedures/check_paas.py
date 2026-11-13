@@ -35,7 +35,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, CollectorCallback, GroupResultException
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
-from kubemarine.plugins import calico, builtin, manifest, envoy_gateway
+from kubemarine.plugins import calico, builtin, manifest, envoy_gateway, headlamp
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static, utils
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -637,7 +637,7 @@ def get_not_running_pods(cluster: KubernetesCluster) -> str:
 
 def kubernetes_pods_condition(cluster: KubernetesCluster) -> None:
     system_namespaces = ["kube-system", "ingress-nginx", "gateway-system", "kube-public", "kubernetes-dashboard", "default",
-                         "local-path-storage", "calico-apiserver"]
+                         "local-path-storage", "calico-apiserver", cluster.inventory['plugins']['headlamp']['namespace']]
     critical_states = cluster.globals['pods']['critical_states']
     with TestCase(cluster, '207', "Kubernetes", "Pods Condition") as tc:
         pods_descriptions = get_not_running_pods(cluster).split('\n')[1:]
@@ -754,6 +754,54 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
             else:
                 raise TestFailure("not available",
                               hint=f"Please verify the following Kubernetes Dashboard status and fix this issue:\n{status}")
+
+
+def kubernetes_headlamp_status(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '237', "Plugins", "Headlamp Availability") as tc:
+        headlamp_plugin = cluster.inventory['plugins']['headlamp']
+        if not headlamp_plugin['install']:
+            tc.success(results="skipped")
+            return
+
+        retries = 10
+        namespace = headlamp_plugin['namespace']
+        service_name = headlamp_plugin['releaseName']
+        hint = f"Please verify the Headlamp status in {namespace!r} namespace and fix this issue"
+        control_plane = cluster.nodes['control-plane'].get_first_member()
+
+        def check_url(curl_args: str) -> bool:
+            for i in range(1, retries + 1):
+                result = control_plane.sudo(f'curl -g -k -s -S -o /dev/null -w "%{{http_code}}" {curl_args}', warn=True)
+                http_code = result.get_simple_out().strip()
+                if http_code == '200':
+                    return True
+                cluster.log.debug(f'Headlamp is not available yet (HTTP code {http_code!r})... '
+                                  f'Retries left: {retries - i}')
+                time.sleep(10)
+            return False
+
+        cluster.log.debug('Check Headlamp service...')
+        results = control_plane.sudo(f"kubectl get svc -n {namespace} {service_name} "
+                                     "-o=jsonpath=\"{.spec.clusterIP} {.spec.ports[0].port}\"", warn=True)
+        result = list(results.values())[0]
+        if result.failed:
+            cluster.log.debug(f'Can not get Headlamp service: {result.stderr}')
+            raise TestFailure("not available", hint=hint)
+
+        service_ip, service_port = result.stdout.strip().split(' ')
+        if ipaddress.ip_address(service_ip).version == 6:
+            service_ip = f"[{service_ip}]"
+        if not check_url(f"http://{service_ip}:{service_port}/"):
+            raise TestFailure("service is not available", hint=hint)
+
+        if cluster.inventory['plugins']['nginx-ingress-controller']['install']:
+            cluster.log.debug('Check Headlamp ingress...')
+            hostname = headlamp_plugin['hostname']
+            ingress_ip = cluster.inventory['control_plain']['internal']
+            if not check_url(f'-L --resolve "{hostname}:443:{ingress_ip}" https://{hostname}/'):
+                raise TestFailure("ingress is not available", hint=hint)
+
+        tc.success(results="available")
 
 
 def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
@@ -1229,7 +1277,7 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
     `kube-proxy`, `coredns`,
     `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
     `ingress-nginx-controller`, `local-path-provisioner`,
-    `kubernetes-dashboard`, and `dashboard-metrics-scraper` are checked,
+    `kubernetes-dashboard`, `dashboard-metrics-scraper`, and `headlamp` are checked,
     and the `coredns` configmap is also checked.
 
     :param cluster: KubernetesCluster object
@@ -1294,6 +1342,9 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                 entities_to_check['kubernetes-dashboard'] = {"Deployment": {
                     "kubernetes-dashboard": {"version": expected_version},
                     "dashboard-metrics-scraper": {"version": expected_metrics_scrapper_version}}}
+            if plugin == 'headlamp':
+                entities_to_check[plugin_item['namespace']] = {"Deployment": {
+                    plugin_item['releaseName']: {"version": headlamp.get_image_version(expected_version)}}}
 
         for namespace, types_dict in entities_to_check.items():
             for kind, services in types_dict.items():
@@ -1325,7 +1376,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
     `kube-proxy`, `coredns`,
     `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
     `ingress-nginx-controller`, `local-path-provisioner`,
-    `kubernetes-dashboard`, and `dashboard-metrics-scraper` pods.
+    `kubernetes-dashboard`, `dashboard-metrics-scraper`, and `headlamp` pods.
 
     :param cluster: KubernetesCluster object
     :return: None
@@ -1337,7 +1388,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
         for plugin in plugins.oob_plugins:
             plugin_item = cluster.inventory['plugins'][plugin]
             if not plugin_item['install']:
-                break
+                continue
 
             if plugin == 'calico':
                 entities_to_check["kube-system"]["DaemonSet"].append("calico-node")
@@ -1359,6 +1410,8 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
             if plugin == 'kubernetes-dashboard':
                 entities_to_check['kubernetes-dashboard'] = {"Deployment": [
                     "kubernetes-dashboard", "dashboard-metrics-scraper"]}
+            if plugin == 'headlamp':
+                entities_to_check[plugin_item['namespace']] = {"Deployment": [plugin_item['releaseName']]}
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
@@ -1811,7 +1864,8 @@ tasks = OrderedDict({
     'kubernetes': {
         'pods': kubernetes_pods_condition,
         'plugins': {
-            'dashboard': kubernetes_dashboard_status
+            'dashboard': kubernetes_dashboard_status,
+            'headlamp': kubernetes_headlamp_status,
         },
         'nodes': {
             'existence': kubernetes_nodes_existence,

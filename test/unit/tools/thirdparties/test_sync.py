@@ -103,7 +103,7 @@ class SynchronizationTest(unittest.TestCase):
 
         requirements = tracker.get_changed_software_requirements()
         self.assertEqual(new_versions, list(requirements), "Unexpected Kubernetes versions were changed")
-        expected_software = {'calico', 'nginx-ingress-controller', 'envoy-gateway', 'kubernetes-dashboard', 
+        expected_software = {'calico', 'nginx-ingress-controller', 'envoy-gateway', 'kubernetes-dashboard', 'headlamp',
                              'local-path-provisioner', 'containerd', 'crictl', 'openstack-cinder-csi', 'csi-snapshot-controller'}
         for ver in new_versions:
             self.assertEqual(expected_software,
@@ -384,8 +384,10 @@ class SynchronizationTest(unittest.TestCase):
                 self.compatibility_map()[latest_patch_k8s_versions[1]][extra_image] = 'B'
                 self.compatibility_map()[latest_patch_k8s_versions[-1]][extra_image] = 'A'
 
+                # alpine is shared with headlamp, which is validated first
+                plugin_regex = '(headlamp|local-path-provisioner)' if extra_image == 'alpine' else re.escape(plugin)
                 kwargs = {
-                    'image': re.escape(extra_image), 'plugin': re.escape(plugin),
+                    'image': re.escape(extra_image), 'plugin': plugin_regex,
                     'version_A': '.*', 'version_B': '.*',
                     'older_k8s_version': '.*', 'newer_k8s_version': '.*', 'k8s_version': '.*',
                 }

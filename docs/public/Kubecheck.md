@@ -53,6 +53,7 @@ This section provides information about the Kubecheck functionality.
     - [206 Generic Packages Version](#206-generic-packages-version)
     - [207 Pods Condition](#207-pods-condition)
     - [208 Dashboard Availability](#208-dashboard-availability)
+    - [237 Headlamp Availability](#237-headlamp-availability)
     - [209 Nodes Existence](#209-nodes-existence)
     - [210 Nodes Roles](#210-nodes-roles)
     - [211 Nodes Condition](#211-nodes-condition)
@@ -427,6 +428,7 @@ The task tree is as follows:
   * pods
   * plugins
     * dashboard
+    * headlamp
   * nodes
     * existence
     * roles
@@ -573,6 +575,13 @@ This test checks that system pods are in good condition.
 
 This test checks that the dashboard is available by its URL.
 
+##### 237 Headlamp Availability
+
+*Task*: `kubernetes.plugins.headlamp`
+
+This test checks that the Headlamp service is available.
+If `nginx-ingress-controller` or `evnoy-gateway` plugins are installed, it also checks that Headlamp is available by its URL.
+
 ##### 209 Nodes Existence
 
 *Task*: `kubernetes.nodes.existence`
@@ -713,7 +722,7 @@ In this test, the versions of the images of the default services
 `kube-proxy`, `coredns`,
 `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
 `ingress-nginx-controller`, `local-path-provisioner`,
-`kubernetes-dashboard`, and `dashboard-metrics-scraper` are checked,
+`kubernetes-dashboard`, `dashboard-metrics-scraper`, and `headlamp` are checked,
 and the `coredns` configmap is also checked.
 
 ##### 223 Default Services Health Status
@@ -724,7 +733,7 @@ This test verifies the health of
 `kube-proxy`, `coredns`,
 `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
 `ingress-nginx-controller`, `local-path-provisioner`,
-`kubernetes-dashboard`, and `dashboard-metrics-scraper` pods.
+`kubernetes-dashboard`, `dashboard-metrics-scraper`, and `headlamp` pods.
 
 ##### 224 Calico Configuration Check
 
