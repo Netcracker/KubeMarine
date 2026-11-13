@@ -3,7 +3,6 @@
 <!-- #GFCFilterMarkerEnd# -->
 
 This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
-Add test changes to check the sync process
 
 - [Kubemarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)

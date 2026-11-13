@@ -11,7 +11,7 @@ on:
       auto-merge:
         description: "Automatically enable auto-merge for the created pull request"
         type: boolean
-        default: false
+        default: true
   schedule:
     - cron: "0 6 * * 1"
 
@@ -32,5 +32,5 @@ jobs:
         uses: netcracker/qubership-workflow-hub/actions/apm-packages-update@27fd7674286e5f561a6fd8277f2f389ff96ddb9e  # v2.6.0
         with:
           dry-run: ${{ inputs.dry-run || 'false' }}
-          auto-merge: ${{ inputs.auto-merge || 'false' }}
+          auto-merge: ${{ inputs.auto-merge || 'true' }}
           token: ${{ secrets.APM_UPDATE_TOKEN }}  # PAT with `repo` scope

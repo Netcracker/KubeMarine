@@ -3,7 +3,7 @@ run-name: "Sync troubleshooting skill #${{ github.run_number }} — triggered by
 
 on:
   push:
-    branches: [main, fix/apm-skill-followups]
+    branches: [main]
     paths:
       - "docs/public/Troubleshooting.md"
   workflow_dispatch:
