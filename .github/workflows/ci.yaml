@@ -183,7 +183,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags')
     strategy:
       matrix:
-        arch: [ 'win64', 'macos14-x86_64', 'macos14-arm64', 'linux-x86_64' ]
+        arch: [ 'win64', 'macos15-x86_64', 'macos15-arm64', 'linux-x86_64' ]
         include:
           - ext: ''
           - arch: 'win64'
