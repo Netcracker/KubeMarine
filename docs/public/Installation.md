@@ -4842,6 +4842,7 @@ plugins:
       # Relevant if nginx-ingress-controller is installed
       ingress:
         hosts:
+        # Note that it is recommended to use reference to '{{ plugins.headlamp.hostname }}'
         - host: '{{ plugins.headlamp.hostname }}'
           paths:
           - path: /
@@ -4853,6 +4854,9 @@ plugins:
                   number: 80
       # Relevant if envoy-gateway is installed
       httpRoute:
+        hostnames:
+        # Note that it is recommended to use reference to '{{ plugins.headlamp.hostname }}'
+        - '{{ plugins.headlamp.hostname }}'
         rules:
         - matches:
           - path:
@@ -4887,11 +4891,13 @@ At this point dashboard will become unavailable.
 
     headlamp:
       install: true
+      hostname: 'dashboard.{{ cluster_name }}'
       # below configuration should be used only if you plan to use auth proxy
       values:
         ingress:
           hosts: 
-          - host: dashboard.{{cluster_name}}
+          # Note that it is recommended to use reference '{{ plugins.headlamp.hostname }}'
+          - host: '{{ plugins.headlamp.hostname }}'
             paths:
             - path: /
               type: Prefix
@@ -4899,15 +4905,16 @@ At this point dashboard will become unavailable.
                 service:
                   name: $YOUR_AUTH_PROXY_SVC
                   port:
-                    number: $YOUR_AUTH_PROXY_PORY
+                    number: $YOUR_AUTH_PROXY_PORT
         httpRoute:
           hostnames:
-          - dashboard.{{cluster_name}}
+          # Note that it is recommended to use reference to '{{ plugins.headlamp.hostname }}'
+          - '{{ plugins.headlamp.hostname }}'
           rules:
           - matches:
             - path:
                 value: /
-              type: PathPrefix
+                type: PathPrefix
             backendRefs:
             - name: $YOUR_AUTH_PROXY_SVC
               port: $YOUR_AUTH_PROXY_PORT
@@ -4915,7 +4922,7 @@ At this point dashboard will become unavailable.
 3. If you use authentication proxy, deploy it to headlamp namespace, so that it is available as `$YOUR_AUTH_PROXY_SVC` Service on port `$YOUR_AUTH_PROXY_PORT`. At this point headlamp dashboard should become available.
 4. Verify everything works as expected, dashboard available, login works, UI is shown.
 5. If something does not work, you can rollback to kubernetes-dashboard by patching headlamp Ingress/HTTPRoute hostname to `disable-headlamp.com`, then patch kubernetes-dashboard Ingress/HTTPRoute hostname back to your dashboard name.
-6. If everything is ok, remove `kubernetes-dasbhoard` namespace.
+6. If everything is ok, remove `kubernetes-dashboard` namespace.
 
 ##### local-path-provisioner
 

@@ -794,12 +794,11 @@ def kubernetes_headlamp_status(cluster: KubernetesCluster) -> None:
         if not check_url(f"http://{service_ip}:{service_port}/"):
             raise TestFailure("service is not available", hint=hint)
 
-        if cluster.inventory['plugins']['nginx-ingress-controller']['install']:
-            cluster.log.debug('Check Headlamp ingress...')
-            hostname = headlamp_plugin['hostname']
-            ingress_ip = cluster.inventory['control_plain']['internal']
-            if not check_url(f'-L --resolve "{hostname}:443:{ingress_ip}" https://{hostname}/'):
-                raise TestFailure("ingress is not available", hint=hint)
+        cluster.log.debug('Check Headlamp ingress...')
+        hostname = headlamp_plugin['hostname']
+        ingress_ip = cluster.inventory['control_plain']['internal']
+        if not check_url(f'-L --resolve "{hostname}:443:{ingress_ip}" https://{hostname}/'):
+            raise TestFailure("ingress is not available", hint=hint)
 
         tc.success(results="available")
 

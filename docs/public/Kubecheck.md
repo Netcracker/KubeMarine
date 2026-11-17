@@ -580,7 +580,7 @@ This test checks that the dashboard is available by its URL.
 *Task*: `kubernetes.plugins.headlamp`
 
 This test checks that the Headlamp service is available.
-If `nginx-ingress-controller` or `evnoy-gateway` plugins are installed, it also checks that Headlamp is available by its URL.
+It also checks that Headlamp is available by its URL.
 
 ##### 209 Nodes Existence
 
