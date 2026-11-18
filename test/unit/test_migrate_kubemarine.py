@@ -456,6 +456,23 @@ class UpgradePlugins(unittest.TestCase):
                                           previous_version_spec='', next_version_spec=''):
             self._run_and_check('upgrade_calico', False, EnrichmentStage.PROCEDURE)
 
+    def test_enrich_headlamp(self):
+        self.changed_config['plugins']['headlamp'] = [self.kubernetes_version]
+        self.migrate_kubemarine['upgrade']['plugins']['headlamp'] = {'debugImage': 'alpine-new'}
+
+        res = self._run_and_check('upgrade_headlamp', True, EnrichmentStage.PROCEDURE)
+        headlamp = res.inventory()['plugins']['headlamp']
+        self.assertEqual('alpine-new', headlamp['debugImage'],
+                         "Image was not enriched from procedure inventory")
+
+    def test_headlamp_require_image_redefinition(self):
+        self.changed_config['plugins']['headlamp'] = [self.kubernetes_version]
+        self.inventory['plugins']['headlamp'] = {'debugImage': 'alpine-redefined'}
+        with test_utils.assert_raises_kme(self, "KME0009",
+                                          key='debugImage', plugin_name='headlamp',
+                                          previous_version_spec='', next_version_spec=''):
+            self._run_and_check('upgrade_headlamp', False, EnrichmentStage.PROCEDURE)
+
     def test_run_other_patch_not_require_image_redefinition(self):
         self.changed_config['plugins']['calico'] = [self.kubernetes_version]
         self.inventory['plugins']['calico'] = {'node': {'image': 'calico-node-redefined'}}

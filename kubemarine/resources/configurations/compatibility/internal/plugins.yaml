@@ -47,6 +47,22 @@ kubernetes-dashboard:
   v1.37.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
+headlamp:
+  v1.34.1:
+    version: v0.46.0
+    alpine-version: 3.24.2
+  v1.34.2:
+    version: v0.46.0
+    alpine-version: 3.24.2
+  v1.35.0:
+    version: v0.46.0
+    alpine-version: 3.24.2
+  v1.36.0:
+    version: v0.46.0
+    alpine-version: 3.24.2
+  v1.37.0:
+    version: v0.46.0
+    alpine-version: 3.24.2
 local-path-provisioner:
   v1.34.1:
     version: v0.0.32

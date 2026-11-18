@@ -109,6 +109,11 @@ plugins:
           default: 'https://raw.githubusercontent.com/kubernetes/dashboard/{version}/aio/deploy/recommended.yaml'
     requirements:
       default: 'https://github.com/kubernetes/dashboard/releases/tag/{version}'
+  # Headlamp chart should be downloaded manually to kubemarine/plugins/charts/headlamp-{version}
+  headlamp:
+    manifests: [] # manifests are empty because it is helm chart
+    requirements:
+      default: 'https://github.com/kubernetes-sigs/headlamp/releases/tag/{version}'
   local-path-provisioner:
     manifests:
       - source:

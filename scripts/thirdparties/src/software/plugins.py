@@ -19,7 +19,7 @@ from typing import List, Tuple, Dict, Any
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import static, utils, log
-from kubemarine.plugins import builtin, envoy_gateway, openstack_cinder_csi
+from kubemarine.plugins import builtin, envoy_gateway, openstack_cinder_csi, headlamp
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoftware, UpgradeConfig
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
@@ -138,6 +138,12 @@ class Plugins(SoftwareType):
                     new_settings["nodeDriverRegistrar-version"] = images_versions["nodeDriverRegistrar"]
                     new_settings["plugin-version"] = images_versions["plugin"]
 
+                # Headlamp chart is not downloaded automatically, so only check that it exists.
+                # Alpine image is used for node shell and pod debug.
+                if plugin_name == "headlamp":
+                    headlamp.get_image_version(plugin_version)
+                    new_settings["alpine-version"] = k8s_settings["alpine"]
+
                 compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
 
             validate_compatibility_map(compatibility_map, plugin_name)
@@ -176,7 +182,7 @@ def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name:
         extra_images.append('webhook')
     elif plugin_name == 'kubernetes-dashboard':
         extra_images.append('metrics-scraper')    
-    elif plugin_name == 'local-path-provisioner':
+    elif plugin_name in ('local-path-provisioner', 'headlamp'):
         extra_images.append('alpine')
 
     for extra_image in extra_images:
