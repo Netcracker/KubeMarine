@@ -1,54 +1,46 @@
-### Description
-Please include a summary of the change and describe issue. Please also include relevant motivation and context.
-* 
+## Change
 
-Fixes # (issue)
+**Why:**
 
+<!-- What problem does it solve? -->
 
-### Solution
-Describe solution. List all changes that you made during implementation.
-* 
+**What:**
 
+<!-- What does this PR change? -->
 
-### How to apply
-Provide steps how to apply on top previous Kubemarine version to execute on existing clusters
-* [Install task/s](docs/public/Installation.md#installation-tasks-description)
-* Manual step 
-* [Upgrade procedure](docs/public/Maintenance.md#upgrade-procedure)
+**Issue / ticket:** <!-- Link, ID, or N/A -->
 
+## Self-Validation
 
-### Test Cases
-Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce. Please also list any relevant details for your test configuration.
+<!--
+Check all applicable items.
+If an item is not applicable, leave it unchecked and explain why below.
+Applicable requirements must be satisfied before merge.
+-->
 
-**TestCase 1**
+- [ ] **Backward Compatibility — API** is preserved.
+- [ ] **Backward Compatibility — CRD** is preserved.
+- [ ] **Backward Compatibility — Deployment Parameters** (Helm/configurations/environments) is preserved.
+- [ ] **Upgrade** requires no client-side or existing configuration changes.
+- [ ] **Tests** for new or changed functionality are added/updated.
+- [ ] **Documentation** and **Skills** are updated.
+- [ ] **OpenSpec** is updated.
+- [ ] Implemented **OpenSpec** change is archived.
 
-Test Configuration:
+**N/A reasons (if any):**
 
-- Hardware: 
-- OS: 
-- Inventory: 
+<!-- List unchecked items and explain why they do not apply. -->
 
-Steps:
+## Test Plan and Verification
 
-1. 
+<!--
+Describe tests executed and their results.
+Required for all PRs except minor documentation or typo fixes.
+-->
 
-Results:
+## Points of Attention (optional)
 
-| Before | After |
-| ------ | ------ |
-|  |  |
-
-
-### Checklist
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] There is no breaking changes, or migration patch is provided
-- [ ] Integration CI passed
-- [ ] Unit tests. If Yes list of new/changed tests with brief description
-- [ ] There is no merge conflicts
-
-
-#### Unit tests
-Indicate new or changed unit tests and what they do, if any.
-
-
+<!--
+Anything worth highlighting: risky logic, design decisions,
+known limitations, or follow-ups.
+-->
