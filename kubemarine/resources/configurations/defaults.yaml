@@ -908,6 +908,34 @@ plugins:
                       port:
                         number: 443
 
+  headlamp:
+    version: '{{ globals.compatibility_map.software["headlamp"][services.kubeadm.kubernetesVersion].version }}'
+    install: false
+    namespace: "headlamp"
+    releaseName: "headlamp"
+    hostname: 'dashboard.{{ cluster_name }}'
+    headlampRegistry: ''
+    debugRegistry: ''
+    debugImage: 'library/alpine:{{ globals.compatibility_map.software["headlamp"][services.kubeadm.kubernetesVersion]["alpine-version"] }}'
+    values: {}
+    installation:
+      priority: 3
+      procedures:
+        - python:
+            module: plugins/headlamp.py
+            method: apply_headlamp_chart
+        - expect:
+            deployments:
+              - name: '{{ plugins["headlamp"].releaseName }}'
+                namespace: '{{ plugins["headlamp"].namespace }}'
+            pods:
+              list:
+              - '{{ plugins["headlamp"].releaseName }}'
+              namespace: '{{ plugins["headlamp"].namespace }}'
+        - python:
+            module: plugins/headlamp.py
+            method: schedule_summary_report
+
   local-path-provisioner:
     version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion].version }}'
     install: false

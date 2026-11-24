@@ -25,10 +25,11 @@ from kubemarine.core.group import NodeGroup
 class SummaryItem(enum.Enum):
     KUBECONFIG = (0, "Kubeconfig")
     DASHBOARD_URL = (1, "Dashboard URL")
-    CONTROL_PLANES = (2, "Running Control Planes")
-    WORKERS = (3, "Running Workers")
-    ACCOUNT_TOKENS = (4, "Account Tokens File")
-    EXECUTION_TIME = (5, "Elapsed")
+    HEADLAMP_URL = (2, "Headlamp URL")
+    CONTROL_PLANES = (3, "Running Control Planes")
+    WORKERS = (4, "Running Workers")
+    ACCOUNT_TOKENS = (5, "Account Tokens File")
+    EXECUTION_TIME = (6, "Elapsed")
 
     def __init__(self, order: int, text: str) -> None:
         self.order = order

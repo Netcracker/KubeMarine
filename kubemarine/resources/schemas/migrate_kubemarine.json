@@ -37,6 +37,9 @@
         "kubernetes-dashboard": {
           "$ref": "definitions/plugins/kubernetes-dashboard.json"
         },
+        "headlamp": {
+          "$ref": "definitions/plugins/headlamp.json"
+        },
         "local-path-provisioner": {
           "$ref": "definitions/plugins/local-path-provisioner.json"
         }

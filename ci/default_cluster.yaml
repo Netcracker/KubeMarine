@@ -34,5 +34,9 @@ plugins:
   kubernetes-dashboard:
     install: true
 
+  headlamp:
+    install: true
+    hostname: 'headlamp.{{ cluster_name }}'
+
   local-path-provisioner:
     install: true

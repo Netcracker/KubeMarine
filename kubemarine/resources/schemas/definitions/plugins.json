@@ -12,6 +12,9 @@
     "kubernetes-dashboard": {
       "$ref": "plugins/kubernetes-dashboard.json"
     },
+    "headlamp": {
+      "$ref": "plugins/headlamp.json"
+    },
     "local-path-provisioner": {
       "$ref": "plugins/local-path-provisioner.json"
     },
